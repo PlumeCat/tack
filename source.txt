@@ -1,0 +1,11 @@
+import stdlib // file, 
+
+// comment
+	
+a = 1;
+b = 2;
+
+function foo(c, d)
+{
+	e = c + d;
+}

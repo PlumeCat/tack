@@ -1,0 +1,37 @@
+features
+
+operators
+	ass.op. 		=
+	cmp.op.			== != < > <= >=
+
+	ar.un.op.		+ 	-
+	ar.bin.op. 		+ 	- 	* 	/ 	%
+	ar.ass.op.		+=	-=	*=	/=	%=
+	
+	bw.un.op.		~
+	bw.bin.op.		& | ^ << >>
+	bw.ass.op.		&= |= ^= <<= >>=
+	
+	bool.un.op.		!
+	bool.bin.op.	&& ||
+	
+	no boolean ass-ops because of short-circuiting
+
+keywords
+	
+	import
+	struct function var
+	new delete
+	if else
+	for while
+	continue break return
+
+the interpreter
+
+	1. read the source file
+	2. parse source into token list
+	3. reparse token list into symbol list
+	4. convert symbol list into AST using bnf
+	???
+
+	strings are special cases of array[number]
