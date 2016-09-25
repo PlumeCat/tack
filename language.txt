@@ -1,4 +1,8 @@
-features
+keywords
+	import function var if else for while continue break return
+	// array struct class ctor dtor new delete
+special characters
+	() {} [] , . ;
 
 operators
 	ass.op. 		=
@@ -15,7 +19,7 @@ operators
 	bool.un.op.		!
 	bool.bin.op.	&& ||
 	
-	no boolean ass-ops because of short-circuiting
+	no boolean ass-ops
 
 keywords
 	

@@ -2,8 +2,19 @@ import stdlib // file,
 
 // comment
 	
-a = 1;
-b = 2;
+var a = 1;
+var b = 2;
+
+/* begin commt 
+ *
+ * stuff
+ *
+ * end comment */
+
+
+var c = "a string value";
+
+var d = "hope this can handle;		3G4   gb0964>/.G/.4]g.;[G strings..."
 
 function foo(c, d)
 {
