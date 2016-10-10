@@ -1,6 +1,8 @@
 keywords
-	import function var if else for while continue break return
-	// array struct class ctor dtor new delete
+	import function var 
+	if else 
+	for while continue break return
+	// array map struct class ctor dtor new delete null
 special characters
 	() {} [] , . ;
 
@@ -30,12 +32,26 @@ keywords
 	for while
 	continue break return
 
-the interpreter
-
-	1. read the source file
-	2. parse source into token list
-	3. reparse token list into symbol list
-	4. convert symbol list into AST using bnf
-	???
+the language
 
 	strings are special cases of array[number]
+	
+	variables (var) are scoped to the deepest surrounding {}
+
+	if a variable or function is top-level in a script file, it is global
+		=> accessible to all functions in that script
+		=> NOT accessible outside the script
+	however, variables and functions in the global scope that are
+	also marked `export` are "super-global", they are accessible
+	to any other script that imports it.
+		=> imported declarations are global in the script they are imported into
+		=> later you will be able to type `import foo as bar` to create a
+		=> global namespace `bar` in the importer script, containing all the
+		=> imports from foo.
+
+	struct are allocated on the stack
+
+	class are allocated on the heap
+	class are allocated manually - you must new and delete them
+
+

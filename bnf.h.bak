@@ -1,0 +1,95 @@
+#ifndef _BNF_H
+#define _BNF_H
+
+struct BnfRule
+{
+	string name;
+	vector<vector<string>> expressions;
+};
+
+extern vector<BnfRule>
+
+struct Bnf
+{
+	std::vector<BnfRule> rules;
+};
+
+bnf = {
+	vector<string> {
+		vector<string> {}
+	}
+}
+
+void parseBnf(Bnf& bnf)
+{
+	ifstream file("bnf.txt");
+	if (!file.is_open())
+	{
+		cout << "Error: could not find bnf.txt" << endl;
+		exit(2);
+	}
+
+
+	vector<string> bnfTokens;
+	while (!file.eof())
+	{
+		string line;
+		getline(file, line);
+		line.erase(remove(line.begin(), line.end(), '\t'), line.end());
+		vector<string> lineTokens;
+		split(line, lineTokens, ' ');
+		for (int i = 0; i < lineTokens.size(); i++)
+		{
+			string s = lineTokens[i];
+			bnfTokens.push_back(s);
+		}
+	}
+	file.close();
+
+	// process bnf tokens
+	BnfRule curRule;
+	int mode = 0; // 0 = name, 1 = expression
+
+	for (int i = 0; i < bnfTokens.size(); i++) {
+		string t = bnfTokens[i];
+		if ((t.size() == 0) || t[0] == ' ' || t[0] == '\t' || t[0] == '\n')
+		{
+			continue;
+		}
+
+		if (t[0] == ':')
+		{
+			// start expressions
+			curRule.expressions.push_back(vector<string>());
+			mode = 1;
+			continue;
+		}
+		if (t[0] == '|')
+		{
+			// end current expression
+			curRule.expressions.push_back(vector<string>());
+			continue;
+		}
+		if (t[0] == ';')
+		{
+			// end current rule
+			mode = 0;
+			// start a new rule
+			bnf.rules.push_back(curRule);
+			curRule = BnfRule();
+			continue;
+		}
+
+		if (mode == 0)
+		{
+			curRule.name = t;
+		}
+		else if (mode == 1)
+		{
+			curRule.expressions.back().push_back(t);
+		}
+	}
+
+}
+
+#endif

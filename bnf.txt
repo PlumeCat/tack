@@ -13,14 +13,15 @@ decl 				: func-decl
 import-decl 		: IMPORT identifier
 					;
 
-func-decl 			: FUNCTION identifier LPAREN args-list RPAREN statement-block
+func-decl 			: FUNCTION identifier LPAREN args-decl RPAREN statement-block
+					| FUNCTION identifier LPAREN RPAREN statement-block
 					;
-args-decl 			: identifier
-					| args-decl COMMA identifier
+args-decl 			: args-decl COMMA identifier
+					| identifier
 					;
 
 var-decl 			: VAR identifier
-					| VAR identifier '=' expression
+					| VAR identifier OP-ASSIGN expression
 					;
 identifier 			: NAME
 					;
@@ -87,6 +88,9 @@ assign-exp 			: identifier OP-ASSIGN assign-exp
 ternary-exp 		: bool-or-exp QUESTION expression COLON ternary-exp
 					| bool-or-exp
 					;
+
+bool-exp 			: bool-exp OP-BOOLOR
+
 bool-or-exp 		: bool-or-exp OP-BOOLOR bool-and-exp
 					| bool-and-exp
 					;
@@ -120,17 +124,17 @@ add-exp 			: add-exp OP-ADD mul-exp
 					| add-exp OP-SUB mul-exp
 					| mul-exp
 					;
-multiply-exp 		: mul-exp OP-MUL unary-exp
-					| mul-exp OP-DIV unary-exp
-					| mul-exp OP-MOD unary-exp
-					| unary-exp
+multiply-exp 		: mul-exp OP-MUL prefix-exp
+					| mul-exp OP-DIV prefix-exp
+					| mul-exp OP-MOD prefix-exp
+					| prefix-exp
 					;
-unary-exp 			: OP-ADD unary-exp
-					| OP-SUB unary-exp
-					| OP-BITNOT unary-exp
-					| OP-BOOLNOT unary-exp
-					| OP-INCREMENT unary-exp
-					| OP-DECREMENT unary-exp
+prefix-exp 			: OP-ADD prefix-exp
+					| OP-SUB prefix-exp
+					| OP-BITNOT prefix-exp
+					| OP-BOOLNOT prefix-exp
+					| OP-INCREMENT prefix-exp
+					| OP-DECREMENT prefix-exp
 					| postfix-exp
 					;
 postfix-exp 		: postfix-exp OP-INCREMENT
@@ -151,6 +155,7 @@ array-access-operator : LBRACKET expression RBRACKET
 					;
 
 function-call-operator : LPAREN args-list RPAREN
+					| LPAREN RPAREN
 					;
 
 args-list 			: args-list COMMA expression
