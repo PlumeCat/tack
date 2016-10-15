@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <map>
 using namespace std;
 
 #define rule {
@@ -26,8 +27,9 @@ vector<BnfRule> bnf = {
 							alt "import-statement" end
 	rule "var-statement" 	is  "VAR", "NAME" 
 							alt "VAR", "NAME", "OP-ASSIGN", "expression" end
-	rule "import-statement" is  "IMPORT", "NAME", end
-	rule "func-decl"		is  "FUNCTION", "NAME", "LPAREN", "args-decl", "RPAREN", "statement-block" end
+	rule "import-statement" is  "IMPORT", "NAME", "SEMI" end
+	rule "func-decl"		is  "FUNCTION", "NAME", "LPAREN", "args-decl", "RPAREN", "statement-block" 
+							alt "FUNCTION", "NAME", "LPAREN", "RPAREN", "statement-block" end
 	rule "args-decl" 		is  "args-decl", "COMMA", "NAME" 
 							alt "NAME" end
 	rule "statement-block" 	is "LBRACE", "statement-list", "RBRACE" end

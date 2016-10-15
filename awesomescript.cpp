@@ -94,7 +94,7 @@ int main()
 		cout << symbolToString(s) << endl;
 	}
 
-	AstNode* ast = makeAst(bnf, symbols, nullptr);
+	AstNode* ast = makeAst(bnf, symbols.begin(), symbols.end(), nullptr);
 
 	cout << "done" << endl;
 
