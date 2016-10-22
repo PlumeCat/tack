@@ -67,8 +67,8 @@ AstNode* parseVarStatement(SymbolIter& symbol)
 	if (symbol->type == SYMBOL_VAR &&
 		(symbol+1)->type == SYMBOL_NAME)
 	{
+		AstNode* node = new AstNode(AST_VAR_STATEMENT);
 	}
-	
 
 	return nullptr;
 }
