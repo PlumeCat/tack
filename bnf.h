@@ -74,8 +74,8 @@ vector<BnfRule> bnf = {
 	rule "decl"				is  "func-decl" 
 							alt "var-statement" 
 							alt "import-statement" end
-	rule "var-statement" 	is  "VAR", "NAME" 
-							alt "VAR", "NAME", "OP-ASSIGN", "expression" end
+	rule "var-statement" 	is  "VAR", "NAME", "SEMI"
+							alt "VAR", "NAME", "OP-ASSIGN", "expression", "SEMI" end
 	rule "import-statement" is  "IMPORT", "NAME", "SEMI" end
 	rule "func-decl"		is  "FUNCTION", "NAME", "LPAREN", "args-decl", "RPAREN", "statement-block" 
 							alt "FUNCTION", "NAME", "LPAREN", "RPAREN", "statement-block" end
@@ -169,6 +169,7 @@ vector<BnfRule> bnf = {
  							alt "expression" end
 
 };
+
 
 #undef rule
 #undef is

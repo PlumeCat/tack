@@ -89,14 +89,22 @@ int main()
 		symbols.push_back(tokenToSymbol(t));
 	}
 
+	// for (auto s : symbols)
+	// {
+	// 	cout << symbolToString(s) << endl;
+	// }
 
-	for (auto s : symbols)
+	AstNode* scriptAst = parseScript(symbols);
+	if (scriptAst)
 	{
-		cout << symbolToString(s) << endl;
+		cout << "successfully parsed script" << endl;
+		printAst(scriptAst);
+		delete scriptAst;
 	}
-
-	AstNode* ast = makeAst(bnf, symbols.begin(), symbols.end(), AST_SCRIPT);
-	cout << "done" << endl;
+	else
+	{
+		cout << "error parsing script" << endl;
+	}
 
 	return 0;
 }

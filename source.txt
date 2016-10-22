@@ -1,15 +1,2 @@
 import stdlib;
 import ffi;
-	
-var a = 1;
-var b = 2;
-
-var c = "a string value";
-var d = "hope this can handle;"
-
-function main()
-{
-	e = c + " " + d;
-	print(e);
-	return 0;
-}
