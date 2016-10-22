@@ -17,8 +17,6 @@ const string opchars = string("=+-*/%!<>&|^~.?:");
 #include "bnf.h"
 #include "ast.h"
 
-
-
 void split(const string& str, vector<string>& tokens, char c)
 {
 	int lp = 0;
@@ -67,7 +65,7 @@ string readFile(const string& fname, bool newlines=true)
 
 int main()
 {
-	cout << "awesomescript" << endl;
+	cout << "\n\n--==<<(({{ awesomescript }}))>>==--\n\n" << endl;
 
 	string code = readFile("source.txt");
 	vector<Token> tokens;
