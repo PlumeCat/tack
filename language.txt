@@ -54,4 +54,12 @@ the language
 	class are allocated on the heap
 	class are allocated manually - you must new and delete them
 
+	no garbage collection for classes
+
+	however there is a garbage collector as part of the standard lib
+
+	also, people will be able to write garbage collectors in modules, so different GC for different purpose will be possible (hopefully with minimal performance impact) and people can write them in the language itself! or in c
+
+	there will be a package manager and a registry. packages can be written in the language or c (not sure how to handle compilation of c modules...)
+
 
