@@ -87,11 +87,6 @@ int main()
 		symbols.push_back(tokenToSymbol(t));
 	}
 
-	// for (auto s : symbols)
-	// {
-	// 	cout << symbolToString(s) << endl;
-	// }
-
 	AstNode* scriptAst = parseScript(symbols);
 	if (scriptAst)
 	{
