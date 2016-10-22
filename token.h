@@ -261,8 +261,6 @@ void tokenize(const string& src, vector<Token>& tokens)
 	int i = 0;
 	while (i < code.size())
 	{
-		usleep(1000);//safety
-
 		Token t;
 		int count = consumeToken(&code[i], src.size() - i, t);
 		if (count < 0)

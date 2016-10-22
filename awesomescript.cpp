@@ -1,8 +1,10 @@
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <vector>
 #include <fstream>
-#include <unistd.h>
+#include <time.h>
+// #include <unistd.h>
 #include <algorithm>
 
 using namespace std;
@@ -37,7 +39,6 @@ void split(const string& str, vector<string>& tokens, char c)
 		}
 
 		lp = p+1;
-		usleep(10000);
 	}
 }
 
@@ -94,8 +95,7 @@ int main()
 		cout << symbolToString(s) << endl;
 	}
 
-	AstNode* ast = makeAst(bnf, symbols.begin(), symbols.end(), nullptr);
-
+	AstNode* ast = makeAst(bnf, symbols.begin(), symbols.end(), AST_SCRIPT);
 	cout << "done" << endl;
 
 	return 0;

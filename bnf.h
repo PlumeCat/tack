@@ -11,12 +11,61 @@ using namespace std;
 #define alt },{
 #define end }}},
 
-
 struct BnfRule
 {
 	string name;
 	vector<vector<string>> expressions;
 };
+
+/*
+ast 
+
+script:
+	[import | func-decl | var-statement]
+
+func-decl:
+	FUNCTION NAME LPAREN [NAME] RPAREN statement-block
+
+statement-block LBRACE [statement] RBRACE
+
+var-statement:
+	VAR NAME
+	VAR NAME OP-ASSIGN expression
+
+statement:
+	var-statement;
+	expression SEMI;
+	RETURN expression SEMI;
+	BREAK SEMI;
+	CONTINUE SEMI;
+	conditional-construct
+	for-loop
+	while-loop
+
+conditional-construct
+	if-construct
+	if-construct else-construct
+	if-construct [elseif-construct] else-construct
+
+if-construct:
+	IF LPAREN expression RPAREN statement-block
+elseif-construct:
+	ELSE IF LPAREN expression RPAREN statement-block
+else-construct:
+	ELSE statement-block
+
+for-loop:
+	FOR LPAREN statement SEMI expression SEMI expression RPAREN statement-block
+
+while-loop:
+	WHILE LPAREN expression RPAREN statement-block
+
+
+expression:
+	...
+
+
+*/
 
 vector<BnfRule> bnf = {
 	rule "script" 			is  "decl-list" end
@@ -35,7 +84,7 @@ vector<BnfRule> bnf = {
 	rule "statement-block" 	is "LBRACE", "statement-list", "RBRACE" end
 	rule "statement-list"  	is "statement-list", "statement" 
 							alt "statement" end
-	rule "statement"		is "expression"
+	rule "statement"		is "expression", "SEMI"
 							alt "return-statement"
 							alt "break-statement"
 							alt "continue-statement"
@@ -71,8 +120,8 @@ vector<BnfRule> bnf = {
  							alt "assign-rhs", "OP-LSHIFTEQ", "expression"
  							alt "assign-rhs", "OP-RSHIFTEQ", "expression"
  							alt "ternary-exp" end
- 	rule "assign-rhs"		is "NAME", "array-access"
- 							alt "NAME" end
+ 	rule "assign-rhs"		is "NAME", "array-access" // write
+ 							alt "NAME" end // write
  	rule "ternary-exp"		is "expression", "QUESTION", "expression", "COLON", "expression" 
  							alt "bool-exp" end
  	rule "bool-exp"			is "bool-exp", "OP-BOOLOR", "bool-exp"
@@ -107,16 +156,21 @@ vector<BnfRule> bnf = {
  							alt "postfix-exp", "array-access"
  							alt "postfix-exp", "func-call"
  							alt "primary-exp" end
- 	rule "primary-exp"		is "NAME" 
+ 	rule "primary-exp"		is "NAME" // read
  							alt "STRING" 
  							alt "NUMBER" 
  							alt "LPAREN", "expression", "RPAREN" end
 
 
- 	//rule "array-access"		is "LBRACKET", "expression", "RBRACKET" end
+ 	rule "array-access"		is "LBRACKET", "expression", "RBRACKET" end
  	rule "func-call"		is "LPAREN", "args-list", "RPAREN" 
  							alt "LPAREN", "RPAREN" end
  	rule "args-list"		is "args-list", "COMMA", "expression"
  							alt "expression" end
 
 };
+
+#undef rule
+#undef is
+#undef alt
+#undef end
