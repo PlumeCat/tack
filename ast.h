@@ -11,24 +11,110 @@ enum AstNodeType
 	AST_VAR_STATEMENT,
 	AST_IMPORT_STATEMENT,
 
-	AST_KEYWORD_IMPORT,
 	AST_IDENTIFIER,
-	AST_KEYWORD_VAR,
+	AST_EXPRESSION,
 
-	AST_SEMICOLON,
-
-	AST_OPERATOR_ASSIGN,
+	AST_CONST_STRING,
+	AST_CONST_NUMBER,
 };
+
+
+
+/*
+AST Node definitions:
+
+	// { x } 	repeat x (zero or more)
+	// x | y 	x or y
+	// [ x ]	x is optional
+
+	Script
+		{ ImportStatement | FuncDecl | VarStatement }
+
+	FuncDecl
+		Identifier, { ArgDef }, StatementBlock
+
+	ArgDef
+		Identifier, [ Expression ]
+
+	VarStatement
+		Identifier, [ Expression ]
+
+	ImportStatement
+		Identifier
+
+	IfConstruct
+		IfBlock, [ { ElseIfBlock } ], [ ElseBlock ]
+
+	IfBlock
+		Expression, StatementBlock
+
+	ElseIfBlock
+		Expression, StatementBlock
+
+	ElseBlock
+		StatementBlock
+
+	WhileLoop
+		Expression, StatementBlock
+
+	StatementBlock
+		{ 	
+			IfConstruct | 
+			WhileLoop | 
+			BreakStatement | 
+			ContinueStatement | 
+			ReturnStatement | 
+			VarStatement | 
+			ExpressionStatement 
+		}
+
+	BreakStatement
+		[]
+
+	ContinueStatement
+		[]
+
+	ReturnStatement
+		[ Expression ]
+
+	ExpressionStatement
+		Expression
+
+	Expression // the base expression type
+		AssignExpression |
+		TernaryExpression |
+		BinaryExpression |
+		UnaryExpression |
+		ConstantExpression |
+		SubExpression |
+
+	SubExpression // an expression enclosed in parens; should be evaluated before the parent
+		Expression
+
+	AssignExpression
+		Identifier, Operator, Expression
+
+	TernaryExpression
+		Expression, Expression, Expression
+
+	BinaryExpression
+		Expression, Operator, Expression
+
+	UnaryExpression
+		Expression, Operator
+		
+*/
+
 map<AstNodeType, string> astNodeNames = {
 	{ AST_SCRIPT, 			"Script" },
 	{ AST_FUNC_DECL, 		"FuncDecl" },
 	{ AST_VAR_STATEMENT,	"VarStatement" },
 	{ AST_IMPORT_STATEMENT, "ImportStatement" },
-	{ AST_KEYWORD_IMPORT,	"Import" },
-	{ AST_KEYWORD_VAR,		"Var" },
+
 	{ AST_IDENTIFIER,		"Identifier" },
-	{ AST_SEMICOLON,		"Semi" },
-	{ AST_OPERATOR_ASSIGN,	"AssignOperator" }
+	{ AST_CONST_STRING,		"StringConstant" },
+	{ AST_CONST_NUMBER, 	"NumberConstant" },
+	{ AST_EXPRESSION,		"Expression" },
 };
 
 string astNodeName(AstNodeType type)
@@ -64,42 +150,185 @@ struct AstNode
 
 AstNode* parseVarStatement(SymbolIter& symbol)
 {
-	if (symbol->type == SYMBOL_VAR &&
-		(symbol+1)->type == SYMBOL_NAME)
+	SymbolIter orig = symbol;
+	AstNode* node = new AstNode(AST_VAR_STATEMENT);
+
+	if (symbol->type == SYMBOL_VAR)
 	{
-		AstNode* node = new AstNode(AST_VAR_STATEMENT);
+		symbol++;
+	}
+	else
+	{
+		goto fail;
 	}
 
+	if (symbol->type == SYMBOL_NAME)
+	{
+		AstNode* name = new AstNode(AST_IDENTIFIER, symbol->data);
+		node->children.push_back(name);
+		symbol++;
+	}
+	else
+	{
+		goto fail;
+	}
+
+	if (symbol->type == SYMBOL_SEMICOLON)
+	{
+		symbol++;
+	}
+	else
+	{
+		goto fail;
+	}
+
+	return node;
+
+fail:
+	delete node;
+	symbol = orig;
 	return nullptr;
 }
 
-AstNode* parseFuncDecl(SymbolIter& symbol)
+AstNode* parseExpression(SymbolIter& symbol)
 {
+	SymbolIter orig = symbol;
+	AstNode* node = new AstNode(AST_EXPRESSION);
+
+	if (symbol->type == SYMBOL_NUMBER)
+	{
+		AstNode* num = new AstNode(AST_CONST_NUMBER, symbol->data);
+		node->children.push_back(num);
+		symbol++;
+	}
+	else if (symbol->type == SYMBOL_STRING)
+	{
+		AstNode* str = new AstNode(AST_CONST_STRING, symbol->data);
+		node->children.push_back(str);
+		symbol++;
+	}
+	else
+	{
+		goto fail;
+	}
+
+	return node;
+
+fail:
+	delete node;
+	symbol = orig;
+	return nullptr;	
+}
+
+AstNode* parseVarStatement2(SymbolIter& symbol)
+{
+	SymbolIter orig = symbol;
+	AstNode* node = new AstNode(AST_VAR_STATEMENT);
+	AstNode* child = nullptr;
+
+	if (symbol->type == SYMBOL_VAR)
+	{
+		symbol++;
+	}
+	else
+	{
+		goto fail;
+	}
+
+	if (symbol->type == SYMBOL_NAME)
+	{
+		AstNode* name = new AstNode(AST_IDENTIFIER, symbol->data);
+		node->children.push_back(name);
+		symbol++;
+	}
+	else
+	{
+		goto fail;
+	}
+
+	if (symbol->type == SYMBOL_OP_ASSIGN)
+	{
+		symbol++;
+	}
+	else
+	{
+		goto fail;
+	}
+
+	child = parseExpression(symbol);
+	if (child)
+	{
+		node->children.push_back(child);
+	}
+	else
+	{
+		goto fail;
+	}
+
+	if (symbol->type == SYMBOL_SEMICOLON)
+	{
+		symbol++;
+	}
+	else
+	{
+		goto fail;
+	}
+
+	return node;
+
+fail:
+	delete node;
+	symbol = orig;
 	return nullptr;
 }
 
 AstNode* parseImportStatement(SymbolIter& symbol)
 {
-	if (symbol->type == SYMBOL_IMPORT &&
-		(symbol+1)->type == SYMBOL_NAME &&
-		(symbol+2)->type == SYMBOL_SEMICOLON)
+	SymbolIter orig = symbol;
+	AstNode* node = new AstNode(AST_IMPORT_STATEMENT);
+
+	if (symbol->type == SYMBOL_IMPORT)
 	{
-		AstNode* node = new AstNode(AST_IMPORT_STATEMENT);
-
-		node->children.push_back(new AstNode(AST_KEYWORD_IMPORT));
-		node->children.push_back(new AstNode(AST_IDENTIFIER, (symbol+1)->data));
-		node->children.push_back(new AstNode(AST_SEMICOLON));
-
-		symbol += 3;
-		return node;
+		symbol++;
+	}
+	else
+	{
+		goto fail;
 	}
 
+	if (symbol->type == SYMBOL_NAME)
+	{
+		AstNode* name = new AstNode(AST_IDENTIFIER, symbol->data);
+		node->children.push_back(name);
+		symbol++;
+	}
+	else
+	{
+		goto fail;
+	}
+
+	if (symbol->type == SYMBOL_SEMICOLON)
+	{
+		symbol++;
+	}
+	else
+	{
+		goto fail;
+	}
+
+	return node;
+
+fail:
+	delete node;
+	symbol = orig;
 	return nullptr;
 }
 
+
+
 AstNode* parseScript(vector<Symbol>& symbols)
 {
-	vector<Symbol>::iterator symbol = symbols.begin();
+	SymbolIter symbol = symbols.begin();
 
 	AstNode* node = new AstNode(AST_SCRIPT);
 	while (symbol != symbols.end())
@@ -118,12 +347,19 @@ AstNode* parseScript(vector<Symbol>& symbols)
 			continue;
 		}
 
-		child = parseFuncDecl(symbol);
+		child = parseVarStatement2(symbol);
 		if (child)
 		{
 			node->children.push_back(child);
 			continue;
 		}
+
+		// child = parseFuncDecl(symbol);
+		// if (child)
+		// {
+		// 	node->children.push_back(child);
+		// 	continue;
+		// }
 
 		delete node;
 		return nullptr;
@@ -137,7 +373,7 @@ void printAst(AstNode* node, string indent="")
 	cout << indent << astNodeName(node->type) << ": " << node->data << "\n";
 	for (int i = 0; i < node->children.size(); i++)
 	{
-		printAst(node->children[i], indent+"  ");
+		printAst(node->children[i], indent+"    ");
 	}
 }
 

@@ -1,2 +1,8 @@
 import stdlib;
-import ffi;
+import math;
+import http;
+
+var foo = "bar";
+var x = 2;
+var y;
+var z = 3;

@@ -17,56 +17,6 @@ struct BnfRule
 	vector<vector<string>> expressions;
 };
 
-/*
-ast 
-
-script:
-	[import | func-decl | var-statement]
-
-func-decl:
-	FUNCTION NAME LPAREN [NAME] RPAREN statement-block
-
-statement-block LBRACE [statement] RBRACE
-
-var-statement:
-	VAR NAME
-	VAR NAME OP-ASSIGN expression
-
-statement:
-	var-statement;
-	expression SEMI;
-	RETURN expression SEMI;
-	BREAK SEMI;
-	CONTINUE SEMI;
-	conditional-construct
-	for-loop
-	while-loop
-
-conditional-construct
-	if-construct
-	if-construct else-construct
-	if-construct [elseif-construct] else-construct
-
-if-construct:
-	IF LPAREN expression RPAREN statement-block
-elseif-construct:
-	ELSE IF LPAREN expression RPAREN statement-block
-else-construct:
-	ELSE statement-block
-
-for-loop:
-	FOR LPAREN statement SEMI expression SEMI expression RPAREN statement-block
-
-while-loop:
-	WHILE LPAREN expression RPAREN statement-block
-
-
-expression:
-	...
-
-
-*/
-
 vector<BnfRule> bnf = {
 	rule "script" 			is  "decl-list" end
 	rule "decl-list" 		is  "decl-list", "decl"

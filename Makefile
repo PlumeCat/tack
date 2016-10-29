@@ -1,5 +1,4 @@
 headers=ast.h symbol.h token.h bnf.h
-binary=build/awesomescript
 
 ifeq ($(OS),Windows_NT)
     binary = ./build/awesomescript.exe
