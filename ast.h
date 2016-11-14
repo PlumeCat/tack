@@ -48,10 +48,8 @@ AST Node definitions:
 		}
 
 	√ BreakStatement
-		[]
 
 	√ ContinueStatement
-		[]
 
 	√ ReturnStatement
 		[ Expression ]
@@ -67,10 +65,13 @@ AST Node definitions:
 		ConstantExpression |
 		SubExpression |
 
-	SubExpression // an expression enclosed in parens; should be evaluated before the parent
+	√ SubExpression // an expression enclosed in parens; should be evaluated before the parent
 		Expression
 
 	AssignExpression
+		Identifier, Operator, Expression
+
+	CompareExpression
 		Identifier, Operator, Expression
 
 	TernaryExpression
@@ -104,10 +105,19 @@ enum AstNodeType
 	AST_CONTINUE_STATEMENT,
 	AST_BREAK_STATEMENT,
 
+	AST_EXPRESSION,
+	AST_SUB_EXPRESSION,
+	AST_EXPRESSION_STATEMENT,
+	AST_ASSIGN_EXPRESSION,
+	AST_COMPARE_EXPRESSION,
+	AST_BINARY_EXPRESSION,
+	AST_TERNARY_EXPRESSION,
+	AST_UNARY_EXPRESSION,
+
 	AST_IDENTIFIER,
 	AST_CONST_STRING,
 	AST_CONST_NUMBER,
-	AST_EXPRESSION,
+
 };
 
 
@@ -129,9 +139,19 @@ map<AstNodeType, string> astNodeNames = {
 	{ AST_BREAK_STATEMENT,	"BreakStatement" },
 
 	{ AST_IDENTIFIER,		"Identifier" },
+	{ AST_EXPRESSION,		"Expression" },
+	{ AST_SUB_EXPRESSION,	"SubExpression" },
+	{ AST_EXPRESSION_STATEMENT, "ExpressionStatement" },
+
+	{ AST_ASSIGN_EXPRESSION,"AssignExpression" },
+	{ AST_COMPARE_EXPRESSION,"CompareExpression" },
+	{ AST_BINARY_EXPRESSION,"BinaryExpression" },
+	{ AST_UNARY_EXPRESSION, "UnaryExpression" },
+	{ AST_TERNARY_EXPRESSION,"TernaryExpression" },
+
 	{ AST_CONST_STRING,		"StringConstant" },
 	{ AST_CONST_NUMBER, 	"NumberConstant" },
-	{ AST_EXPRESSION,		"Expression" },
+
 };
 
 string astNodeName(AstNodeType type)
@@ -220,6 +240,8 @@ AstNode* parseAssignExpression(SymbolIter&);
 AstNode* parseTernaryExpression(SymbolIter&);
 AstNode* parseBinaryExpression(SymbolIter&);
 AstNode* parseUnaryExpression(SymbolIter&);
+AstNode* parseCompareExpression(SymbolIter&);
+
 
 AstNode* parseExpression(SymbolIter& symbol)
 {
@@ -231,27 +253,99 @@ AstNode* parseExpression(SymbolIter& symbol)
 		AstNode* num = new AstNode(AST_CONST_NUMBER, symbol->data);
 		node->children.push_back(num);
 		symbol++;
+		return node;
 	}
 	else if (symbol->type == SYMBOL_STRING)
 	{
 		AstNode* str = new AstNode(AST_CONST_STRING, symbol->data);
 		node->children.push_back(str);
 		symbol++;
+		return node;
 	}
-	else
+	else if (symbol->type == SYMBOL_LPAREN)
 	{
-		goto fail;
+		AstNode* sub = parseSubExpression(symbol);
+		node->children.push_back(sub);
+		return node;
 	}
 
-	return node;
-
-fail:
 	delete node;
 	symbol = orig;
 	return nullptr;	
 }
 
+AstNode* parseExpressionStatement(SymbolIter& symbol)
+{
+	SymbolIter orig = symbol;
+	AstNode* node = new AstNode(AST_EXPRESSION_STATEMENT);
 
+	if (expect(iter, parseExpression, node))
+	if (expect(iter, SYMBOL_SEMICOLON))
+		return node;
+
+	delete node;
+	symbol = orig;
+	return nullptr;	
+}
+AstNode* parseAssignExpression(SymbolIter& symbol)
+{
+	SymbolIter orig = symbol;
+
+}
+AstNode* parseCompareExpression(SymbolIter& symbol)
+{
+	SymbolIter orig = symbol;
+	AstNode* node = new AstNode(AST_COMPARE_EXPRESSION);
+
+	delete node;
+	symbol = orig;
+	return nullptr;
+}
+AstNode* parseBinaryExpression(SymbolIter& symbol)
+{
+	SymbolIter orig = symbol;
+	AstNode* node = new AstNode(AST_BINARY_EXPRESSION);
+
+	if (expect(symbol, parseExpression, node))
+	if (expect(symbol, SYMBOL_OP_BOOLOR) ||
+		expect(symbol, SYMBOL_OP_BOOLAND) ||
+		expect(symbol, SYMBOL_OP_BITOR) ||
+		expect(symbol, SYMBOL_OP_BITAND) ||
+		expect(symbol, SYMBOL_OP_BITXOR) ||
+		expect(symbol, SYMBOL_OP_LSHIFT) ||
+		expect(symbol, SYMBOL_OP_RSHIFT) ||
+		expect(symbol, SYMBOL_OP_ADD) ||
+		expect(symbol, SYMBOL_OP_SUB) ||
+		expect(symbol, SYMBOL_OP_MUL) ||
+		expect(symbol, SYMBOL_OP_DIV) ||
+		expect(symbol, SYMBOL_OP_MOD))
+	if (expect(symbol, parseExpression, node))
+		return node;
+
+	delete node;
+	symbol = orig;
+	return nullptr;
+}
+AstNode* parseUnaryExpression(SymbolIter& symbol)
+{
+	SymbolIter orig = symbol;
+	AstNode* node = new AstNode(AST_BINARY_EXPRESSION);
+
+	if (expect(symbol, parseExpression, node))
+	if (expect(symbol, SYMBOL_OP_INCREMENT) ||
+		expect(symbol, SYMBOL_OP_DECREMENT) ||
+		expect(symbol, SYMBOL_OP_BOOLNOT) ||
+		expect(symbol, SYMBOL_OP_BITNOT))
+		return node;
+
+	delete node;
+	symbol = orig;
+	return nullptr;
+}
+AstNode* parseTernaryExpression(SymbolIter& symbol)
+{
+
+}
 AstNode* parseIdentifier(SymbolIter& iter)
 {
 	string data;
@@ -418,18 +512,20 @@ AstNode* parseReturnStatement(SymbolIter& symbol)
 	AstNode* node = new AstNode(AST_RETURN_STATEMENT);
 
 	if (expect(symbol, SYMBOL_RETURN))
-	if (expect(symbol, parseExpression, node))
 	{
-		if (expect(symbol, SYMBOL_SEMICOLON))
+		if (expect(symbol, parseExpression, node))
 		{
-			return node;
+			if (expect(symbol, SYMBOL_SEMICOLON))
+			{
+				return node;
+			}
 		}
-	}
-	else
-	{
-		if (expect(symbol, SYMBOL_SEMICOLON))
+		else
 		{
-			return node;
+			if (expect(symbol, SYMBOL_SEMICOLON))
+			{
+				return node;
+			}
 		}
 	}
 
