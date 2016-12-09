@@ -233,6 +233,7 @@ AstNode* parseStatementBlock(SymbolIter&);
 AstNode* parseBreakStatement(SymbolIter&);
 AstNode* parseContinueStatement(SymbolIter&);
 AstNode* parseReturnStatement(SymbolIter&);
+AstNode* parseIdentifier(SymbolIter& iter);
 AstNode* parseExpressionStatement(SymbolIter&);
 AstNode* parseExpression(SymbolIter&);
 AstNode* parseSubExpression(SymbolIter&);
@@ -290,6 +291,17 @@ AstNode* parseExpressionStatement(SymbolIter& symbol)
 AstNode* parseAssignExpression(SymbolIter& symbol)
 {
 	SymbolIter orig = symbol;
+	AstNode* node = new AstNode(AST_ASSIGN_EXPRESSION);
+
+	if (expect(symbol, parseIdentifier, node))
+	if (expect(symbol, SYMBOL_OP_ADD_EQ) ||
+		expect(symbol, SYMBOL_OP_SUB_EQ))
+		return node;
+
+
+	delete node;
+	symbol = orig;
+	return nullptr;k
 
 }
 AstNode* parseCompareExpression(SymbolIter& symbol)
@@ -344,7 +356,19 @@ AstNode* parseUnaryExpression(SymbolIter& symbol)
 }
 AstNode* parseTernaryExpression(SymbolIter& symbol)
 {
+	SymbolIter orig = symbol;
+	AstNode* node = new AstNode(AST_BINARY_EXPRESSION);
 
+	if (expect(symbol, parseExpression, node))
+	if (expect(symbol, SYMBOL_QUESTION))
+	if (expect(symbol, parseExpression, node))
+	if (expect(symbol, SYMBOL_COLON))
+	if (expect(symbol, parseExpression, node))
+		return node;
+
+	delete node;
+	symbol = orig;
+	return nullptr;
 }
 AstNode* parseIdentifier(SymbolIter& iter)
 {
@@ -591,7 +615,6 @@ AstNode* parseScript(vector<Symbol>& symbols)
 		}
 		else
 		{
-			delete node;
 			return nullptr;
 		}
 	}
