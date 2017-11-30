@@ -1,0 +1,30 @@
+Key:
+    [ none or one ]
+    { none or one or multiple }
+    this and this
+    this | or this
+
+
+program     = { decl }
+decl        = func_decl | var_decl
+var_decl    = VAR NAME [ OP_ASSIGN expression ] SEMICOLON
+func_decl   = VAR NAME LPAREN [ args_decl ] RPAREN statement_block
+args_decl   = NAME { COMMA NAME }
+
+statement_block = LBRACE { statement } RBRACE
+statement = if_construct |
+            while_construct |
+            for_construct |
+            return_statement |
+            break_statement |
+            continue_statement |
+            expression SEMICOLON
+
+expression  = ...
+
+    assign-exp   (assignment, compound assignment)
+    ternary-exp
+
+    binary-exp   (logical > bitwise > comparison > relation > shift > arithmetic)
+    unary-exp    (pre-inc, post-inc, array-access, prop access, func call)
+    primary-exp  (identifier, num, string, bracketed exp)

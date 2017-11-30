@@ -1,0 +1,91 @@
+language
+    functional
+    composition + piping
+    no garbage collection (RAII)
+    no side effects
+    no hidden state / hidden magic
+
+types
+    null        falsy
+    bool        true / false
+    int         64-bit
+    float       64-bit
+    string      unicode?
+    array       0-based integer-indexed list
+    object      a container with arbitrary properties
+                can create a raw object with `object()` any time
+                objects can have properties assigned at any time
+                objects have no visible properties by default
+    function
+        a function
+        single return value (use a fucking object you heathens)
+        arbitrary arguments
+        doesn't support variadic arguments... yet...
+    class       an extension of object
+    map
+    enum
+    blob        binary large object
+                use as buffer etc
+    stream      
+    thread
+
+language constructs
+    if, else if, else
+    for
+    while
+
+    // switch
+    // do..while
+    // with
+    // try/catch
+
+    declaration
+        function declaration
+        variable declaration
+
+    expression
+
+operators
+    operator    |  cmpnd-ass?  |  non-binary  |  precedence
+                |              |              |   
+----------------+--------------+--------------+---------------
+                |              |              |                
+    a = b       |              |              |  1
+                |              |              |   
+    +a          |              |  √           |  1
+    -a          |              |  √           |  1
+    a + b       |      √       |              |  1
+    a - b       |      √       |              |  1
+    a * b       |      √       |              |  1
+    a / b       |      √       |              |  1
+    a % b       |      √       |              |  1
+    a ** b      |      √       |              |  1
+                |              |              |   
+    a++         |              |  √           |  1
+    a--         |              |  √           |  1
+    ++a         |              |  √           |  1
+    --a         |              |  √           |  1
+                |              |              |   
+    a == b      |              |              |  1
+    a != b      |              |              |  1
+    a <= b      |              |              |  1
+    a >= b      |              |              |  1
+    a < b       |              |              |  1
+    a > b       |              |              |  1
+                |              |              |   
+    !a          |              |  √           |  1
+    a && b      |              |              |  1
+    a || b      |              |              |  1
+    a ^^ b      |              |              |  1
+                |              |              |   
+    ~a          |              |  √           |  1
+    a & b       |      √       |              |  1
+    a | b       |      √       |              |  1
+    a ^ b       |      √       |              |  1
+    a << b      |      √       |              |  1
+    a >> b      |      √       |              |  1
+                |              |              |   
+    a[b]        |              |              |  1
+    a(b, ...)   |              |  ?           |  1
+                |              |              |   
+    a ? b : c   |              |  √           |  1 
