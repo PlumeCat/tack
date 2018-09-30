@@ -1,15 +1,25 @@
-headers=ast.h symbol.h token.h bnf.h
+# Makefile
+CC := gcc
+CFLAGS := -std=c11 -m32 -march=i386
+TARGET := tack
 
-ifeq ($(OS),Windows_NT)
-    binary = ./build/awesomescript.exe
-else
-    binary = ./build/awesomescript
-endif
+INCLUDE := ./include
+HEADERS = $(wildcard $(INCLUDE)/*.h)
+#SRC = $(wildcard src/*.c)
+#OBJ = $(patsubst %.c,%.o,$(SRC))
 
-run : awesomescript
-	$(binary)
+#%.o: %.c $(HEADERS)
+#	@$(CC) $(CFLAGS) -c -o $@ $< -I$(INCLUDE)
 
-awesomescript : awesomescript.cpp $(headers)
-	g++ -std=c++11 \
-	-o $(binary) \
-	awesomescript.cpp
+clean:
+	@rm -rf bin/*
+	@find . -name "*.o" -delete
+
+#build: clean $(OBJ)
+#	@$(CC) $(CFLAGS) -o bin/$(TARGET) $(OBJ)
+
+build: src/main.c
+	g++ -std=c11 src/main.c -o bin/$(TARGET)
+
+run: build
+	@bin/$(TARGET)

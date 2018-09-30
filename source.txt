@@ -1,12 +1,1 @@
-import stdlib;
-import math;
-import http;
-
-var foo = "bar";
-var x = 2;
-
-function gcd(p, q)
-{
-	var x = 2;
-	var z = ((2));
-}
+foobar; glom
