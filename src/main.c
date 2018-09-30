@@ -31,9 +31,11 @@ int read_line(FILE* file, char* buf, int max) {
     return pos;
 }
 
+/* read entire text file into memory, return the result */
 char* read_text_file(const char* fname) {
     FILE* file = fopen(fname, "r");
     
+    // TODO: error handling tbh fam
     fseek(file, 0, SEEK_END);
     int size = ftell(file);
     fseek(file, 0, SEEK_SET);
@@ -64,6 +66,7 @@ typedef enum AstNodeType {
     AST_BREAK_STATEMENT,
 
     AST_IDENTIFIER,
+    AST_NUMBER_LITERAL,
 
 } AstNodeType;
 
@@ -91,6 +94,9 @@ typedef struct CompileError {
     char* msg;
 } CompileError;
 
+
+
+
 AstNode* ast_new(AstNodeType type) {
     AstNode* n = new(AstNode);
     n->type = type;
@@ -117,12 +123,18 @@ void ast_print(AstNode* node, int level) {
             case AST_IDENTIFIER:
                 printf("Identifier: %s\n", node->data);
                 break;
+            case AST_NUMBER_LITERAL:
+                printf("Number literal: %s\n", node->data);
+                break;
             default:
-                printf("unknown node type\n");
+                printf("Unknown node type\n");
                 break;
         }
     }
 }
+
+
+
 
 
 typedef struct State {
@@ -139,6 +151,9 @@ void state_free(State* s) {
         free(s);
     }
 }
+
+
+
 
 inline bool is_identifier_starter(char c) {
     return  (c >= 'A' && c <= 'Z') ||
@@ -170,6 +185,31 @@ AstNode* parse_identifier(ParseContext* ctx) {
 
         return node;
     }
+
+    return NULL;
+}
+AstNode* parse_int_literal(ParseContext* ctx) {
+    int startpos = ctx->pos;
+    char c = ctx->code[ctx->pos];
+
+    if (c <= '9' && c >= '0') {
+        ctx->pos += 1;
+        while (ctx->code[ctx->pos] <= '9' && ctx->code[ctx->pos] >= '0') {
+            ctx->pos += 1;
+        }
+
+        AstNode* node = ast_new(AST_NUMBER_LITERAL);
+        int datasize = ctx->pos - startpos;
+        node->data = new_array(char, datasize + 1);
+        node->data[datasize] = 0;
+        memcpy(node->data, &ctx->code[startpos], datasize);
+
+        return node;
+    }
+
+    return NULL;
+}
+AstNode* parse_float_literal(ParseContext* ctx) {
     return NULL;
 }
 
@@ -183,6 +223,7 @@ AstNode* parse(const char* code) {
     };
 
     AstNode* ast = parse_identifier(&ctx);
+    if (!ast) ast = parse_int_literal(&ctx);
     return ast;
 }
 
@@ -197,6 +238,8 @@ void execute(State* state, char* code) {
 }
 
 int main(int argc, char** argv) {
+
+    malloc(100);
     
     if (argc == 2) {
         

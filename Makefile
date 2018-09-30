@@ -1,6 +1,7 @@
 # Makefile
 CC := gcc
-CFLAGS := -std=c11 -m32 -march=i386
+CFLAGS := -std=c11 -m32 -march=i386 \
+		-fsanitize=address -fno-omit-frame-pointer -ggdb
 TARGET := tack
 
 INCLUDE := ./include
