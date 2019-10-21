@@ -1,15 +1,17 @@
 # Makefile
-CC := gcc
-CFLAGS := -std=c11 -m64 -D_DEBUG
-TARGET := langs
 
-SRC := $(wildcard src/*.c)
+CXX := g++
+CXX_FLAGS := -w -g -std=c++17 \
+	-I./include
+
+source := $(wildcard src/*.cpp)
+target := dist/main.exe
 
 clean:
-	@rm -rf bin/*
+	rm -r dist
 
-build: $(SRC)
-	@gcc $(CFLAGS) $(SRC) -o bin/$(TARGET)
+build: $(source)
+	$(CXX) $(CXX_FLAGS) $(source) -o $(target)
 
 run: build
-	@bin/$(TARGET)
+	$(target) source.str
