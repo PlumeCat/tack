@@ -50,7 +50,7 @@ expression:				ternary-exp
 
 
 # operator precedence now increases the lower down we go
-# TODO: fix associativity
+# TODO: fix associativity etc...
 
 ternary-exp: 	bool-exp "?" bool-exp ":" bool-exp
 				bool-exp

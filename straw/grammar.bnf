@@ -1,0 +1,45 @@
+program         = { declaration | assignment | expression }
+
+sep             = ';' | '\n'
+
+program-part    = declaration sep
+                | assignment sep
+                | expression sep
+
+declaration     = "let" name
+                | "let" name '=' expression
+assignment      = name assign-op expression
+
+expression      = block
+                | binary-exp
+
+func_literal    = '(' [ arg_decl ] ')' '->' block
+
+arg_decl        = name { , name }
+
+block           = '{' program '}'
+
+// Expressions
+
+binary-exp      = unary-exp binary-op binary-exp
+                | unary-exp
+
+                // precedence: bool x2, compare x6, bit x3, shift x2, add x2, mul x3
+
+unary-exp       = unary-op unary-exp
+                | postfix-exp
+
+
+postfix-exp     = postfix-exp calling
+                | primary-exp
+
+calling         = '(' [ param_list ] ')'
+
+param_list      = expression { , expression }
+
+primary-exp     = '(' expression ')'
+                | NUMBER
+                | STRING
+                | name
+
+name            = `a-zA-Z_{a-z|A-Z|0-9|_}`
