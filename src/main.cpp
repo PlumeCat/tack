@@ -28,20 +28,14 @@ void execute(const string& source) {
     auto program = ast();
 
     try {
-        if (parse_program(ptr, program)) {
-            cout << "Parse succeeded" << endl;
-            cout << program << endl;
-        } else {
-            throw runtime_error("invalid program");
-        }
+        parse_program(ptr, program);
+        cout << "Evaluating: " << eval(program) << endl;
+    } catch (parse_end&) {
+        cout << "unexpected end of file" << endl;
+    } catch (invalid_program&) {
+        cout << "invalid program" << endl;
     } catch (exception& e) {
-        cout << "Parse errors: " << e.what() << endl;
-    }
-
-    try {
-        cout << "\n\nEvaluating: " << eval(program) << endl;
-    } catch (exception& e) {
-        cout << "Runtime errors" << e.what() << endl;
+        cout << "runtime error: " << e.what() << endl;
     }
 }
 
