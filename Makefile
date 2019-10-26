@@ -14,4 +14,4 @@ build: $(source)
 	$(CXX) $(CXX_FLAGS) $(source) -o $(target)
 
 run: build
-	$(target) source.str
+	$(target) source.str 2>/dev/null

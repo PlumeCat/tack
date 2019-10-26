@@ -3,12 +3,15 @@
 #include <exception>
 #include <optional>
 #include <string>
+#include <sstream>
 #include <vector>
 #include <map>
 #include <array>
 #include <numeric>
 #include <string_view>
 #include <algorithm>
+
+#include <cassert>
 #include <cstring>
 #include <cstdlib>
 #include <ctime>
@@ -20,16 +23,19 @@ using namespace std;
 //#include "parse_context.h"
 #include "ast.h"
 #include "parsing.h"
-#include "heapsort.h"
+// #include "heapsort.h"
+#include "state.h"
 #include "eval.h"
 
 void execute(const string& source) {
     auto ptr = (char*)source.c_str();
     auto program = ast();
+    auto vmstate = state();
 
     try {
-        parse_program(ptr, program);
-        cout << "Evaluating: " << eval(program) << endl;
+        parse(ptr, program);
+        cerr << program << endl; // debug log output the ast
+        eval(program, vmstate);
     } catch (parse_end&) {
         cout << "unexpected end of file" << endl;
     } catch (invalid_program&) {

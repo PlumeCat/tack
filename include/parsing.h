@@ -40,26 +40,20 @@ struct parse_context {
 // Parsing DSL (TODO: needs work)
 #define _cat(a, b) a##b
 #define cat(a, b) _cat(a, b)
-#define TRY2(exp, block) \
-    auto cat(_restore_at, __LINE__) = ctx.at;\
-    if (true exp) {\
-        block\
-        return true;\
-    }\
-    ctx.at = cat(_restore_at, __LINE__);
-
 #define rulename(rule) cat(parse_, rule)
-
+// use this for forward declarations
+#define DECLARE_RULE(name)\
+bool rulename(name)(parse_context& ctx, ast& result)
 
 // begin parsing function
 #define DEFINE_RULE(name)\
-bool rulename(name)(parse_context& ctx, ast& result) {\
+DECLARE_RULE(name) {\
     auto _eof = false;
-#define TRY(exp, block) \
+#define TRY(exp, stuff) \
     auto cat(_restore, __LINE__) = ctx.at;\
     try {\
         if (true exp) { \
-            block\
+            stuff\
             return true; \
         }\
         ctx.at = cat(_restore, __LINE__);\
@@ -75,9 +69,10 @@ bool rulename(name)(parse_context& ctx, ast& result) {\
     return false;\
 }
 
-// parsing "combinators"
+// parsing DSL "combinators"
 #define WS                  && parse_ws(ctx)
 #define CHAR(c)             && parse_char(ctx, c)
+#define STR(s)              && parse_string(ctx, s)
 #define RULE(rule, res)     && rulename(rule)(ctx, res)
 #define TERM                && parse_terminator(ctx)
 
@@ -90,7 +85,8 @@ bool rulename(name)(parse_context& ctx, ast& result) {\
 
 // consume valid identifier
 // return false if identifier not found
-// throw if EOF
+// if a valid starting character (_a-zA_Z) is encountered,
+//      EOF will be acceptable from that point onward
 bool parse_identifier(parse_context& ctx, string& name) {
     auto start = ctx.at;
     auto f = ctx.peek();
@@ -131,27 +127,31 @@ bool parse_char(parse_context& ctx, char c) {
     return true;
 }
 
-// consume the statement / expression terminator
+// consume the statement / expression terminator (and any leading whitespace)
 // return true if found
 // can be ';', '\n' or EOF (ergo, doesn't throw on EOF)
+// this has the nice property of transparently skipping the '\r' characters in CRLF files
 bool parse_terminator(parse_context& ctx) {
-    try {
-        return parse_char(ctx, ';');
-    } catch (parse_end&) {
-        return true;
+    auto restore = ctx.at;
+    while (true) {
+        try {
+            auto c = ctx.peek();
+            if (c == ';' || c == '\n') {
+                ctx.advance(); // won't throw
+                return true;
+            }
+            if (isspace(c)) {
+                ctx.advance(); // won't throw
+            } else {
+                // no terminator found
+                break;
+            }
+        } catch (parse_end&) {
+            return true; // EOF is ok
+        }
     }
+    ctx.at = restore;
     return false;
-    // try {
-    //     auto c = ctx.peek();
-    //     if (c == ';' || c == '\n' || c == '\r') {
-    //         ctx.advance();
-    //         return true;
-    //     }
-    // } catch (parse_end&) {
-    //     return true;
-    // }
-
-    // return false;
 }
 
 // consume 0 or more whitespace chars
@@ -167,6 +167,19 @@ bool parse_ws(parse_context& ctx) {
 }
 
 // consume the given string
+template<int N> bool parse_string(parse_context& ctx, const char(&str)[N]) {
+    assert(str[N-1] == 0);
+    auto restore = ctx.at;
+    for (int i = 0; i < N-1; i++) {
+        auto c = ctx.peek();
+        if (c != str[i]) {
+            ctx.at = restore;
+            return false;
+        }
+        ctx.advance();
+    }
+    return true;
+}
 // return false if not found
 // throw if EOF
 // template<int N>
@@ -192,6 +205,44 @@ bool parse_number(parse_context& ctx, double& num) {
     }
     ctx.advance(end_pos - start_pos);
     return true;
+}
+
+
+
+//////////////////////////////////////////////////////////////////////////
+// Parsing operators
+//////////////////////////////////////////////////////////////////////////
+
+// consume the declaration operator
+// return false if not found
+// throw if EOF
+bool parse_declare_op(parse_context& ctx, ast_operator& result) {
+    if (parse_char(ctx, '=')) {
+        result = OP_ASSIGN;
+        return true;
+    }
+    result = OP_UNKNOWN;
+    return false;
+}
+
+// consume assignment operators, if any
+// return false if not found
+// throw if eof
+bool parse_assign_op(parse_context& ctx, ast_operator& result) {
+    // see comments in parse_bin_op
+    result = parse_char(ctx, '=') ? OP_ASSIGN :
+            parse_string(ctx, "+=") ? OP_ASSIGN_ADD :
+            parse_string(ctx, "-=") ? OP_ASSIGN_SUB :
+            parse_string(ctx, "*=") ? OP_ASSIGN_MUL :
+            parse_string(ctx, "/=") ? OP_ASSIGN_DIV :
+            parse_string(ctx, "%=") ? OP_ASSIGN_MOD :
+            parse_string(ctx, "|=") ? OP_ASSIGN_OR :
+            parse_string(ctx, "&=") ? OP_ASSIGN_AND :
+            parse_string(ctx, "^=") ? OP_ASSIGN_XOR :
+            parse_string(ctx, "+=") ? OP_ASSIGN_LSH :
+            parse_string(ctx, "+=") ? OP_ASSIGN_RSH :
+            OP_UNKNOWN;
+    return result != OP_UNKNOWN;
 }
 
 // consume an unary operator
@@ -229,9 +280,9 @@ bool parse_bin_op(parse_context& ctx, ast_operator& result) {
 //////////////////////////////////////////////////////////////////////////
 
 // forward declaration
-bool parse_exp(parse_context& ctx, ast& result);
-
-
+DECLARE_RULE(exp);
+DECLARE_RULE(program);
+DECLARE_RULE(program_part);
 
 DEFINE_RULE(primary_exp)
     // bracketed expression
@@ -239,7 +290,7 @@ DEFINE_RULE(primary_exp)
     TRY(WS
         CHAR('(')       WS
         RULE(exp, expr) WS
-        CHAR(')')       WS
+        CHAR(')')
         , {
             result = expr;
         }
@@ -247,7 +298,8 @@ DEFINE_RULE(primary_exp)
 
     // literal number
     auto num = 0.0;
-    TRY(WS RULE(number, num) WS
+    TRY(WS
+        RULE(number, num)
         , {
             result.num_data = num;
             result.type = ast_type::LITERAL;
@@ -256,7 +308,8 @@ DEFINE_RULE(primary_exp)
 
     // name
     auto n = string();
-    TRY(WS RULE(identifier, n) WS
+    TRY(WS
+        RULE(identifier, n)
         , {
             result.str_data = n;
             result.type = ast_type::IDENTIFIER;
@@ -264,7 +317,70 @@ DEFINE_RULE(primary_exp)
     )
 END_RULE()
 
+DEFINE_RULE(calling)
 
+    // empty call variant
+    TRY(WS CHAR('(') WS CHAR(')')
+        , {})
+
+    auto restore = ctx.at;
+    if (parse_ws(ctx) && parse_char(ctx, '(')) {
+        while (true) {
+            auto p = ast();
+            if (parse_exp(ctx, p)) {
+                result.children.push_back(p);
+                parse_ws(ctx);
+                if (parse_char(ctx, ',')) {
+                    continue;
+                } else if (parse_char(ctx, ')')) {
+                    return true;
+                } else {
+                    ctx.at = restore;
+                    return false;
+                }
+            } else {
+                ctx.at = restore;
+                return false;
+            }
+        }
+    } else {
+        ctx.at = restore;
+        return false;
+    }
+
+END_RULE()
+
+DEFINE_RULE(indexing)
+    return false;
+END_RULE()
+
+DEFINE_RULE(postfix_exp)
+    auto r = ctx.at;
+    try {
+        auto pexp = ast();
+        if (parse_primary_exp(ctx, pexp)) { 
+            while (true) {
+                // TODO: greedily consume callings and indexings until no more found
+                if (parse_calling(ctx, result)) {
+                    result.type = CALLING;
+                    result.children.insert(result.children.begin(), pexp);
+                } else if (parse_indexing(ctx, result)) {
+                    result.type = INDEXING;
+                    result.children.insert(result.children.begin(), pexp);
+                } else {
+                    result = pexp;
+                }
+                return true;
+            }
+        } else {
+            ctx.at = r;
+            return false;
+        }
+    } catch (parse_end&) {
+        ctx.at = r;
+        return false;
+    }
+END_RULE()
 
 DEFINE_RULE(unary_exp)
     auto op = ast_operator();
@@ -272,18 +388,17 @@ DEFINE_RULE(unary_exp)
     
     TRY(WS
         RULE(unary_op, op)    WS
-        RULE(unary_exp, expr) WS
+        RULE(unary_exp, expr)
         , {
             result.children.push_back(expr);
             result.type = UNARY_EXP;
             result.op = op;
         })
 
-    TRY(WS RULE(primary_exp, result) WS
+    TRY(WS
+        RULE(postfix_exp, result)
         , {})
 END_RULE()
-
-
 
 DEFINE_RULE(binary_exp)
     auto lhs = ast();
@@ -293,7 +408,7 @@ DEFINE_RULE(binary_exp)
     TRY(WS
         RULE(unary_exp, lhs)  WS
         RULE(bin_op, op)      WS
-        RULE(binary_exp, rhs) WS
+        RULE(binary_exp, rhs)
         , {
             result.children.push_back(lhs);
             result.children.push_back(rhs);
@@ -301,33 +416,130 @@ DEFINE_RULE(binary_exp)
             result.op = op;
         })
 
-    TRY(WS RULE(unary_exp, result) WS
+    TRY(WS
+        RULE(unary_exp, result)
         , {})
 END_RULE()
 
+DEFINE_RULE(block)
+
+    // empty block variant
+    TRY(WS CHAR('{') WS CHAR('}')
+        , {})
+
+    // populated block variant
+    auto restore = ctx.at;
+    if (parse_ws(ctx) && parse_char(ctx, '{')) {
+        while (true) {
+            auto a = ast();
+            if (parse_program_part(ctx, a)) {
+                result.children.push_back(a);
+                if (parse_terminator(ctx)) {
+                    if (parse_ws(ctx) && parse_char(ctx, '}')) {
+                        return true;
+                    } else {
+                        continue;
+                    }
+                }
+                else {
+                    parse_ws(ctx);
+                    if (parse_char(ctx, '}')) {
+                        return true;
+                    } else {
+                        ctx.at = restore;
+                        return false;
+                    }
+                }
+            } else {
+                ctx.at = restore;
+                return false;
+            }
+        }
+    }
+END_RULE()
 
 DEFINE_RULE(exp)
-    TRY(WS RULE(binary_exp, result) TERM WS
+    TRY(WS
+        RULE(block, result)
+        , {})
+    TRY(WS
+        RULE(binary_exp, result)
         , {})
 END_RULE()
 
+DEFINE_RULE(assignment) 
+    auto id = string();
+    auto e = ast();
+    auto op = ast_operator();
+    TRY(WS
+        RULE(identifier, id)    WS
+        RULE(assign_op, op)     WS
+        RULE(exp, e)
+        , {
+            auto identifier = ast();
+            identifier.str_data = id;
+            identifier.type = IDENTIFIER;
 
-void parse_program(const string& data, ast& result) {
+            result.type = ASSIGNMENT;
+            result.op = op;
+            result.children.push_back(identifier);
+            result.children.push_back(e);
+        })
+END_RULE()
+
+DEFINE_RULE(declaration)
+    auto id = string();
+    auto e = ast();
+    auto op = ast_operator();
+    TRY(WS
+        STR("let")              WS
+        RULE(identifier, id)    WS
+        RULE(declare_op, op)    WS
+        RULE(exp, e)
+        , {
+            auto identifier = ast();
+            identifier.str_data = id;
+            identifier.type = IDENTIFIER;
+
+            result.type = DECLARATION;
+            result.op = op;
+            result.children.push_back(identifier);
+            result.children.push_back(e);
+        })
+END_RULE()
+
+DEFINE_RULE(program_part)
+    TRY(RULE(declaration, result), {})
+    TRY(RULE(assignment, result), {})
+    TRY(RULE(exp, result), {})
+END_RULE()
+
+DEFINE_RULE(program)
+    while (ctx.at < ctx.end) {
+        auto restore = ctx.at;
+        try {
+            auto r = ast();
+            if (parse_program_part(ctx, r) && parse_terminator(ctx)) {
+                result.children.push_back(r);
+                continue;
+            } else {
+                ctx.at = restore;
+            }
+        }
+        catch (parse_end&) {
+            ctx.at = restore;
+        }
+
+        return false;
+    }
+    return true;
+END_RULE()
+
+void parse(const string& data, ast& result) {
     auto ctx = parse_context(data);
-
-    while (true) {
-        auto e = ast();
-        //cout << " -- remaining: {{" << string(ctx.at, ctx.end) << "}}" << endl;
-
-        if (!parse_exp(ctx, e)) {
-            throw invalid_program();
-        }
-        
-        result.children.push_back(e);
-
-        if (ctx.at == ctx.end) {
-            break;
-        }
+    parse_program(ctx, result);
+    if (ctx.at != ctx.end) {
+        throw invalid_program();
     }
 }
 

@@ -3,10 +3,15 @@
 
 enum ast_type {
     PROGRAM,
+    DECLARATION,
+    ASSIGNMENT,
     BINARY_EXP,
     UNARY_EXP,
     LITERAL,
     IDENTIFIER,
+    BLOCK,
+    CALLING,
+    INDEXING,
 };
 
 enum ast_operator {
@@ -57,10 +62,15 @@ enum ast_operator {
 string type_to_string(ast_type t) {
     const auto m = map<ast_type, string> {
         { PROGRAM,      "Program" },
+        { DECLARATION,  "Declaration" },
+        { ASSIGNMENT,   "Assignment" },
         { BINARY_EXP,   "BinaryExp" },
         { UNARY_EXP,    "UnaryExp" },
         { LITERAL,      "Literal" },
         { IDENTIFIER,   "Identifier" },
+        { BLOCK,        "Block" },
+        { CALLING,      "Calling" },
+        { INDEXING,     "Indexing" },
     };
     auto f = m.find(t);
     if (f != m.end()) {
