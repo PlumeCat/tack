@@ -64,15 +64,23 @@ struct state {
     void pop_scope() {
         scopes.pop_back();
     }
+
     // variables
-    void local(const string& name, const value& val) {
+    void set_local(const string& name, const value& val) {
         scopes[scopes.size()-1][name] = val;
     }
-    value& local(const string& name) {
-        auto& s = scopes[scopes.size()-1];
+    value& get_local(const string& name, int frame = -1) {
+        if (frame == -1) {
+            frame = scopes.size() - 1;
+        }
+        auto& s = scopes[frame];
         auto f = s.find(name);
         if (f == s.end()) {
-            throw runtime_error("Unknown local variable: " + name);
+            if (frame == 0) {
+                throw runtime_error("Unknown variable: " + name);
+            } else {
+                return get_local(name, frame - 1);
+            }
         }
         return f->second;
     }

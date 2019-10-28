@@ -47,14 +47,14 @@ value eval_assignment(const ast& a, state& s) {
     assert(a.type == ASSIGNMENT);
     auto name = a.children[0].str_data;
     auto val = eval(a.children[1], s);
-    s.local(name, val);
+    s.set_local(name, val);
     return 1;
 }
 value eval_declaration(const ast& a, state& s) {
     assert(a.type == DECLARATION);
     auto name = a.children[0].str_data;
     auto val = eval(a.children[1], s);
-    s.local(name, val);
+    s.set_local(name, val);
     return 1;
 }
 
@@ -70,14 +70,14 @@ value eval_program(const ast& a, state& s) {
 }
 
 value eval_calling(const ast& a, state& s) {
-    // TODO: look up the function!
     if (a.children[0].str_data == "print") {
         for (int i = 1; i < a.children.size(); i++) {
             cout << eval(a.children[i], s) << " ";
         }
         cout << endl;
-    } else {        
+    } else {
         auto func = eval(a.children[0], s);
+
         if (func.type != value::FUNCTION) {
             throw runtime_error("trying to call a non-function value");
         }
@@ -85,10 +85,20 @@ value eval_calling(const ast& a, state& s) {
             throw runtime_error("invalid function value");
         }
 
+        auto& body = func.fval.children[func.fval.children.size()-1];
         s.push_scope();
-        // evaluate and map parameters here
-        auto res = eval(func.fval.children[func.fval.children.size()-1], s);
+
+        // evaluate parameter tuple and push as local variables
+        for (int i = 0; i < func.fval.children.size()-1; i++) {
+            auto argname = func.fval.children[i].str_data;
+            auto argval = eval(a.children[i+1], s);
+            s.set_local(argname, argval);
+        }
+
+        // evaluate body
+        auto res = eval(body, s);
         s.pop_scope();
+
         return res;
     }
     return value(0);
@@ -101,7 +111,7 @@ value eval(const ast& a, state& s) {
         case UNARY_EXP:     return eval_un_exp(a, s);
         case NUM_LITERAL:   return value(a.num_data);
         case FUNC_LITERAL:  return value(a);
-        case IDENTIFIER:    return s.local(a.str_data);
+        case IDENTIFIER:    return s.get_local(a.str_data);
 
         // declaration and assignment
         case ASSIGNMENT:    return eval_assignment(a, s);
@@ -109,7 +119,7 @@ value eval(const ast& a, state& s) {
 
         // calling
         case CALLING:       return eval_calling(a, s);
-        
+
         // compound structures
         case BLOCK:
         case PROGRAM:

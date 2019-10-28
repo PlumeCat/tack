@@ -34,14 +34,14 @@ void execute(const string& source) {
 
     try {
         parse(ptr, program);
-        cerr << program << endl; // debug log output the ast
+        log.debug() << program << endl;
         eval(program, vmstate);
     } catch (parse_end&) {
-        cout << "unexpected end of file" << endl;
+        log.error() << "unexpected end of file" << endl;
     } catch (invalid_program&) {
-        cout << "invalid program" << endl;
+        log.error() << "invalid program" << endl;
     } catch (exception& e) {
-        cout << "runtime error: " << e.what() << endl;
+        log.error() << "runtime error: " << e.what() << endl;
     }
 }
 
@@ -68,11 +68,30 @@ int main(int argc, char* argv[]) {
     } else {
         // source file mode
         auto fname = argv[1];
-        cout << "Loading: " << fname << endl;
+        log.info() << "Loading: " << fname << endl;
         auto data = read_text_file(fname);
-        cout << "length: " << data.length() << " | " << strlen(&*data.begin()) << endl;
+        log.info() << "length: " << data.length() << " | " << strlen(&*data.begin()) << endl;
         execute(data);
     }
 
     return 0;
 }
+
+/*
+TODO:
+    function parameters
+    indirect functions instead of by value
+    if else
+    for / while / map / ...
+    lists, strings
+    comments
+
+    parsing improvements:
+        - unify macro approach (or define grammar combinators), remove hardcoded bits
+        - specify ast schema, add validator
+        - very inefficient, just inspect "log_func" for all parsers. improve?
+        - can't handle single-argument functions
+        - can't handle chained postfix operators  eg hof()(), ll[1][2]
+        - find a good way of checking exhaustively for ambiguities (and even for resolving them)
+
+*/

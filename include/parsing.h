@@ -284,32 +284,79 @@ DECLARE_RULE(exp);
 DECLARE_RULE(program);
 DECLARE_RULE(program_part);
 
+DEFINE_RULE(func_body)
+    TRY(WS
+        STR("->") WS
+        RULE(exp, result)
+        , {})
+END_RULE()
+
 DEFINE_RULE(func_literal)
+    log_func();
+
     auto body = ast();
+    log.debug() << "trying unargumented func...";
     TRY(WS
         CHAR('(')       WS
         CHAR(')')       WS
-        STR("->")       WS
-        RULE(exp, body)
+        RULE(func_body, body)
         , {
+            log.debug() << "success" << endl;
             result.type = FUNC_LITERAL;
-            // TODO: push arguments as a first
+            // no parameter function
             result.children.push_back(body);
         })
+
+    log.debug() << "failed" << endl;
+
+    log.debug() << "trying argumented func {" << string(ctx.at, ctx.at + 10) << "}" << endl;
+    auto r = ctx.at;
+    if (parse_ws(ctx) && parse_char(ctx, '(')) {
+        log.debug() << "  " << "found (" << endl;
+        while (true) {
+            auto p = ast();
+            if (parse_ws(ctx) && parse_identifier(ctx, p.str_data)) {
+                log.debug() << "found first identifier: " << p << endl;
+                vector<ast> identifiers;
+
+                p.type = IDENTIFIER;
+                identifiers.push_back(p);
+
+                // greedily consume identifiers
+                while (true) {
+                    parse_ws(ctx);
+                    auto id = ast();
+                    auto body = ast();
+                    if (parse_char(ctx, ',') && parse_ws(ctx) && parse_identifier(ctx, id.str_data)) {
+                        log.debug() << "found additional identifier: " << id << endl;
+                        id.type = IDENTIFIER;
+                        identifiers.push_back(id);
+                    } else if (parse_char(ctx, ')') && parse_func_body(ctx, body)) {
+                        log.debug() << "end of parameter list" << endl;
+                        // end of parameter list
+                        for (auto& i: identifiers) {
+                            result.children.push_back(i);
+                        }
+                        result.children.push_back(body);
+                        result.type = FUNC_LITERAL;
+                        return true;
+                    } else {
+                        ctx.at = r;
+                        return false;
+                    }
+                }
+            } else {
+                ctx.at = r;
+                return false;
+            }
+        }
+    } else {
+        ctx.at = r;
+        return false;
+    }
 END_RULE()
 
 DEFINE_RULE(primary_exp)
-    // bracketed expression
-    auto expr = ast();
-    TRY(WS
-        CHAR('(')       WS
-        RULE(exp, expr) WS
-        CHAR(')')
-        , {
-            result = expr;
-        }
-    )
-
     // literal number
     auto num = 0.0;
     TRY(WS
@@ -327,6 +374,17 @@ DEFINE_RULE(primary_exp)
         , {
             result = func;
         })
+
+    // bracketed expression
+    auto expr = ast();
+    TRY(WS
+        CHAR('(')       WS
+        RULE(exp, expr) WS
+        CHAR(')')
+        , {
+            result = expr;
+        }
+    )
 
     // name
     auto n = string();
@@ -380,7 +438,7 @@ DEFINE_RULE(postfix_exp)
     auto r = ctx.at;
     try {
         auto pexp = ast();
-        if (parse_primary_exp(ctx, pexp)) { 
+        if (parse_primary_exp(ctx, pexp)) {
             while (true) {
                 // TODO: greedily consume callings and indexings until no more found
                 if (parse_calling(ctx, result)) {
@@ -407,7 +465,7 @@ END_RULE()
 DEFINE_RULE(unary_exp)
     auto op = ast_operator();
     auto expr = ast();
-    
+
     TRY(WS
         RULE(unary_op, op)    WS
         RULE(unary_exp, expr)
@@ -489,7 +547,7 @@ DEFINE_RULE(exp)
         , {})
 END_RULE()
 
-DEFINE_RULE(assignment) 
+DEFINE_RULE(assignment)
     auto id = string();
     auto e = ast();
     auto op = ast_operator();
