@@ -1,5 +1,9 @@
 #ifndef _STATE_H
 #define _STATE_H
+
+struct value;
+ostream& operator<< (ostream& o, const value& val);
+
 struct value {
     enum {
         NUMBER,
@@ -7,10 +11,12 @@ struct value {
         FUNCTION,
     } type;
 
+    struct function { int id; };
+
     // union {
         double dval;
         string sval;
-        ast fval;
+        function fval;
     // };
 
     value() {
@@ -25,9 +31,9 @@ struct value {
         type = STRING;
         sval = s;
     }
-    value(const ast& a) {
+    value(const function& f) {
         type = FUNCTION;
-        fval = a;
+        fval = f;
     }
     value(const value&) = default;
     ~value() = default;
@@ -51,23 +57,31 @@ struct value {
         type = STRING;
         return *this;
     }
-    value& operator=(const ast& body) {
-        fval = body;
+    value& operator=(const function& f) {
+        fval = f;
         type = FUNCTION;
         return *this;
+    }
+    operator string() {
+        stringstream s;
+        s << *this;
+        return s.str();
     }
 };
 ostream& operator<< (ostream& o, const value& val) {
     switch (val.type) {
         case value::NUMBER:     return o << val.dval;
         case value::STRING:     return o << val.sval;
-        case value::FUNCTION:   return o << val.fval;
+        case value::FUNCTION:   return o << "function: " << val.fval.id;
         default:                return o << "<unknown-type>";
     }
 }
+
 using scope = map<string, value>;
 struct state {
     vector<scope> scopes;
+    vector<ast> functions; // interned functions
+
     state() = default;
     state(const state&) = default;
     ~state() = default;

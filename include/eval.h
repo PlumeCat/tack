@@ -79,24 +79,25 @@ value eval_calling(const ast& a, state& s) {
         }
         cout << endl;
     } else {
-        auto func = eval(a.children[0], s);
-
-        if (func.type != value::FUNCTION) {
-            throw runtime_error("trying to call a non-function value");
+        auto fid = eval(a.children[0], s);
+        if (fid.type != value::FUNCTION) {
+            throw runtime_error("trying to call a non-function: "  + (string)fid);
         }
-        if (func.fval.type != FUNC_LITERAL) {
+        auto func = s.functions[fid.fval.id];
+
+        if (func.type != FUNC_LITERAL) {
             throw runtime_error("invalid function value");
         }
-        if (func.fval.children.size() != a.children.size()) {
+        if (func.children.size() != a.children.size()) {
             throw runtime_error("incorrect number of arguments");
         }
 
-        auto& body = func.fval.children[func.fval.children.size()-1];
+        auto& body = func.children[func.children.size()-1];
         s.push_scope();
 
         // evaluate parameter tuple and push as local variables
-        for (int i = 0; i < func.fval.children.size()-1; i++) {
-            auto argname = func.fval.children[i].str_data;
+        for (int i = 0; i < func.children.size()-1; i++) {
+            auto argname = func.children[i].str_data;
             auto argval = eval(a.children[i+1], s);
             s.set_local(argname, argval);
         }
@@ -110,6 +111,11 @@ value eval_calling(const ast& a, state& s) {
     return value(0);
 }
 
+value eval_func_literal(const ast& a, state& s) {
+    s.functions.push_back(a);
+    return value(value::function { s.functions.size() - 1 });
+}
+
 value eval(const ast& a, state& s) {
     switch (a.type) {
         // expressions
@@ -117,7 +123,7 @@ value eval(const ast& a, state& s) {
         case UNARY_EXP:     return eval_un_exp(a, s);
         case NUM_LITERAL:   return value(a.num_data);
         case STRING_LITERAL:return value(a.str_data);
-        case FUNC_LITERAL:  return value(a);
+        case FUNC_LITERAL:  return eval_func_literal(a, s);
         case IDENTIFIER:    return s.get_local(a.str_data);
 
         // declaration and assignment

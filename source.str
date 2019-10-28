@@ -18,5 +18,7 @@ let h = (a, b, c) => {
 }
 
 
+1()
+
 let c = (1 + 2)
-print(h())
+print(h(1, 2, 3))
