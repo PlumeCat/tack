@@ -284,6 +284,20 @@ DECLARE_RULE(exp);
 DECLARE_RULE(program);
 DECLARE_RULE(program_part);
 
+DEFINE_RULE(func_literal)
+    auto body = ast();
+    TRY(WS
+        CHAR('(')       WS
+        CHAR(')')       WS
+        STR("->")       WS
+        RULE(exp, body)
+        , {
+            result.type = FUNC_LITERAL;
+            // TODO: push arguments as a first
+            result.children.push_back(body);
+        })
+END_RULE()
+
 DEFINE_RULE(primary_exp)
     // bracketed expression
     auto expr = ast();
@@ -302,9 +316,17 @@ DEFINE_RULE(primary_exp)
         RULE(number, num)
         , {
             result.num_data = num;
-            result.type = ast_type::LITERAL;
+            result.type = NUM_LITERAL;
         }
     )
+
+    // literal function
+    auto func = ast();
+    TRY(WS
+        RULE(func_literal, func)
+        , {
+            result = func;
+        })
 
     // name
     auto n = string();
@@ -312,7 +334,7 @@ DEFINE_RULE(primary_exp)
         RULE(identifier, n)
         , {
             result.str_data = n;
-            result.type = ast_type::IDENTIFIER;
+            result.type = IDENTIFIER;
         }
     )
 END_RULE()
@@ -323,7 +345,7 @@ DEFINE_RULE(calling)
     TRY(WS CHAR('(') WS CHAR(')')
         , {})
 
-    auto restore = ctx.at;
+    auto r = ctx.at;
     if (parse_ws(ctx) && parse_char(ctx, '(')) {
         while (true) {
             auto p = ast();
@@ -335,16 +357,16 @@ DEFINE_RULE(calling)
                 } else if (parse_char(ctx, ')')) {
                     return true;
                 } else {
-                    ctx.at = restore;
+                    ctx.at = r;
                     return false;
                 }
             } else {
-                ctx.at = restore;
+                ctx.at = r;
                 return false;
             }
         }
     } else {
-        ctx.at = restore;
+        ctx.at = r;
         return false;
     }
 
@@ -424,18 +446,18 @@ END_RULE()
 DEFINE_RULE(block)
 
     // empty block variant
-    TRY(WS CHAR('{') WS CHAR('}')
+    TRY(WS STR("{") WS STR("}")
         , {})
 
     // populated block variant
     auto restore = ctx.at;
-    if (parse_ws(ctx) && parse_char(ctx, '{')) {
+    if (parse_ws(ctx) && parse_string(ctx, "{")) {
         while (true) {
             auto a = ast();
             if (parse_program_part(ctx, a)) {
                 result.children.push_back(a);
                 if (parse_terminator(ctx)) {
-                    if (parse_ws(ctx) && parse_char(ctx, '}')) {
+                    if (parse_ws(ctx) && parse_string(ctx, "}")) {
                         return true;
                     } else {
                         continue;
@@ -443,7 +465,7 @@ DEFINE_RULE(block)
                 }
                 else {
                     parse_ws(ctx);
-                    if (parse_char(ctx, '}')) {
+                    if (parse_string(ctx, "}")) {
                         return true;
                     } else {
                         ctx.at = restore;

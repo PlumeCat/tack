@@ -1,8 +1,8 @@
-let x = 1
-let y = 2
-
-let z = {
-    x + y
+let hof = () -> {
+    () -> { 2 }
 }
 
-print(z)
+
+let hof_return_val = hof()
+let hof_retval_retval = hof_return_val()
+print(hof_retval_retval)
