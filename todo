@@ -1,0 +1,55 @@
+TODO:
+    parsing improvements:
+        - unify macro approach (or define grammar combinators), remove hardcoded bits
+        - specify ast schema, add validation (subclasses?)
+        - very inefficient, can we improve? side effect of naive rec-desc?
+        - handle more binary operators
+        - correct operator precedence - use parser?
+        - multithread imports and late binding / linker stage at end
+        X handle single-argument functions
+        - handle chained postfix operators  eg hof()(), aoa[1][2]
+        - find a good way of checking exhaustively for ambiguities (and even for resolving them)
+            - ordering of TRY is significant in causing ambiguities
+            - during parsing, when ambiguity is resolved, can use to generate very specific error messages
+            - for now, should be able to:
+                - generate error messages at a block level when an incorrect program_part is detected
+                - then skip to end of block somehow and attempt to resume
+        - error messages
+
+    syntax:
+        - can we omit brackets for function literals?
+
+    reference vm:
+        X intern functions (source code can only contain so many functions :D)
+        - strings a bit useless
+        - print() semantically broken: a = print; a("hello world")
+            - will tie in with integrating c functions
+        - bytecode generation
+            - then can cache bytecodes between runs
+
+    jitter:
+        - extension of the rvm
+
+    features:
+        X strings
+        - arrays
+        - if/else
+        - looping
+        - comments
+        - imports
+        - custom data structures
+        - static typing, type safety, automatic deduction
+        - stdlib
+            - math
+            - strings
+            - collections
+            - io
+            - ffi / syscall
+        - closure
+
+    other:
+        - some unit tests!!
+        - fix the REPL
+            - make the top-level parse a program-part
+            - evaluate as we go
+            - handle multilines nicely
