@@ -16,7 +16,7 @@ struct _log {
         return out() << "INFO: ";
     }
     ostream& error() {
-        return out() << "ERROR: ";
+        return cerr << "ERROR: ";
     }
 } log;
 

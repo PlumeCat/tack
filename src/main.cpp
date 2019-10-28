@@ -76,22 +76,3 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
-
-/*
-TODO:
-    function parameters
-    indirect functions instead of by value
-    if else
-    for / while / map / ...
-    lists, strings
-    comments
-
-    parsing improvements:
-        - unify macro approach (or define grammar combinators), remove hardcoded bits
-        - specify ast schema, add validator
-        - very inefficient, just inspect "log_func" for all parsers. improve?
-        - can't handle single-argument functions
-        - can't handle chained postfix operators  eg hof()(), ll[1][2]
-        - find a good way of checking exhaustively for ambiguities (and even for resolving them)
-
-*/

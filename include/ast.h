@@ -8,6 +8,7 @@ enum ast_type {
     BINARY_EXP,
     UNARY_EXP,
     NUM_LITERAL,
+    STRING_LITERAL,
     FUNC_LITERAL,
     IDENTIFIER,
     BLOCK,

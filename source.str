@@ -1,19 +1,22 @@
-let f = () -> {
+let log = (x) => {
+    print("LOG: ", x)
+}
+
+
+log("hello world")
+
+let f = () => {
     2
 }
 
-let g = (a,b) -> a + b
+let g = (a, b) => a + b
 
-let h = (a, b) -> {
-    a + b
+let h = (a, b, c) => {
+    print(a, b, c)
+    let func = (x, y) => { x + y }
+    func(a, b) + c
 }
 
 
 let c = (1 + 2)
-print(c)
-
-print(f())
-
-print(g(1, 2))
-
-print(h(2, 3))
+print(h())

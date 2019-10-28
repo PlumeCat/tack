@@ -23,6 +23,9 @@ value eval_un_exp(const ast& a, state& s) {
 value eval_bin_exp(const ast& a, state& s) {
     auto c0 = eval(a.children[0], s);
     auto c1 = eval(a.children[1], s);
+    if (c0.type != value::NUMBER || c1.type != value::NUMBER) {
+        throw runtime_error("can't evaluate binaryoperator for non-number");
+    }
     switch (a.op) {
         // Arithmetic
         case OP_ADD:        return c0.dval + c1.dval;
@@ -84,6 +87,9 @@ value eval_calling(const ast& a, state& s) {
         if (func.fval.type != FUNC_LITERAL) {
             throw runtime_error("invalid function value");
         }
+        if (func.fval.children.size() != a.children.size()) {
+            throw runtime_error("incorrect number of arguments");
+        }
 
         auto& body = func.fval.children[func.fval.children.size()-1];
         s.push_scope();
@@ -110,6 +116,7 @@ value eval(const ast& a, state& s) {
         case BINARY_EXP:    return eval_bin_exp(a, s);
         case UNARY_EXP:     return eval_un_exp(a, s);
         case NUM_LITERAL:   return value(a.num_data);
+        case STRING_LITERAL:return value(a.str_data);
         case FUNC_LITERAL:  return value(a);
         case IDENTIFIER:    return s.get_local(a.str_data);
 

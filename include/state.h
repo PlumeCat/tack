@@ -3,12 +3,16 @@
 struct value {
     enum {
         NUMBER,
+        STRING,
         FUNCTION,
     } type;
+
     // union {
         double dval;
+        string sval;
         ast fval;
     // };
+
     value() {
         type = NUMBER;
         dval = 0;
@@ -16,6 +20,10 @@ struct value {
     value(double val) {
         type = NUMBER;
         dval = val;
+    }
+    value(const string& s) {
+        type = STRING;
+        sval = s;
     }
     value(const ast& a) {
         type = FUNCTION;
@@ -27,6 +35,7 @@ struct value {
         type = v.type;
         switch (type) {
             case NUMBER:    dval = v.dval; break;
+            case STRING:    sval = v.sval; break;
             case FUNCTION:  fval = v.fval; break;
             default:        throw runtime_error("Unknown type!");
         }
@@ -35,6 +44,11 @@ struct value {
     value& operator=(double val) {
         dval = val;
         type = NUMBER;
+        return *this;
+    }
+    value& operator=(const string& val) {
+        sval = val;
+        type = STRING;
         return *this;
     }
     value& operator=(const ast& body) {
@@ -46,6 +60,7 @@ struct value {
 ostream& operator<< (ostream& o, const value& val) {
     switch (val.type) {
         case value::NUMBER:     return o << val.dval;
+        case value::STRING:     return o << val.sval;
         case value::FUNCTION:   return o << val.fval;
         default:                return o << "<unknown-type>";
     }

@@ -37,7 +37,7 @@ struct parse_context {
 };
 
 
-// Parsing DSL (TODO: needs work)
+// Parsing DSL
 #define _cat(a, b) a##b
 #define cat(a, b) _cat(a, b)
 #define rulename(rule) cat(parse_, rule)
@@ -207,7 +207,23 @@ bool parse_number(parse_context& ctx, double& num) {
     return true;
 }
 
-
+// parse a literal string - anything enclosed by '"'
+// will throw on EOF if the opening " is not closed
+bool parse_string_literal(parse_context& ctx, string& out_str) {
+    // const auto start_pos = &*ctx.at;
+    // auto end_pos = (char*)nullptr;
+    if (ctx.peek() != '"') {
+        return false;
+    }
+    ctx.advance();
+    auto first = ctx.at;
+    while (ctx.peek() != '"') {
+        ctx.advance();
+    }
+    out_str = string(first, ctx.at);
+    ctx.advance(); // skip the last '"'
+    return true;
+}
 
 //////////////////////////////////////////////////////////////////////////
 // Parsing operators
@@ -286,7 +302,7 @@ DECLARE_RULE(program_part);
 
 DEFINE_RULE(func_body)
     TRY(WS
-        STR("->") WS
+        STR("=>") WS
         RULE(exp, result)
         , {})
 END_RULE()
@@ -364,8 +380,15 @@ DEFINE_RULE(primary_exp)
         , {
             result.num_data = num;
             result.type = NUM_LITERAL;
-        }
-    )
+        })
+
+    auto str = string();
+    TRY(WS
+        RULE(string_literal, str)
+        , {
+            result.str_data = str;
+            result.type = STRING_LITERAL;
+        })
 
     // literal function
     auto func = ast();
@@ -383,8 +406,7 @@ DEFINE_RULE(primary_exp)
         CHAR(')')
         , {
             result = expr;
-        }
-    )
+        })
 
     // name
     auto n = string();
@@ -393,8 +415,7 @@ DEFINE_RULE(primary_exp)
         , {
             result.str_data = n;
             result.type = IDENTIFIER;
-        }
-    )
+        })
 END_RULE()
 
 DEFINE_RULE(calling)
@@ -440,7 +461,6 @@ DEFINE_RULE(postfix_exp)
         auto pexp = ast();
         if (parse_primary_exp(ctx, pexp)) {
             while (true) {
-                // TODO: greedily consume callings and indexings until no more found
                 if (parse_calling(ctx, result)) {
                     result.type = CALLING;
                     result.children.insert(result.children.begin(), pexp);
