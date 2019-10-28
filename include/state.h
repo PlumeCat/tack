@@ -1,17 +1,14 @@
 #ifndef _STATE_H
 #define _STATE_H
-
 struct value {
     enum {
         NUMBER,
         FUNCTION,
     } type;
-    
     // union {
         double dval;
         ast fval;
     // };
-    
     value() {
         type = NUMBER;
         dval = 0;
@@ -25,9 +22,7 @@ struct value {
         fval = a;
     }
     value(const value&) = default;
-    
     ~value() = default;
-    
     value& operator=(const value& v) {
         type = v.type;
         switch (type) {
@@ -48,7 +43,6 @@ struct value {
         return *this;
     }
 };
-
 ostream& operator<< (ostream& o, const value& val) {
     switch (val.type) {
         case value::NUMBER:     return o << val.dval;
@@ -56,10 +50,7 @@ ostream& operator<< (ostream& o, const value& val) {
         default:                return o << "<unknown-type>";
     }
 }
-
-
 using scope = map<string, value>;
-
 struct state {
     vector<scope> scopes;
     state() = default;
@@ -68,7 +59,7 @@ struct state {
     state& operator=(const state&) = default;
     // entering and exiting scopes
     void push_scope() {
-        scopes.push_back(scope());        
+        scopes.push_back(scope());
     }
     void pop_scope() {
         scopes.pop_back();
@@ -86,5 +77,4 @@ struct state {
         return f->second;
     }
 };
-
 #endif
