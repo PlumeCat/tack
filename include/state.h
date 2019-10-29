@@ -8,6 +8,7 @@ struct value {
     enum {
         NUMBER,
         STRING,
+        LIST,
         FUNCTION,
     } type;
 
@@ -16,6 +17,7 @@ struct value {
     // union {
         double dval;
         string sval;
+        vector<value> lval;
         function fval;
     // };
 
@@ -30,6 +32,10 @@ struct value {
     value(const string& s) {
         type = STRING;
         sval = s;
+    }
+    value(const vector<value>& l) {
+        type = LIST;
+        lval = l;
     }
     value(const function& f) {
         type = FUNCTION;
@@ -57,6 +63,11 @@ struct value {
         type = STRING;
         return *this;
     }
+    value& operator=(const vector<value>& l) {
+        type = LIST;
+        lval = l;
+        return *this;
+    }
     value& operator=(const function& f) {
         fval = f;
         type = FUNCTION;
@@ -72,6 +83,7 @@ ostream& operator<< (ostream& o, const value& val) {
     switch (val.type) {
         case value::NUMBER:     return o << val.dval;
         case value::STRING:     return o << val.sval;
+        case value::LIST:       return o << val.lval;
         case value::FUNCTION:   return o << "function: " << val.fval.id;
         default:                return o << "<unknown-type>";
     }

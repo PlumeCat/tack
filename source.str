@@ -9,6 +9,10 @@ let f = () => {
     2
 }
 
+let list = []
+
+print(list)
+
 let g = (a, b) => a + b
 
 let h = (a, b, c) => {

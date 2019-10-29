@@ -372,6 +372,51 @@ DEFINE_RULE(func_literal)
     }
 END_RULE()
 
+DEFINE_RULE(list_literal)
+    // empty list
+    TRY(WS
+        CHAR('[') WS
+        CHAR(']') WS
+        , {
+            result.type = LIST_LITERAL;
+        })
+
+    // non-empty list
+    auto r = ctx.at;
+    if (parse_ws(ctx) && parse_char(ctx, '[')) {
+        while (true) {
+            auto p = ast();
+            if (parse_ws(ctx) && parse_exp(ctx, p)) {
+                vector<ast> elements;
+                result.type = LIST_LITERAL;
+                elements.push_back(p);
+
+                while (true) {
+                    parse_ws(ctx);
+                    auto e = ast();
+                    if (parse_char(ctx, ',') && parse_ws(ctx) && parse_exp(ctx, e)) {
+                        elements.push_back(e);
+                    } else if (parse_char(ctx, ']')) {
+                        for (auto& e: elements) {
+                            result.children.push_back(e);
+                        }
+                        return true;
+                    } else {
+                        ctx.at = r;
+                        return false;
+                    }
+                }
+            } else {
+                ctx.at = r;
+                return false;
+            }
+        }
+    } else {
+        ctx.at = r;
+        return false;
+    }
+END_RULE()
+
 DEFINE_RULE(primary_exp)
     // literal number
     auto num = 0.0;
@@ -388,6 +433,13 @@ DEFINE_RULE(primary_exp)
         , {
             result.str_data = str;
             result.type = STRING_LITERAL;
+        })
+
+    auto l = ast();
+    TRY(WS
+        RULE(list_literal, l)
+        , {
+            result = l;
         })
 
     // literal function

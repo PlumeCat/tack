@@ -3,6 +3,14 @@
 
 value eval(const ast&, state&);
 
+value eval_list_literal(const ast& a, state& s) {
+    auto res = value(vector<value>());
+    for (const auto& c: a.children) {
+        res.lval.push_back(eval(c, s));
+    }
+    return res;
+}
+
 value eval_un_exp(const ast& a, state& s) {
     auto c = eval(a.children[0], s);
     if (c.type != value::NUMBER) {
@@ -123,6 +131,7 @@ value eval(const ast& a, state& s) {
         case UNARY_EXP:     return eval_un_exp(a, s);
         case NUM_LITERAL:   return value(a.num_data);
         case STRING_LITERAL:return value(a.str_data);
+        case LIST_LITERAL:  return eval_list_literal(a, s);
         case FUNC_LITERAL:  return eval_func_literal(a, s);
         case IDENTIFIER:    return s.get_local(a.str_data);
 

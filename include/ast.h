@@ -9,6 +9,7 @@ enum ast_type {
     UNARY_EXP,
     NUM_LITERAL,
     STRING_LITERAL,
+    LIST_LITERAL,
     FUNC_LITERAL,
     IDENTIFIER,
     BLOCK,

@@ -6,6 +6,14 @@
 
 #include "definitions.h"
 
+template<typename t>
+ostream& operator<<(ostream& o, const vector<t>& c) {
+    for (const auto& e: c) {
+        o << c;
+    }
+    return o;
+}
+
 // trim leading whitespace; return the resulting string
 string trim_l(const string& d) {
     auto p = 0;
