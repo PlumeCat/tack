@@ -5,6 +5,7 @@ enum ast_type {
     PROGRAM,
     DECLARATION,
     ASSIGNMENT,
+    IF_EXP,
     BINARY_EXP,
     UNARY_EXP,
     NUM_LITERAL,

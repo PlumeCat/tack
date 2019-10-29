@@ -15,8 +15,20 @@ program-part    = declaration sep
 
 declaration     = "let" name
                 | "let" name '=' expression
-assignment      = name assign-op expression
 
+assignment      = locator assign-op expression
+
+locator         = name
+                | name '[' exp ']'
+                | name '[' exp ']' '[' exp ']'
+
+                // a = 1
+                // a[2] = 1
+                // a[2][3] = 1
+                // a.b.c = 1
+                // a.b[2] = 1
+                // a.b[2].c[3] = 1
+                // a.b[2][3] = 1
 
 
 // EXPRESSIONS
@@ -34,7 +46,10 @@ unary-exp       = unary-op unary-exp
                 | postfix-exp
 
 postfix-exp     = postfix-exp calling                           // LEFT RECURSIVE!!
+                | postfix-exp indexing
                 | primary-exp
+
+indexing        = '[' exp ']'
 
 calling         = '(' [ param_list ] ')'
 
@@ -44,6 +59,7 @@ primary-exp     = '(' expression ')'
                 | number-literal
                 | string-literal
                 | func-literal
+                | array-literal
                 | name
 
 name            = `a-zA-Z_{a-z|A-Z|0-9|_}`

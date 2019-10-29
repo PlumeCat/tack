@@ -1,21 +1,27 @@
 TODO:
     parsing improvements:
-        - unify macro approach (or define grammar combinators), remove hardcoded bits
-        - specify ast schema, add validation (subclasses?)
+        - handle more binary operators
         - correct operator precedence
-        - multithread imports and late binding / linker stage at end
+        - handle chained postfix operators  eg hof()(), aoa[1][2]
         X handle single-argument functions
         X index operator
-        - handle chained postfix operators  eg hof()(), aoa[1][2]
+        - multithread imports
+        - error messages
+
+    parser:
+        - get rid of the "success" blocks; should be able to accomplish with optionals or always return ast & throw failure approach
+        - very inefficient, can we improve? side effect of naive rec-desc?
+            - nested TRY will help with this; (eg, see parse_if_exp)
+        - unify macro approach (or define grammar combinators), remove hardcoded bits
+            - do some kind of general looping / greedy parser
+            - ALL parsing rules should be macro'd
+        - specify ast schema, add validation (subclasses?)
         - find a good way of checking exhaustively for ambiguities (and even for resolving them)
             - ordering of TRY is significant in causing ambiguities
             - during parsing, when ambiguity is resolved, can use to generate very specific error messages
             - for now, should be able to:
                 - generate error messages at a block level when an incorrect program_part is detected
                 - then skip to end of block somehow and attempt to resume
-        - error messages
-        - very inefficient, can we improve? side effect of naive rec-desc?
-        - handle more binary operators
 
     syntax:
         - can we omit brackets for function literals?
@@ -30,7 +36,7 @@ TODO:
             - then can cache bytecodes between runs
 
     jitter:
-        - extension of the rvm
+        - extension of the reference vm
 
     features:
         X strings
@@ -38,8 +44,8 @@ TODO:
         - if/else
         - looping
         - comments
-        - imports
         - custom data structures
+        - imports
         - static typing, type safety, automatic deduction
         - stdlib
             - math

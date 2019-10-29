@@ -81,6 +81,25 @@ value eval_program(const ast& a, state& s) {
     return res;
 }
 
+value eval_if_exp(const ast& a, state& s) {
+    auto condition = eval(a.children[0], s);
+    if (condition.type != value::NUMBER) {
+        throw runtime_error("conditional expression should be a number");
+    }
+
+    if (condition.dval > 0.0) {
+        return eval(a.children[1], s);
+    } else {
+        if (a.children.size() > 2) {
+            return eval(a.children[2], s);
+        } else {
+            // TODO: what should if-expression return if the condition fails and there's no else?
+            // Rust will give it "unit" type, whatever that means
+            return value(0.0);
+        }
+    }
+}
+
 value eval_indexing(const ast& a, state& s) {
     auto l = eval(a.children[0], s);
     auto i = eval(a.children[1], s);
@@ -142,12 +161,13 @@ value eval_func_literal(const ast& a, state& s) {
 value eval(const ast& a, state& s) {
     switch (a.type) {
         // expressions
+        case IF_EXP:        return eval_if_exp(a, s);
         case BINARY_EXP:    return eval_bin_exp(a, s);
         case UNARY_EXP:     return eval_un_exp(a, s);
-        case NUM_LITERAL:   return value(a.num_data);
-        case STRING_LITERAL:return value(a.str_data);
         case LIST_LITERAL:  return eval_list_literal(a, s);
         case FUNC_LITERAL:  return eval_func_literal(a, s);
+        case NUM_LITERAL:   return value(a.num_data);
+        case STRING_LITERAL:return value(a.str_data);
         case IDENTIFIER:    return s.get_local(a.str_data);
 
         // declaration and assignment

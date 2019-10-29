@@ -288,6 +288,7 @@ bool parse_bin_op(parse_context& ctx, ast_operator& result) {
 DECLARE_RULE(exp);
 DECLARE_RULE(program);
 DECLARE_RULE(program_part);
+DECLARE_RULE(block);
 
 DEFINE_RULE(func_body)
     TRY(WS
@@ -406,7 +407,62 @@ DEFINE_RULE(list_literal)
     }
 END_RULE()
 
+DEFINE_RULE(if_exp)
+    auto e = ast();
+    auto yes = ast();
+    auto no  = ast();
+
+    // if {} else if {} ...
+    TRY(WS
+        STR("if")           WS
+        RULE(exp, e)        WS
+        RULE(block, yes)    WS
+        STR("else")         WS
+        RULE(if_exp, no)
+        , {
+            result.type = IF_EXP;
+            result.children.push_back(e);
+            result.children.push_back(yes);
+            result.children.push_back(no);
+        })
+
+    // // if {} else {}
+    e = ast(); yes = ast(); no = ast();
+    TRY(WS
+        STR("if")           WS
+        RULE(exp, e)        WS
+        RULE(block, yes)    WS
+        STR("else")         WS
+        RULE(block, no)
+        , {
+            result.type = IF_EXP;
+            result.children.push_back(e);
+            result.children.push_back(yes);
+            result.children.push_back(no);
+        })
+
+    // // if {}
+    e = ast(); yes = ast();
+    TRY(WS
+        STR("if")           WS
+        RULE(exp, e)        WS
+        RULE(block, yes)
+        , {
+            result.type = IF_EXP;
+            result.children.push_back(e);
+            result.children.push_back(yes);
+        })
+END_RULE()
+
 DEFINE_RULE(primary_exp)
+    // if expression
+    auto ifexp = ast();
+    TRY(WS
+        RULE(if_exp, ifexp)
+        , {
+            result = ifexp;
+        })
+
     // literal number
     auto num = 0.0;
     TRY(WS
@@ -574,11 +630,11 @@ END_RULE()
 
 DEFINE_RULE(block)
 
-    // empty block variant
+    // empty variant
     TRY(WS STR("{") WS STR("}")
         , {})
 
-    // populated block variant
+    // populated variant
     auto restore = ctx.at;
     if (parse_ws(ctx) && parse_string(ctx, "{")) {
         while (true) {
