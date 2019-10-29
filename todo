@@ -2,12 +2,10 @@ TODO:
     parsing improvements:
         - unify macro approach (or define grammar combinators), remove hardcoded bits
         - specify ast schema, add validation (subclasses?)
-        - very inefficient, can we improve? side effect of naive rec-desc?
-        - handle more binary operators
         - correct operator precedence
         - multithread imports and late binding / linker stage at end
         X handle single-argument functions
-        - index operator
+        X index operator
         - handle chained postfix operators  eg hof()(), aoa[1][2]
         - find a good way of checking exhaustively for ambiguities (and even for resolving them)
             - ordering of TRY is significant in causing ambiguities
@@ -16,6 +14,8 @@ TODO:
                 - generate error messages at a block level when an incorrect program_part is detected
                 - then skip to end of block somehow and attempt to resume
         - error messages
+        - very inefficient, can we improve? side effect of naive rec-desc?
+        - handle more binary operators
 
     syntax:
         - can we omit brackets for function literals?
@@ -23,7 +23,8 @@ TODO:
     reference vm:
         X intern functions (source code can only contain so many functions :D)
         - lists and strings a bit useless
-        - print() semantically broken: a = print; a("hello world")
+        - print() semantically broken:
+            a = print; a("hello world") should work but won't
             - will tie in with integrating c functions
         - bytecode generation
             - then can cache bytecodes between runs
@@ -33,7 +34,7 @@ TODO:
 
     features:
         X strings
-        X - arrays
+        X arrays
         - if/else
         - looping
         - comments
@@ -44,8 +45,9 @@ TODO:
             - math
             - strings
             - collections
-            - io
-            - ffi / syscall
+            - io: std-in/out, files, paths, network
+            - os, syscall, ffi
+            - threads, async, futures
         - closure
 
     other:

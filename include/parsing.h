@@ -180,17 +180,6 @@ template<int N> bool parse_string(parse_context& ctx, const char(&str)[N]) {
     }
     return true;
 }
-// return false if not found
-// throw if EOF
-// template<int N>
-// bool parse_str(parse_context& ctx, const char (&str) [N]) {
-//     // TODO: dodgy address-of-reference?
-//     if (strncmp(&*ctx.at, str, N) == 0) {
-//         ctx.advance(N);
-//         return true;
-//     }
-//     return false;
-// }
 
 // consume a number (and leading whitespace)
 // return false if not found
@@ -427,6 +416,7 @@ DEFINE_RULE(primary_exp)
             result.type = NUM_LITERAL;
         })
 
+    // string literal
     auto str = string();
     TRY(WS
         RULE(string_literal, str)
@@ -435,6 +425,7 @@ DEFINE_RULE(primary_exp)
             result.type = STRING_LITERAL;
         })
 
+    // list literal
     auto l = ast();
     TRY(WS
         RULE(list_literal, l)
@@ -450,7 +441,7 @@ DEFINE_RULE(primary_exp)
             result = func;
         })
 
-    // bracketed expression
+    // sub-expression
     auto expr = ast();
     TRY(WS
         CHAR('(')       WS
@@ -460,7 +451,7 @@ DEFINE_RULE(primary_exp)
             result = expr;
         })
 
-    // name
+    // actual identifier
     auto n = string();
     TRY(WS
         RULE(identifier, n)
