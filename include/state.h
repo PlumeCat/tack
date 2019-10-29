@@ -48,6 +48,7 @@ struct value {
         switch (type) {
             case NUMBER:    dval = v.dval; break;
             case STRING:    sval = v.sval; break;
+            case LIST:      lval = v.lval; break;
             case FUNCTION:  fval = v.fval; break;
             default:        throw runtime_error("Unknown type!");
         }

@@ -376,7 +376,7 @@ DEFINE_RULE(list_literal)
     // empty list
     TRY(WS
         CHAR('[') WS
-        CHAR(']') WS
+        CHAR(']')
         , {
             result.type = LIST_LITERAL;
         })

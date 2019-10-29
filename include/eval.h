@@ -5,6 +5,7 @@ value eval(const ast&, state&);
 
 value eval_list_literal(const ast& a, state& s) {
     auto res = value(vector<value>());
+    res.type = value::LIST;
     for (const auto& c: a.children) {
         res.lval.push_back(eval(c, s));
     }

@@ -8,10 +8,15 @@
 
 template<typename t>
 ostream& operator<<(ostream& o, const vector<t>& c) {
-    for (const auto& e: c) {
-        o << c;
+    o << "[";
+    if (c.size()) {
+        o << " " << c[0];
+        for (auto e = c.begin()+1; e != c.end(); e++) {
+            o << ", " << (*e);
+        }
+        o << " ";
     }
-    return o;
+    return o << "]";
 }
 
 // trim leading whitespace; return the resulting string

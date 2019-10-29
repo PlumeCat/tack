@@ -1,25 +1,4 @@
-let log = (x) => {
-    print("LOG: ", x)
-}
-
-
-log("hello world")
-
-let f = () => {
-    2
-}
-
 let list = []
-
-print(list)
-
-let g = (a, b) => a + b
-
-let h = (a, b, c) => {
-    print(a, b, c)
-    let func = (x, y) => { x + y }
-    func(a, b) + c
-}
-
-let c = (1 + 2)
-print(h(1, 2, c))
+let list3 = [ 1 ]
+let list2 = [ 1, 2, 3 +3 ]
+print (list, list3, list2)
