@@ -81,6 +81,20 @@ value eval_program(const ast& a, state& s) {
     return res;
 }
 
+value eval_indexing(const ast& a, state& s) {
+    auto l = eval(a.children[0], s);
+    auto i = eval(a.children[1], s);
+
+    if (l.type != value::LIST) {
+        throw runtime_error("trying to index a non-list");
+    }
+    if (i.type != value::NUMBER) {
+        throw runtime_error("trying to index with a non-number");
+    }
+
+    return l.lval[i.dval];
+}
+
 value eval_calling(const ast& a, state& s) {
     if (a.children[0].str_data == "print") {
         for (int i = 1; i < a.children.size(); i++) {
@@ -142,6 +156,9 @@ value eval(const ast& a, state& s) {
 
         // calling
         case CALLING:       return eval_calling(a, s);
+
+        // indexing
+        case INDEXING:      return eval_indexing(a, s);
 
         // compound structures
         case BLOCK:

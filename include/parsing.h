@@ -476,6 +476,7 @@ DEFINE_RULE(calling)
     TRY(WS CHAR('(') WS CHAR(')')
         , {})
 
+    // parameter variant; append parameter values to end
     auto r = ctx.at;
     if (parse_ws(ctx) && parse_char(ctx, '(')) {
         while (true) {
@@ -504,7 +505,14 @@ DEFINE_RULE(calling)
 END_RULE()
 
 DEFINE_RULE(indexing)
-    return false;
+    auto e = ast();
+    TRY(WS
+        CHAR('[')               WS
+        RULE(primary_exp, e)    WS
+        CHAR(']')
+        , {
+            result.children.push_back(e);
+        })
 END_RULE()
 
 DEFINE_RULE(postfix_exp)

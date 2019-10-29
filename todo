@@ -4,9 +4,10 @@ TODO:
         - specify ast schema, add validation (subclasses?)
         - very inefficient, can we improve? side effect of naive rec-desc?
         - handle more binary operators
-        - correct operator precedence - use parser?
+        - correct operator precedence
         - multithread imports and late binding / linker stage at end
         X handle single-argument functions
+        - index operator
         - handle chained postfix operators  eg hof()(), aoa[1][2]
         - find a good way of checking exhaustively for ambiguities (and even for resolving them)
             - ordering of TRY is significant in causing ambiguities
@@ -21,7 +22,7 @@ TODO:
 
     reference vm:
         X intern functions (source code can only contain so many functions :D)
-        - strings a bit useless
+        - lists and strings a bit useless
         - print() semantically broken: a = print; a("hello world")
             - will tie in with integrating c functions
         - bytecode generation
@@ -32,7 +33,7 @@ TODO:
 
     features:
         X strings
-        - arrays
+        X - arrays
         - if/else
         - looping
         - comments
