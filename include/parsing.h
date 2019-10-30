@@ -314,7 +314,6 @@ bool parse_bin_op(parse_context& ctx, ast_operator& result) {
 
 // forward declaration
 DECLARE_RULE(exp);
-DECLARE_RULE(program);
 DECLARE_RULE(program_part);
 DECLARE_RULE(block);
 
@@ -393,7 +392,7 @@ END_RULE()
 DEFINE_RULE(range_literal)
     auto n1 = 0.0;
     auto n2 = 0.0;
-    // cout << "range literal: " << string(ctx.at, ctx.end) << endl;
+
     TRY(WS
         RULE(integer, n1)
         STR("..")
@@ -638,8 +637,8 @@ END_RULE()
 DEFINE_RULE(indexing)
     auto e = ast();
     TRY(WS
-        CHAR('[')               WS
-        RULE(primary_exp, e)    WS
+        CHAR('[')       WS
+        RULE(exp, e)    WS
         CHAR(']')
         , {
             result.children.push_back(e);
@@ -712,43 +711,6 @@ DEFINE_RULE(binary_exp)
         , {})
 END_RULE()
 
-DEFINE_RULE(block)
-
-    // empty variant
-    TRY(WS STR("{") WS STR("}")
-        , {})
-
-    // populated variant
-    auto restore = ctx.at;
-    if (parse_ws(ctx) && parse_string(ctx, "{")) {
-        while (true) {
-            auto a = ast();
-            if (parse_program_part(ctx, a)) {
-                result.children.push_back(a);
-                if (parse_terminator(ctx)) {
-                    if (parse_ws(ctx) && parse_string(ctx, "}")) {
-                        return true;
-                    } else {
-                        continue;
-                    }
-                }
-                else {
-                    parse_ws(ctx);
-                    if (parse_string(ctx, "}")) {
-                        return true;
-                    } else {
-                        ctx.at = restore;
-                        return false;
-                    }
-                }
-            } else {
-                ctx.at = restore;
-                return false;
-            }
-        }
-    }
-END_RULE()
-
 DEFINE_RULE(exp)
     TRY(WS
         RULE(block, result)
@@ -805,30 +767,75 @@ DEFINE_RULE(program_part)
     TRY(RULE(exp, result), {})
 END_RULE()
 
-DEFINE_RULE(program)
-    while (ctx.at < ctx.end) {
-        auto restore = ctx.at;
-        try {
-            auto r = ast();
-            if (parse_program_part(ctx, r) && parse_terminator(ctx)) {
-                result.children.push_back(r);
-                continue;
+DEFINE_RULE(block)
+    // empty variant
+    TRY(WS STR("{") WS STR("}")
+        , {})
+
+    // populated variant
+    auto restore = ctx.at;
+    if (parse_ws(ctx) && parse_string(ctx, "{")) {
+        while (true) {
+            auto a = ast();
+            if (parse_program_part(ctx, a)) {
+                result.children.push_back(a);
+                if (parse_terminator(ctx)) {
+                    if (parse_ws(ctx) && parse_string(ctx, "}")) {
+                        return true;
+                    } else {
+                        continue;
+                    }
+                }
+                else {
+                    parse_ws(ctx);
+                    if (parse_string(ctx, "}")) {
+                        return true;
+                    } else {
+                        ctx.at = restore;
+                        return false;
+                    }
+                }
             } else {
                 ctx.at = restore;
+                return false;
             }
         }
-        catch (parse_end&) {
-            ctx.at = restore;
-        }
-
-        return false;
     }
-    return true;
+END_RULE()
+
+DEFINE_RULE(program)
+    while (true) {
+        auto a = ast();
+        if (parse_program_part(ctx, a)) {
+            result.children.push_back(a);
+            if (parse_terminator(ctx)) {
+                parse_ws(ctx);
+                if (ctx.at == ctx.end) {
+                    return true;
+                } else {
+                    continue;
+                }
+            }
+            else {
+                parse_ws(ctx);
+                if (ctx.at == ctx.end) {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        } else {
+            return false;
+        }
+    }
 END_RULE()
 
 void parse(const string& data, ast& result) {
-    auto ctx = parse_context(data);
-    parse_program(ctx, result);
+    auto data2 = "{" + data + "}";
+    auto ctx = parse_context(data2);
+    if (!parse_block(ctx, result)) {
+        throw invalid_program();
+    }
     if (ctx.at != ctx.end) {
         throw invalid_program();
     }
