@@ -5,17 +5,22 @@ enum ast_type {
     PROGRAM,
     DECLARATION,
     ASSIGNMENT,
+
     IF_EXP,
+    FOR_EXP,
+    BLOCK,
     BINARY_EXP,
     UNARY_EXP,
-    NUM_LITERAL,
-    STRING_LITERAL,
-    LIST_LITERAL,
-    FUNC_LITERAL,
-    IDENTIFIER,
-    BLOCK,
+
     CALLING,
     INDEXING,
+
+    IDENTIFIER,
+    NUM_LITERAL,
+    STRING_LITERAL,
+    RANGE_LITERAL,
+    LIST_LITERAL,
+    FUNC_LITERAL,
 };
 
 enum ast_operator {

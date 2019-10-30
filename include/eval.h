@@ -100,6 +100,20 @@ value eval_if_exp(const ast& a, state& s) {
     }
 }
 
+value eval_for_exp(const ast& a, state& s) {
+    auto loop_var = a.str_data;
+    auto loop_range = eval(a.children[0], s).lval;
+
+    s.push_scope();
+    for (auto& val : loop_range) {
+        s.set_local(loop_var, val); // update loop variable
+        eval(a.children[1], s);     // evaluate loop body
+    }
+    s.pop_scope();
+
+    return value(0.0); // TODO: what do for loops return (if anything???)
+}
+
 value eval_indexing(const ast& a, state& s) {
     auto l = eval(a.children[0], s);
     auto i = eval(a.children[1], s);
@@ -153,6 +167,16 @@ value eval_calling(const ast& a, state& s) {
     return value(0);
 }
 
+value eval_range_literal(const ast& a, state& s) {
+    auto retval = value(vector<value>());
+    auto first = eval(a.children[0], s).dval;
+    auto last = eval(a.children[1], s).dval;
+    for (double i = first; i < last; i++) {
+        retval.lval.push_back(value(i));
+    }
+    return retval;
+}
+
 value eval_func_literal(const ast& a, state& s) {
     s.functions.push_back(a);
     return value(value::function { s.functions.size() - 1 });
@@ -162,9 +186,11 @@ value eval(const ast& a, state& s) {
     switch (a.type) {
         // expressions
         case IF_EXP:        return eval_if_exp(a, s);
+        case FOR_EXP:       return eval_for_exp(a, s);
         case BINARY_EXP:    return eval_bin_exp(a, s);
         case UNARY_EXP:     return eval_un_exp(a, s);
         case LIST_LITERAL:  return eval_list_literal(a, s);
+        case RANGE_LITERAL: return eval_range_literal(a, s);
         case FUNC_LITERAL:  return eval_func_literal(a, s);
         case NUM_LITERAL:   return value(a.num_data);
         case STRING_LITERAL:return value(a.str_data);

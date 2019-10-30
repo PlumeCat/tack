@@ -113,6 +113,33 @@ bool parse_identifier(parse_context& ctx, string& name) {
         return true;
     }
 
+    ctx.at = start;
+    return false;
+}
+
+// consume a number and leading whitespace - integer format only
+// return false if not found
+// throw if EOF
+bool parse_integer(parse_context& ctx, double& num) {
+    const auto start_pos = ctx.at;
+    auto f = ctx.peek();
+    if (f >= '0' && f <= '9') {
+        ctx.advance();
+        try {
+            while (true) {
+                auto c = ctx.peek();
+                if (!(c >= '0' && c <= '9')) {
+                    break;
+                }
+                ctx.advance();
+            }
+        } catch (parse_end&) {}
+
+        num = (double)stoi(string(start_pos, ctx.at), nullptr);
+        return true;
+    }
+
+    ctx.at = start_pos;
     return false;
 }
 
@@ -186,6 +213,7 @@ template<int N> bool parse_string(parse_context& ctx, const char(&str)[N]) {
 // throw if EOF
 bool parse_number(parse_context& ctx, double& num) {
     // TODO: dodgy address-of-reference?
+    const auto sp = ctx.at;
     const auto start_pos = &*ctx.at;
     auto end_pos = (char*)nullptr;
     num = strtof(start_pos, &end_pos);
@@ -362,6 +390,27 @@ DEFINE_RULE(func_literal)
     }
 END_RULE()
 
+DEFINE_RULE(range_literal)
+    auto n1 = 0.0;
+    auto n2 = 0.0;
+    // cout << "range literal: " << string(ctx.at, ctx.end) << endl;
+    TRY(WS
+        RULE(integer, n1)
+        STR("..")
+        RULE(integer, n2)
+        , {
+            result.type = RANGE_LITERAL;
+            auto c1 = ast();
+            auto c2 = ast();
+            c1.type = NUM_LITERAL;
+            c2.type = NUM_LITERAL;
+            c1.num_data = n1;
+            c2.num_data = n2;
+            result.children.push_back(c1);
+            result.children.push_back(c2);
+        })
+END_RULE()
+
 DEFINE_RULE(list_literal)
     // empty list
     TRY(WS
@@ -454,6 +503,25 @@ DEFINE_RULE(if_exp)
         })
 END_RULE()
 
+DEFINE_RULE(for_exp)
+    auto f = string(); // loop variable
+    auto e = ast(); // the iterator
+    auto body = ast();
+    // for i in e {}
+    TRY(WS
+        STR("for")          WS
+        RULE(identifier, f) WS
+        STR("in")           WS
+        RULE(exp, e)        WS
+        RULE(block, body)
+        , {
+            result.type = FOR_EXP;
+            result.str_data = f;
+            result.children.push_back(e);
+            result.children.push_back(body);
+        })
+END_RULE()
+
 DEFINE_RULE(primary_exp)
     // if expression
     auto ifexp = ast();
@@ -461,6 +529,22 @@ DEFINE_RULE(primary_exp)
         RULE(if_exp, ifexp)
         , {
             result = ifexp;
+        })
+
+    // for expression
+    auto forexp = ast();
+    TRY(WS
+        RULE(for_exp, forexp)
+        , {
+            result = forexp;
+        })
+
+    // range literal
+    auto rexp = ast();
+    TRY(WS
+        RULE(range_literal, rexp)
+        , {
+            result = rexp;
         })
 
     // literal number

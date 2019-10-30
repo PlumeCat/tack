@@ -38,11 +38,12 @@ TODO:
     jitter:
         - extension of the reference vm
 
-    features:
+    basic features:
         X strings
         X arrays
-        - if/else
-        - looping
+        X if/else
+        X looping
+        - range literals!
         - comments
         - custom data structures
         - imports
@@ -54,7 +55,7 @@ TODO:
             - io: std-in/out, files, paths, network
             - os, syscall, ffi
             - threads, async, futures
-        - closure
+        - closures somehow
 
     other:
         - some unit tests!!
