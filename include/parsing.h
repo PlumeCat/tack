@@ -339,8 +339,8 @@ END_RULE()
 DEFINE_RULE(func_literal)
     auto body = ast();
     TRY(WS
-        CHAR('(')       WS
-        CHAR(')')       WS
+        CHAR('(')               WS
+        CHAR(')')               WS
         RULE(func_body, body)
         , {
             result.type = FUNC_LITERAL;
@@ -360,6 +360,24 @@ DEFINE_RULE(func_literal)
         })
 END_RULE()
 
+DEFINE_RULE(list_elements)
+    auto e = ast();
+    TRY(WS
+        RULE(exp, e)                WS
+        CHAR(',')                   WS
+        RULE(list_elements,result)
+        , {
+            result.children.insert(result.children.begin(), e);
+        })
+
+    e = ast();
+    TRY(WS
+        RULE(exp, e)
+        , {
+            result.children.push_back(e);
+        })
+END_RULE()
+
 DEFINE_RULE(list_literal)
     // empty list
     TRY(WS
@@ -370,72 +388,46 @@ DEFINE_RULE(list_literal)
         })
 
     // non-empty list
-    auto r = ctx.at;
-    if (parse_ws(ctx) && parse_char(ctx, '[')) {
-        while (true) {
-            auto p = ast();
-            if (parse_ws(ctx) && parse_exp(ctx, p)) {
-                vector<ast> elements;
-                result.type = LIST_LITERAL;
-                elements.push_back(p);
+    TRY(WS
+        CHAR('[')                   WS
+        RULE(list_elements, result) WS
+        CHAR(']')
+        , {
+            result.type = LIST_LITERAL;
+        })
+END_RULE()
 
-                while (true) {
-                    parse_ws(ctx);
-                    auto e = ast();
-                    if (parse_char(ctx, ',') && parse_ws(ctx) && parse_exp(ctx, e)) {
-                        elements.push_back(e);
-                    } else if (parse_char(ctx, ']')) {
-                        for (auto& e: elements) {
-                            result.children.push_back(e);
-                        }
-                        return true;
-                    } else {
-                        ctx.at = r;
-                        return false;
-                    }
-                }
-            } else {
-                ctx.at = r;
-                return false;
-            }
-        }
-    } else {
-        ctx.at = r;
-        return false;
-    }
+
+DEFINE_RULE(argument_list)
+    auto e = ast();
+    TRY(WS
+        RULE(exp, e)    WS
+        CHAR(',')       WS
+        RULE(argument_list, result)
+        , {
+            result.children.insert(result.children.begin(), e);
+        })
+
+    e = ast();
+    TRY(WS
+        RULE(exp, e)
+        , {
+            result.children.push_back(e);
+        })
 END_RULE()
 
 DEFINE_RULE(calling)
 
+    // parameter variant; append parameter values to end
+    TRY(WS
+        CHAR('(')                   WS
+        RULE(argument_list, result) WS
+        CHAR(')')
+        , {})
+
     // empty call variant
     TRY(WS CHAR('(') WS CHAR(')')
         , {})
-
-    // parameter variant; append parameter values to end
-    auto r = ctx.at;
-    if (parse_ws(ctx) && parse_char(ctx, '(')) {
-        while (true) {
-            auto p = ast();
-            if (parse_exp(ctx, p)) {
-                result.children.push_back(p);
-                parse_ws(ctx);
-                if (parse_char(ctx, ',')) {
-                    continue;
-                } else if (parse_char(ctx, ')')) {
-                    return true;
-                } else {
-                    ctx.at = r;
-                    return false;
-                }
-            } else {
-                ctx.at = r;
-                return false;
-            }
-        }
-    } else {
-        ctx.at = r;
-        return false;
-    }
 END_RULE()
 
 DEFINE_RULE(postfix_exp)
@@ -527,8 +519,6 @@ DEFINE_RULE(program)
         }
     }
 END_RULE()
-
-
 
 
 

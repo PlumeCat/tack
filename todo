@@ -15,9 +15,11 @@ TODO:
         - very inefficient, can we improve? side effect of naive rec-desc?
             - nested TRY will help with this; (eg, see parse_if_exp)
             - tighten up the whitespace rules, this will allow to early-out a lot of rules by peeking 1 or 2 chars
-        - unify macro approach (or define grammar combinators), remove hardcoded bits
-            - do some kind of general looping / greedy parser
+        - unify macro approach (or define grammar combinators)
             - ALL parsing rules should be macro'd
+        X improve right-recursive parsing
+        - implement something for left-recursive rules
+        - update "grammar.bnf" :D :D :D
         - specify ast schema, add validation (subclasses?)
         - find a good way of checking exhaustively for ambiguities (and even for resolving them)
             - ordering of TRY is significant in causing ambiguities

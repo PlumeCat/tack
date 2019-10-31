@@ -1,8 +1,4 @@
-let func = () => {
-    print("hello world")
-}
-
-let func2 = () => {
+let func2 = (a) => {
     print("a: ", a)
 }
 
@@ -12,8 +8,6 @@ let func3 = (a, b, c) => {
 
 for i in 0..3 {
     for j in 0..3 {
-        func()
-        func2(i + j)
-        func3(i, j, 3)
+        func3(i, {}, 3)
     }
 }
