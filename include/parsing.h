@@ -21,11 +21,6 @@ struct parse_context {
         if (at == end) {
             throw parse_end();
         }
-        // if (*at == '\r') {
-        //     // TODO: ugly hack, literally ignore '\r' characters altogether
-        //     advance();
-        //     return peek();
-        // }
         return *at;
     }
     void advance(int n = 1) {
@@ -35,6 +30,7 @@ struct parse_context {
         at += n;
     }
 };
+
 
 
 // Parsing DSL
@@ -314,99 +310,53 @@ bool parse_bin_op(parse_context& ctx, ast_operator& result) {
 
 // forward declaration
 DECLARE_RULE(exp);
+DECLARE_RULE(primary_exp);
+DECLARE_RULE(indexing);
 DECLARE_RULE(program_part);
 DECLARE_RULE(block);
+DECLARE_RULE(func_body);
 
-DEFINE_RULE(func_body)
+
+DEFINE_RULE(param_list)
+    auto i = ast(); i.type = IDENTIFIER;
+    auto j = ast();
+
     TRY(WS
-        STR("=>") WS
-        RULE(exp, result)
-        , {})
+        RULE(identifier, i.str_data)    WS
+        CHAR(',')                       WS
+        RULE(param_list, result)
+        , {
+            result.children.insert(result.children.begin(), i);
+        })
+
+    TRY(WS
+        RULE(identifier, i.str_data)
+        , {
+            result.children.push_back(i);
+        })
 END_RULE()
 
 DEFINE_RULE(func_literal)
-    log_func();
-
     auto body = ast();
-    log.debug() << "trying unargumented func...";
     TRY(WS
         CHAR('(')       WS
         CHAR(')')       WS
         RULE(func_body, body)
         , {
-            log.debug() << "success" << endl;
             result.type = FUNC_LITERAL;
-            // no parameter function
             result.children.push_back(body);
         })
-
-    log.debug() << "failed" << endl;
-
-    log.debug() << "trying argumented func {" << string(ctx.at, ctx.at + 10) << "}" << endl;
-    auto r = ctx.at;
-    if (parse_ws(ctx) && parse_char(ctx, '(')) {
-        log.debug() << "  " << "found (" << endl;
-        while (true) {
-            auto p = ast();
-            if (parse_ws(ctx) && parse_identifier(ctx, p.str_data)) {
-                log.debug() << "found first identifier: " << p << endl;
-                vector<ast> identifiers;
-
-                p.type = IDENTIFIER;
-                identifiers.push_back(p);
-
-                // greedily consume identifiers
-                while (true) {
-                    parse_ws(ctx);
-                    auto id = ast();
-                    auto body = ast();
-                    if (parse_char(ctx, ',') && parse_ws(ctx) && parse_identifier(ctx, id.str_data)) {
-                        log.debug() << "found additional identifier: " << id << endl;
-                        id.type = IDENTIFIER;
-                        identifiers.push_back(id);
-                    } else if (parse_char(ctx, ')') && parse_func_body(ctx, body)) {
-                        log.debug() << "end of parameter list" << endl;
-                        // end of parameter list
-                        for (auto& i: identifiers) {
-                            result.children.push_back(i);
-                        }
-                        result.children.push_back(body);
-                        result.type = FUNC_LITERAL;
-                        return true;
-                    } else {
-                        ctx.at = r;
-                        return false;
-                    }
-                }
-            } else {
-                ctx.at = r;
-                return false;
-            }
-        }
-    } else {
-        ctx.at = r;
-        return false;
-    }
-END_RULE()
-
-DEFINE_RULE(range_literal)
-    auto n1 = 0.0;
-    auto n2 = 0.0;
-
+    auto params = ast();
+    body = ast();
     TRY(WS
-        RULE(integer, n1)
-        STR("..")
-        RULE(integer, n2)
+        CHAR('(')                   WS
+        RULE(param_list, params)    WS
+        CHAR(')')                   WS
+        RULE(func_body, body)
         , {
-            result.type = RANGE_LITERAL;
-            auto c1 = ast();
-            auto c2 = ast();
-            c1.type = NUM_LITERAL;
-            c2.type = NUM_LITERAL;
-            c1.num_data = n1;
-            c2.num_data = n2;
-            result.children.push_back(c1);
-            result.children.push_back(c2);
+            result.type = FUNC_LITERAL;
+            result.children = params.children; // overwrite
+            result.children.push_back(body);
         })
 END_RULE()
 
@@ -453,6 +403,161 @@ DEFINE_RULE(list_literal)
         ctx.at = r;
         return false;
     }
+END_RULE()
+
+DEFINE_RULE(calling)
+
+    // empty call variant
+    TRY(WS CHAR('(') WS CHAR(')')
+        , {})
+
+    // parameter variant; append parameter values to end
+    auto r = ctx.at;
+    if (parse_ws(ctx) && parse_char(ctx, '(')) {
+        while (true) {
+            auto p = ast();
+            if (parse_exp(ctx, p)) {
+                result.children.push_back(p);
+                parse_ws(ctx);
+                if (parse_char(ctx, ',')) {
+                    continue;
+                } else if (parse_char(ctx, ')')) {
+                    return true;
+                } else {
+                    ctx.at = r;
+                    return false;
+                }
+            } else {
+                ctx.at = r;
+                return false;
+            }
+        }
+    } else {
+        ctx.at = r;
+        return false;
+    }
+END_RULE()
+
+DEFINE_RULE(postfix_exp)
+    auto r = ctx.at;
+    try {
+        auto pexp = ast();
+        if (parse_primary_exp(ctx, pexp)) {
+            while (true) {
+                if (parse_calling(ctx, result)) {
+                    result.type = CALLING;
+                    result.children.insert(result.children.begin(), pexp);
+                } else if (parse_indexing(ctx, result)) {
+                    result.type = INDEXING;
+                    result.children.insert(result.children.begin(), pexp);
+                } else {
+                    result = pexp;
+                }
+                return true;
+            }
+        } else {
+            ctx.at = r;
+            return false;
+        }
+    } catch (parse_end&) {
+        ctx.at = r;
+        return false;
+    }
+END_RULE()
+
+DEFINE_RULE(block)
+    // empty variant
+    TRY(WS STR("{") WS STR("}")
+        , {})
+
+    // populated variant
+    auto restore = ctx.at;
+    if (parse_ws(ctx) && parse_string(ctx, "{")) {
+        while (true) {
+            auto a = ast();
+            if (parse_program_part(ctx, a)) {
+                result.children.push_back(a);
+                if (parse_terminator(ctx)) {
+                    if (parse_ws(ctx) && parse_string(ctx, "}")) {
+                        return true;
+                    } else {
+                        continue;
+                    }
+                }
+                else {
+                    parse_ws(ctx);
+                    if (parse_string(ctx, "}")) {
+                        return true;
+                    } else {
+                        ctx.at = restore;
+                        return false;
+                    }
+                }
+            } else {
+                ctx.at = restore;
+                return false;
+            }
+        }
+    }
+END_RULE()
+
+DEFINE_RULE(program)
+    while (true) {
+        auto a = ast();
+        if (parse_program_part(ctx, a)) {
+            result.children.push_back(a);
+            if (parse_terminator(ctx)) {
+                parse_ws(ctx);
+                if (ctx.at == ctx.end) {
+                    return true;
+                } else {
+                    continue;
+                }
+            }
+            else {
+                parse_ws(ctx);
+                if (ctx.at == ctx.end) {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        } else {
+            return false;
+        }
+    }
+END_RULE()
+
+
+
+
+
+DEFINE_RULE(func_body)
+    TRY(WS
+        STR("=>") WS
+        RULE(exp, result)
+        , {})
+END_RULE()
+
+DEFINE_RULE(range_literal)
+    auto n1 = 0.0;
+    auto n2 = 0.0;
+
+    TRY(WS
+        RULE(integer, n1)
+        STR("..")
+        RULE(integer, n2)
+        , {
+            result.type = RANGE_LITERAL;
+            auto c1 = ast();
+            auto c2 = ast();
+            c1.type = NUM_LITERAL;
+            c2.type = NUM_LITERAL;
+            c1.num_data = n1;
+            c2.num_data = n2;
+            result.children.push_back(c1);
+            result.children.push_back(c2);
+        })
 END_RULE()
 
 DEFINE_RULE(if_exp)
@@ -600,40 +705,6 @@ DEFINE_RULE(primary_exp)
         })
 END_RULE()
 
-DEFINE_RULE(calling)
-
-    // empty call variant
-    TRY(WS CHAR('(') WS CHAR(')')
-        , {})
-
-    // parameter variant; append parameter values to end
-    auto r = ctx.at;
-    if (parse_ws(ctx) && parse_char(ctx, '(')) {
-        while (true) {
-            auto p = ast();
-            if (parse_exp(ctx, p)) {
-                result.children.push_back(p);
-                parse_ws(ctx);
-                if (parse_char(ctx, ',')) {
-                    continue;
-                } else if (parse_char(ctx, ')')) {
-                    return true;
-                } else {
-                    ctx.at = r;
-                    return false;
-                }
-            } else {
-                ctx.at = r;
-                return false;
-            }
-        }
-    } else {
-        ctx.at = r;
-        return false;
-    }
-
-END_RULE()
-
 DEFINE_RULE(indexing)
     auto e = ast();
     TRY(WS
@@ -643,33 +714,6 @@ DEFINE_RULE(indexing)
         , {
             result.children.push_back(e);
         })
-END_RULE()
-
-DEFINE_RULE(postfix_exp)
-    auto r = ctx.at;
-    try {
-        auto pexp = ast();
-        if (parse_primary_exp(ctx, pexp)) {
-            while (true) {
-                if (parse_calling(ctx, result)) {
-                    result.type = CALLING;
-                    result.children.insert(result.children.begin(), pexp);
-                } else if (parse_indexing(ctx, result)) {
-                    result.type = INDEXING;
-                    result.children.insert(result.children.begin(), pexp);
-                } else {
-                    result = pexp;
-                }
-                return true;
-            }
-        } else {
-            ctx.at = r;
-            return false;
-        }
-    } catch (parse_end&) {
-        ctx.at = r;
-        return false;
-    }
 END_RULE()
 
 DEFINE_RULE(unary_exp)
@@ -765,69 +809,6 @@ DEFINE_RULE(program_part)
     TRY(RULE(declaration, result), {})
     TRY(RULE(assignment, result), {})
     TRY(RULE(exp, result), {})
-END_RULE()
-
-DEFINE_RULE(block)
-    // empty variant
-    TRY(WS STR("{") WS STR("}")
-        , {})
-
-    // populated variant
-    auto restore = ctx.at;
-    if (parse_ws(ctx) && parse_string(ctx, "{")) {
-        while (true) {
-            auto a = ast();
-            if (parse_program_part(ctx, a)) {
-                result.children.push_back(a);
-                if (parse_terminator(ctx)) {
-                    if (parse_ws(ctx) && parse_string(ctx, "}")) {
-                        return true;
-                    } else {
-                        continue;
-                    }
-                }
-                else {
-                    parse_ws(ctx);
-                    if (parse_string(ctx, "}")) {
-                        return true;
-                    } else {
-                        ctx.at = restore;
-                        return false;
-                    }
-                }
-            } else {
-                ctx.at = restore;
-                return false;
-            }
-        }
-    }
-END_RULE()
-
-DEFINE_RULE(program)
-    while (true) {
-        auto a = ast();
-        if (parse_program_part(ctx, a)) {
-            result.children.push_back(a);
-            if (parse_terminator(ctx)) {
-                parse_ws(ctx);
-                if (ctx.at == ctx.end) {
-                    return true;
-                } else {
-                    continue;
-                }
-            }
-            else {
-                parse_ws(ctx);
-                if (ctx.at == ctx.end) {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-        } else {
-            return false;
-        }
-    }
 END_RULE()
 
 void parse(const string& data, ast& result) {
