@@ -6,12 +6,13 @@ standard library
     - abs, fabs, fmod, remainder
     - min, max, floor, ceil, round
     - pow, sqrt, exp, log
+
 - strings
     - length
     - slice
-
-    - contains
     - replace
+
+    - indexof
     - count
 
     - join
@@ -20,27 +21,38 @@ standard library
     - startswith, endswith
 
     - operator +
+    - operator ==
+    - operator !=
+    - operator []
+
 - lists
     - length
     - slice
     - sort
+    - unique
+    - reverse
 
     - map
-    - reduce
-    - foldl, foldr
+    - reduce, foldl, foldr
     - filter
     - foreach
 
     - contains
     - find
-    - index
+    - indexof
 
     - push
     - pop
     - shift
     - unshift
+    - insert
+    - remove
 
     - operator +
-- io: std-in/out, files, paths, network
+    X operator []
+
+- io, std-in/out, files, paths, network
+
 - os, ffi
+
 - threads, async, futures

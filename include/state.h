@@ -90,7 +90,11 @@ ostream& operator<< (ostream& o, const value& val) {
     }
 }
 
-using scope = map<string, value>;
+// using scope = map<string, value>;
+
+struct scope {
+    map<string, value> local_variables;
+}
 struct state {
     vector<scope> scopes;
     vector<ast> functions; // interned functions
@@ -108,8 +112,12 @@ struct state {
     }
 
     // variables
-    void set_local(const string& name, const value& val) {
+    void define_local(const string& name, const value& val) {
         scopes[scopes.size()-1][name] = val;
+    }
+    void set_local(const string& name, const value& val) {
+        // scopes[scopes.size()-1][name] = val;
+        get_local(name) = val;
     }
     value& get_local(const string& name, int frame = -1) {
         if (frame == -1) {

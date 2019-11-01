@@ -163,10 +163,11 @@ struct ast {
 ostream& operator << (ostream& o, const ast& a) {
     auto output = [&](auto recurse, const ast& a, const string& indent="") -> void {
         const auto indent2 = indent + "    ";
-        o << indent << "Ast: "
-            << type_to_string(a.type) << " | "
-            << op_to_string(a.op) << " | "
-            << a.num_data << " | " << (a.str_data.length() ? a.str_data : "");
+        o << indent //<< "Ast: "
+            << type_to_string(a.type)   << ":"
+            << (a.type == DECLARATION || a.type == ASSIGNMENT || a.type == BINARY_EXP || a.type == UNARY_EXP ? (op_to_string(a.op)) : "")
+            << (a.type == NUM_LITERAL ? (" " + to_string(a.num_data)) : "")
+            << (a.str_data.length() ? (" " + a.str_data) : "");
         for (const auto& c: a.children) {
             o << "\n";
             recurse(recurse, c, indent2);

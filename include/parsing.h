@@ -336,6 +336,7 @@ DEFINE_RULE(func_literal)
     TRY(WS
         CHAR('(')               WS
         CHAR(')')               WS
+        STR("=>")               WS
         RULE(func_body, body)
         , {
             result.type = FUNC_LITERAL;
@@ -347,6 +348,7 @@ DEFINE_RULE(func_literal)
         CHAR('(')                   WS
         RULE(param_list, params)    WS
         CHAR(')')                   WS
+        STR("=>")                   WS
         RULE(func_body, body)
         , {
             result.type = FUNC_LITERAL;
@@ -416,44 +418,50 @@ DEFINE_RULE(calling)
         CHAR('(')                   WS
         RULE(argument_list, result) WS
         CHAR(')')
-        , {})
+        , {
+            result.type = CALLING;
+        })
     TRY(WS
         CHAR('(') WS
         CHAR(')')
-        , {})
+        , {
+            result.type = CALLING;
+        })
+END_RULE()
+
+DEFINE_RULE(indexing)
+    auto pexp = ast();
+    TRY(WS
+        CHAR('[')           WS
+        RULE(exp, pexp)   WS
+        CHAR(']')
+        , {
+            result.type = INDEXING;
+            result.children.push_back(pexp);
+        })
 END_RULE()
 
 DEFINE_RULE(postfix_exp)
-    // Thus far the only left-recursive rule...
-    auto r = ctx.at;
-    try {
-        if (parse_primary_exp(ctx, result)) {
+    auto pexp = ast();
+    TRY(WS
+        RULE(primary_exp, pexp)
+        , {
+            // Thus far the only left-recursive rule...
             while (true) {
                 auto call = ast();
                 auto index = ast();
                 if (parse_calling(ctx, call)) {
-                    // TODO: this is either brilliant or horrible
-                    result.children.insert(result.children.begin(), result);
-                    result.type = CALLING;
-                    result.children.push_back(call);
-                    return true;
+                    call.children.insert(call.children.begin(), pexp);
+                    pexp = call;
                 } else if (parse_indexing(ctx, index)) {
-                    result.children.insert(result.children.begin(), result);
-                    result.type = INDEXING;
-                    result.children.push_back(index);
-                    return true;
+                    index.children.insert(index.children.begin(), pexp);
+                    pexp = index;
                 } else {
+                    result = pexp;
                     return true;
                 }
             }
-        } else {
-            ctx.at = r;
-            return false;
-        }
-    } catch (parse_end&) {
-        ctx.at = r;
-        return false;
-    }
+        })
 END_RULE()
 
 
@@ -470,6 +478,7 @@ DEFINE_RULE(block_contents)
     TRY(WS
         RULE(program_part, p)
         OPT(TERM)
+        WS
         , {
             result.children.push_back(p);
         })
@@ -490,7 +499,6 @@ END_RULE()
 
 DEFINE_RULE(func_body)
     TRY(WS
-        STR("=>") WS
         RULE(exp, result)
         , {})
 END_RULE()
@@ -633,7 +641,7 @@ DEFINE_RULE(primary_exp)
             result = l;
         })
 
-    // literal function
+    // function literal
     auto func = ast();
     TRY(WS
         RULE(func_literal, func)
@@ -659,14 +667,6 @@ DEFINE_RULE(primary_exp)
             result.str_data = n;
             result.type = IDENTIFIER;
         })
-END_RULE()
-
-DEFINE_RULE(indexing)
-    TRY(WS
-        CHAR('[')           WS
-        RULE(exp, result)   WS
-        CHAR(']')
-        , {})
 END_RULE()
 
 DEFINE_RULE(unary_exp)

@@ -32,26 +32,48 @@ value eval_un_exp(const ast& a, state& s) {
 value eval_bin_exp(const ast& a, state& s) {
     auto c0 = eval(a.children[0], s);
     auto c1 = eval(a.children[1], s);
-    if (c0.type != value::NUMBER || c1.type != value::NUMBER) {
-        throw runtime_error("can't evaluate binaryoperator for non-number");
+    if (c0.type != c1.type) {
+        throw runtime_error("can't evaluate binary operator for mismatched types");
     }
-    switch (a.op) {
-        // Arithmetic
-        case OP_ADD:        return c0.dval + c1.dval;
-        case OP_SUB:        return c0.dval - c1.dval;
-        case OP_MUL:        return c0.dval * c1.dval;
-        case OP_DIV:        return c0.dval / c1.dval;
-        // case OP_MOD:     return c0.dval % c1.dval;
 
-        // Binary / bitwise
-        // case OP_AND:     return c0.dval & c1.dval;
-        // case OP_OR:      return c0.dval | c1.dval;
-        // case OP_XOR:     return c0.dval ^ c1.dval;
-        case OP_BOOL_AND:   return c0.dval && c1.dval;
-        case OP_BOOL_OR:    return c0.dval || c1.dval;
+    switch (c0.type) {
+        case value::NUMBER:
+            switch (a.op) {
+                // Arithmetic
+                case OP_ADD:        return c0.dval + c1.dval;
+                case OP_SUB:        return c0.dval - c1.dval;
+                case OP_MUL:        return c0.dval * c1.dval;
+                case OP_DIV:        return c0.dval / c1.dval;
+                // case OP_MOD:     return c0.dval % c1.dval;
 
-        default:
-            throw runtime_error("unknown operator");
+                // Binary / bitwise
+                // case OP_AND:     return c0.dval & c1.dval;
+                // case OP_OR:      return c0.dval | c1.dval;
+                // case OP_XOR:     return c0.dval ^ c1.dval;
+                case OP_BOOL_AND:   return c0.dval && c1.dval;
+                case OP_BOOL_OR:    return c0.dval || c1.dval;
+
+                default:
+                    throw runtime_error("invalid numerical binary operation");
+            }
+        case value::STRING:
+            switch (a.op) {
+                case OP_ADD:        return c0.sval + c1.sval;
+                default:
+                    throw runtime_error("invalid string binary operation");
+            }
+        case value::LIST:
+            switch (a.op) {
+                case OP_ADD: {
+                    auto retval = value(c0.lval);
+                    for (auto& v: c1.lval) {
+                        retval.lval.push_back(v);
+                    }
+                    return retval;
+                }
+                default:
+                    throw runtime_error("invalid list binary operation");
+            }
     }
 }
 
@@ -66,7 +88,7 @@ value eval_declaration(const ast& a, state& s) {
     assert(a.type == DECLARATION);
     auto name = a.children[0].str_data;
     auto val = eval(a.children[1], s);
-    s.set_local(name, val);
+    s.define_local(name, val);
     return 1;
 }
 
@@ -105,6 +127,7 @@ value eval_for_exp(const ast& a, state& s) {
     auto loop_range = eval(a.children[0], s).lval;
 
     s.push_scope();
+    s.define_local(loop_var, 0.0);
     for (auto& val : loop_range) {
         s.set_local(loop_var, val); // update loop variable
         eval(a.children[1], s);     // evaluate loop body
@@ -155,7 +178,7 @@ value eval_calling(const ast& a, state& s) {
         for (int i = 0; i < func.children.size()-1; i++) {
             auto argname = func.children[i].str_data;
             auto argval = eval(a.children[i+1], s);
-            s.set_local(argname, argval);
+            s.define_local(argname, argval);
         }
 
         // evaluate body

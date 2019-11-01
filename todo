@@ -2,18 +2,18 @@ TODO:
     parsing improvements:
         - handle more binary operators
         - correct operator precedence
-        - handle chained postfix operators  eg hof()(), aoa[1][2]
+        X handle chained postfix operators  eg hof()(), aoa[1][2]
         X handle single-argument functions
         X index operator
         - multithread imports
-        - error messages
+        - better error messages
 
     parser:
         X unify macro approach (or define grammar combinators)
             - ALL parsing rules should be macro'd
         X improve right-recursive parsing
         X implement something for left-recursive rules
-        - parse_program broken??? we are hacking to use block :|
+        X parse_program broken??? we are hacking to use block :|
             tricky because EOF acceptable as terminator
         - get rid of the "success" blocks
         - very inefficient, can we improve? side effect of naive rec-desc?
@@ -33,7 +33,6 @@ TODO:
 
     reference vm:
         X intern functions (source code can only contain so many functions :D)
-        - lists and strings a bit useless
         - print() semantically broken:
             a = print; a("hello world") should work but won't
             - will tie in with integrating c functions
@@ -49,12 +48,15 @@ TODO:
         X if/else
         X looping
         X range literals!
-        - comments
-        - custom data structures
-        - imports
-        - static typing, type safety, automatic deduction
         - stdlib
+        - comments
+        - match?
+        - custom data structures
+            - labelled product type
+            - sum type
+        - imports
         - closures somehow
+        - remove special string, make list of char
 
     other:
         - some unit tests!!
@@ -62,3 +64,7 @@ TODO:
             - make the top-level parse a program-part
             - evaluate as we go
             - handle multilines nicely
+        - have an optimising compiler
+            - type checker
+            - [automatic] threading
+            - memory management
