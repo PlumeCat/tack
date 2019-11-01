@@ -70,21 +70,25 @@ enum ast_operator {
 
 string type_to_string(ast_type t) {
     const auto m = map<ast_type, string> {
-        { PROGRAM,      "Program" },
-        { DECLARATION,  "Declaration" },
-        { ASSIGNMENT,   "Assignment" },
-        { BINARY_EXP,   "BinaryExp" },
-        { LIST_LITERAL, "ListLiteral" },
-        { UNARY_EXP,    "UnaryExp" },
-        { RANGE_LITERAL,"RangeLiteral" },
-        { IF_EXP,       "IfExp" },
-        { FOR_EXP,      "ForExp" },
-        { NUM_LITERAL,  "Literal" },
-        { FUNC_LITERAL, "FuncLiteral" },
-        { IDENTIFIER,   "Identifier" },
-        { BLOCK,        "Block" },
-        { CALLING,      "Calling" },
-        { INDEXING,     "Indexing" },
+        { PROGRAM,          "Program" },
+        { DECLARATION,      "Declaration" },
+        { ASSIGNMENT,       "Assignment" },
+
+        { IF_EXP,           "IfExp" },
+        { FOR_EXP,          "ForExp" },
+        { BLOCK,            "Block" },
+        { BINARY_EXP,       "BinaryExp" },
+        { UNARY_EXP,        "UnaryExp" },
+
+        { CALLING,          "Calling" },
+        { INDEXING,         "Indexing" },
+
+        { IDENTIFIER,       "Identifier" },
+        { NUM_LITERAL,      "NumLiteral" },
+        { STRING_LITERAL,   "StringLiteral" },
+        { LIST_LITERAL,     "ListLiteral" },
+        { RANGE_LITERAL,    "RangeLiteral" },
+        { FUNC_LITERAL,     "FuncLiteral" },
     };
     auto f = m.find(t);
     if (f != m.end()) {

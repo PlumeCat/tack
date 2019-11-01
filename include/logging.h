@@ -5,7 +5,7 @@ struct _log {
     stringstream null = stringstream();
 
     ostream& out() {
-        return null;
+        // return null;
         return cerr;
     }
 

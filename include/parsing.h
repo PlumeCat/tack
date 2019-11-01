@@ -43,8 +43,7 @@ bool rulename(name)(parse_context& ctx, ast& result)
 
 // begin parsing function
 #define DEFINE_RULE(name)\
-DECLARE_RULE(name) {\
-    auto _eof = false;
+DECLARE_RULE(name) {
 #define TRY(exp, stuff) \
     auto cat(_restore, __LINE__) = ctx.at;\
     try {\
@@ -55,13 +54,8 @@ DECLARE_RULE(name) {\
         ctx.at = cat(_restore, __LINE__);\
     } catch (parse_end&) {\
         ctx.at = cat(_restore, __LINE__);\
-        _eof = true; /* eof was encountered trying to parse this rule */ \
     }
 #define END_RULE()\
-    if (_eof) {\
-        /* nothing succeeded but one or more of them threw EOF; pass upwards */ \
-        throw parse_end();\
-    }\
     return false;\
 }
 
@@ -70,6 +64,7 @@ DECLARE_RULE(name) {\
 #define CHAR(c)             && parse_char(ctx, c)
 #define STR(s)              && parse_string(ctx, s)
 #define RULE(rule, res)     && rulename(rule)(ctx, res)
+#define OPT(rule)           && ((true rule) || true)
 #define TERM                && parse_terminator(ctx)
 
 
@@ -417,35 +412,39 @@ DEFINE_RULE(argument_list)
 END_RULE()
 
 DEFINE_RULE(calling)
-
-    // parameter variant; append parameter values to end
     TRY(WS
         CHAR('(')                   WS
         RULE(argument_list, result) WS
         CHAR(')')
         , {})
-
-    // empty call variant
-    TRY(WS CHAR('(') WS CHAR(')')
+    TRY(WS
+        CHAR('(') WS
+        CHAR(')')
         , {})
 END_RULE()
 
 DEFINE_RULE(postfix_exp)
+    // Thus far the only left-recursive rule...
     auto r = ctx.at;
     try {
-        auto pexp = ast();
-        if (parse_primary_exp(ctx, pexp)) {
+        if (parse_primary_exp(ctx, result)) {
             while (true) {
-                if (parse_calling(ctx, result)) {
+                auto call = ast();
+                auto index = ast();
+                if (parse_calling(ctx, call)) {
+                    // TODO: this is either brilliant or horrible
+                    result.children.insert(result.children.begin(), result);
                     result.type = CALLING;
-                    result.children.insert(result.children.begin(), pexp);
-                } else if (parse_indexing(ctx, result)) {
+                    result.children.push_back(call);
+                    return true;
+                } else if (parse_indexing(ctx, index)) {
+                    result.children.insert(result.children.begin(), result);
                     result.type = INDEXING;
-                    result.children.insert(result.children.begin(), pexp);
+                    result.children.push_back(index);
+                    return true;
                 } else {
-                    result = pexp;
+                    return true;
                 }
-                return true;
             }
         } else {
             ctx.at = r;
@@ -457,70 +456,37 @@ DEFINE_RULE(postfix_exp)
     }
 END_RULE()
 
+
+DEFINE_RULE(block_contents)
+    auto p = ast();
+    TRY(WS
+        RULE(program_part, p)           TERM
+        RULE(block_contents, result)
+        , {
+            result.children.insert(result.children.begin(), p);
+        })
+
+    p = ast();
+    TRY(WS
+        RULE(program_part, p)
+        OPT(TERM)
+        , {
+            result.children.push_back(p);
+        })
+END_RULE()
+
 DEFINE_RULE(block)
-    // empty variant
-    TRY(WS STR("{") WS STR("}")
+    TRY(WS
+        CHAR('{')    WS
+        CHAR('}')
         , {})
 
-    // populated variant
-    auto restore = ctx.at;
-    if (parse_ws(ctx) && parse_string(ctx, "{")) {
-        while (true) {
-            auto a = ast();
-            if (parse_program_part(ctx, a)) {
-                result.children.push_back(a);
-                if (parse_terminator(ctx)) {
-                    if (parse_ws(ctx) && parse_string(ctx, "}")) {
-                        return true;
-                    } else {
-                        continue;
-                    }
-                }
-                else {
-                    parse_ws(ctx);
-                    if (parse_string(ctx, "}")) {
-                        return true;
-                    } else {
-                        ctx.at = restore;
-                        return false;
-                    }
-                }
-            } else {
-                ctx.at = restore;
-                return false;
-            }
-        }
-    }
+    TRY(WS
+        CHAR('{')                       WS
+        RULE(block_contents, result)    WS
+        CHAR('}')
+        , {})
 END_RULE()
-
-DEFINE_RULE(program)
-    while (true) {
-        auto a = ast();
-        if (parse_program_part(ctx, a)) {
-            result.children.push_back(a);
-            if (parse_terminator(ctx)) {
-                parse_ws(ctx);
-                if (ctx.at == ctx.end) {
-                    return true;
-                } else {
-                    continue;
-                }
-            }
-            else {
-                parse_ws(ctx);
-                if (ctx.at == ctx.end) {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-        } else {
-            return false;
-        }
-    }
-END_RULE()
-
-
 
 DEFINE_RULE(func_body)
     TRY(WS
@@ -696,14 +662,11 @@ DEFINE_RULE(primary_exp)
 END_RULE()
 
 DEFINE_RULE(indexing)
-    auto e = ast();
     TRY(WS
-        CHAR('[')       WS
-        RULE(exp, e)    WS
+        CHAR('[')           WS
+        RULE(exp, result)   WS
         CHAR(']')
-        , {
-            result.children.push_back(e);
-        })
+        , {})
 END_RULE()
 
 DEFINE_RULE(unary_exp)
@@ -802,9 +765,10 @@ DEFINE_RULE(program_part)
 END_RULE()
 
 void parse(const string& data, ast& result) {
-    auto data2 = "{" + data + "}";
-    auto ctx = parse_context(data2);
-    if (!parse_block(ctx, result)) {
+    // auto data2 = "{" + data + "}";
+    // auto ctx = parse_context(data2);
+    auto ctx = parse_context(data);
+    if (!parse_block_contents(ctx, result)) {
         throw invalid_program();
     }
     if (ctx.at != ctx.end) {

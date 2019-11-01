@@ -9,16 +9,16 @@ TODO:
         - error messages
 
     parser:
+        X unify macro approach (or define grammar combinators)
+            - ALL parsing rules should be macro'd
+        X improve right-recursive parsing
+        X implement something for left-recursive rules
         - parse_program broken??? we are hacking to use block :|
             tricky because EOF acceptable as terminator
-        - get rid of the "success" blocks; should be able to accomplish with optionals or always return ast & throw failure approach
+        - get rid of the "success" blocks
         - very inefficient, can we improve? side effect of naive rec-desc?
             - nested TRY will help with this; (eg, see parse_if_exp)
             - tighten up the whitespace rules, this will allow to early-out a lot of rules by peeking 1 or 2 chars
-        - unify macro approach (or define grammar combinators)
-            - ALL parsing rules should be macro'd
-        X improve right-recursive parsing
-        - implement something for left-recursive rules
         - update "grammar.bnf" :D :D :D
         - specify ast schema, add validation (subclasses?)
         - find a good way of checking exhaustively for ambiguities (and even for resolving them)
@@ -54,12 +54,6 @@ TODO:
         - imports
         - static typing, type safety, automatic deduction
         - stdlib
-            - math
-            - strings
-            - collections
-            - io: std-in/out, files, paths, network
-            - os, ffi
-            - threads, async, futures
         - closures somehow
 
     other:

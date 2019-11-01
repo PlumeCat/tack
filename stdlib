@@ -1,0 +1,46 @@
+standard library
+
+- math
+    - PI, E
+    - sin, cos, tan, asin, acos, atan, atan2
+    - abs, fabs, fmod, remainder
+    - min, max, floor, ceil, round
+    - pow, sqrt, exp, log
+- strings
+    - length
+    - slice
+
+    - contains
+    - replace
+    - count
+
+    - join
+
+    - isspace
+    - startswith, endswith
+
+    - operator +
+- lists
+    - length
+    - slice
+    - sort
+
+    - map
+    - reduce
+    - foldl, foldr
+    - filter
+    - foreach
+
+    - contains
+    - find
+    - index
+
+    - push
+    - pop
+    - shift
+    - unshift
+
+    - operator +
+- io: std-in/out, files, paths, network
+- os, ffi
+- threads, async, futures
