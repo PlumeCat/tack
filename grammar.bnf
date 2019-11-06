@@ -1,4 +1,4 @@
-// PROGRAM
+        // PROGRAM
 
 program         = { declaration | assignment | expression }
 
@@ -9,24 +9,19 @@ program-part    = declaration sep
 
 
 declaration     = "let" name
+                | "let" name ':' name
                 | "let" name '=' expression
+                | "let" name ':' name '=' expression
+                | "type" name type-def
+type-def        = '{' '}'
 
 assignment      = locator assign-op expression
 
-locator         = name
+locator         = name indexing
                 | name '[' exp ']'
                 | name '[' exp ']' '[' exp ']'
 
-                // a = 1
-                // a[2] = 1
-                // a[2][3] = 1
-                // a.b.c = 1
-                // a.b[2] = 1
-                // a.b[2].c[3] = 1
-                // a.b[2][3] = 1
-
-
-// EXPRESSIONS
+        // EXPRESSIONS
 
 expression      = block
                 | binary-exp
@@ -34,7 +29,41 @@ expression      = block
 block           = '{' '}'
                 | '{' program '}'
 
-binary-exp      = unary-exp binary-op binary-exp                // precedence : bool x2, compare x6, bit x3, shift x2, add x2, mul x3
+for-exp         = "for" identifier "in" exp block
+
+if-exp          = "if" exp block
+
+binary-exp      = bool-or-exp
+
+        // BINARY EXPRESSIONS
+        lower down will have higher precedence
+        note that cmp doesn't chain like the others
+
+bool-or-exp     = bool-and-exp "||"     bool-and-exp
+                | bool-and-exp
+bool-and-exp    = cmp-exp      "&&"     bool-and-exp
+                | cmp-exp
+cmp-exp         = bit-or-exp   cmp-op   bit-or-exp
+                | bit-or-exp
+bit-or-exp      = bit-and-exp  '|'      bit-and-exp
+                | bit-and-exp
+bit-and-exp     = bit-xor-exp  '&'      bit-and-exp
+                | bit-xor-exp
+bit-xor-exp     = lshift-exp   '^'      bit-xor-exp
+                | lshift-exp
+lshift-exp      = rshift-exp   '<<'     lshift-exp
+                | rshift-exp
+rshift-exp      = add-exp      '>>'     rshift-exp
+                | add-exp
+add-exp         = sub-exp       '+'     add-exp
+                | sub-exp
+sub-exp         = mul-exp       '-'     sub-exp
+                | mul-exp
+mul-exp         = div-exp       '*'     mul-exp
+                | div-exp
+div-exp         = mod-exp       '/'     div-exp
+                | mod-exp
+mod-exp         = unary-exp     '%'     mod-exp
                 | unary-exp
 
 unary-exp       = unary-op unary-exp
@@ -58,7 +87,6 @@ primary-exp     = '(' expression ')'
                 | name
 
 name            = `a-zA-Z_{a-z|A-Z|0-9|_}`
-
 number-literal  = ...
 string-literal  = ...
 func_literal    = '(' [ arg_decl ] ')' '->' expression

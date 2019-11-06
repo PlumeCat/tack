@@ -1,0 +1,443 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+			[
+				"psuh",
+				"push_back"
+			],
+			[
+				"hof",
+				"hof_retval_retval"
+			]
+		]
+	},
+	"build_system": "",
+	"build_system_choices":
+	[
+		[
+			[
+				[
+					"Packages/Makefile/Make.sublime-build",
+					""
+				],
+				[
+					"Packages/Makefile/Make.sublime-build",
+					"Clean"
+				],
+				[
+					"Packages/User/make.sublime-build",
+					""
+				]
+			],
+			[
+				"Packages/User/make.sublime-build",
+				""
+			]
+		]
+	],
+	"build_varint": "",
+	"command_palette":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"gdb",
+				"SublimeGDB: Start Debugging"
+			],
+			[
+				"sublimegdb settings",
+				"Preferences: SublimeGDB Settings – User"
+			],
+			[
+				"gdb ",
+				"SublimeGDB: Start Debugging"
+			],
+			[
+				"settings",
+				"Preferences: SublimeGDB Settings – User"
+			],
+			[
+				"install",
+				"Package Control: Install Package"
+			],
+			[
+				"wrap",
+				"Word Wrap: Toggle"
+			],
+			[
+				"rust",
+				"Set Syntax: Rust"
+			],
+			[
+				"c#",
+				"Set Syntax: C#"
+			],
+			[
+				"go",
+				"Set Syntax: Go"
+			],
+			[
+				"javascirpt",
+				"Set Syntax: JavaScript Next"
+			],
+			[
+				"build",
+				"Build With: C++11"
+			],
+			[
+				"cancel build",
+				"Build: Cancel"
+			],
+			[
+				"package control install",
+				"Package Control: Install Package"
+			],
+			[
+				"key ",
+				"Preferences: Key Bindings"
+			],
+			[
+				"python",
+				"Set Syntax: Python"
+			],
+			[
+				"scala",
+				"Set Syntax: Scala"
+			],
+			[
+				"color scheme",
+				"UI: Select Color Scheme"
+			],
+			[
+				"syntax: c++",
+				"Set Syntax: C++11"
+			],
+			[
+				"c++",
+				"Set Syntax: C++"
+			],
+			[
+				"color sche",
+				"UI: Select Color Scheme"
+			],
+			[
+				"package con",
+				"Package Control: Remove Package"
+			],
+			[
+				"color sc",
+				"UI: Select Color Scheme"
+			],
+			[
+				"menu",
+				"View: Toggle Menu"
+			],
+			[
+				"color",
+				"UI: Select Color Scheme"
+			],
+			[
+				"theme",
+				"UI: Select Theme"
+			],
+			[
+				"spaces",
+				"Indentation: Convert to Spaces"
+			],
+			[
+				"set color sc",
+				"UI: Select Color Scheme"
+			],
+			[
+				"package control: install",
+				"Package Control: Install Package"
+			],
+			[
+				"install ",
+				"Install Package Control"
+			]
+		],
+		"width": 0.0
+	},
+	"console":
+	{
+		"height": 579.0,
+		"history":
+		[
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"file_history":
+	[
+		"/C/Users/james/source/repos/tack/tack.sublime-project",
+		"/C/Users/james/source/repos/tack/.sublime_project",
+		"/C/Users/james/Downloads/Tools/Sublime Text Build 3170 x64/Data/Packages/User/SublimeGDB.sublime-settings",
+		"/C/Users/james/source/repos/tack/src/main.cpp",
+		"/C/Users/james/source/repos/tack/include/logging.h",
+		"/C/Users/james/source/repos/tack/source.str",
+		"/C/Users/james/source/repos/tack/Makefile",
+		"/C/Users/james/source/repos/tack/todo",
+		"/C/Users/james/source/repos/tack/include/util.h",
+		"/C/Users/james/source/repos/tack/include/state.h",
+		"/C/Users/james/source/repos/tack/grammar.bnf",
+		"/C/Users/james/source/repos/tack/source2.str",
+		"/C/Users/james/source/repos/tack/include/ast.h",
+		"/C/Users/james/source/repos/tack/include/eval.h",
+		"/C/Users/james/Downloads/Tools/Sublime Text Build 3170 x64/Data/Packages/User/make.sublime-build",
+		"/C/Users/james/Downloads/Tools/Sublime Text Build 3170 x64/Data/Packages/Package Control/Package Control.sublime-settings",
+		"/C/Users/james/Downloads/spaceships01/carrier01.obj",
+		"/C/Users/james/Downloads/spaceships01/license.txt",
+		"/C/Users/james/source/repos/lang2/language.txt",
+		"/C/Users/james/source/repos/lang2/Makefile",
+		"/C/Users/james/source/repos/lang2/src/main.cpp",
+		"/C/Users/james/source/repos/tradebot/server/test.py",
+		"/C/Users/james/source/repos/tradebot/server/app.py",
+		"/C/Users/james/source/repos/tradebot/server/data.json",
+		"/C/Users/james/source/repos/tradebot/pricebot/app.py",
+		"/C/Users/james/source/repos/tradebot/tradebot-server/app.py",
+		"/C/Users/james/source/repos/SpaceGame/TODO LIST.txt",
+		"/C/Users/james/source/repos/blackjack/main.py",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Makefile",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Meshes/laser_rifle.obj",
+		"/C/Users/james/source/repos/c_http/Makefile",
+		"/C/Users/james/source/repos/c_http/main.c",
+		"/C/Users/james/source/repos/SpaceGame/SpaceGame.sln",
+		"/C/Users/james/source/repos/SpaceGame/SpaceGame/SpaceGame.vcxproj",
+		"/C/Users/james/Desktop/nativelog.txt",
+		"/C/Users/james/source/repos/SpaceGame/Resources/export_dae.py",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Meshes/wall_door_1.obj",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Meshes/bullet.obj",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Assets/wall_door_2.txt",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Assets/tree.txt",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Assets/barrel.txt",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Assets/cube.txt",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Assets/crate.txt",
+		"/C/Users/james/source/repos/SpaceGame/Resources/todo.txt",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Meshes/cylinder.mtl",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Assets/barrel.lua.txt",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Assets/cube.lua.txt",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Assets/tree.lua.txt",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Meshes/lasertrooper.mtl",
+		"/C/Users/james/source/repos/SpaceGame/SpaceGame/todo.txt.txt",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Meshes/sniper_hud.mtl",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Meshes/laser_rifle_hud.mtl",
+		"/C/Users/james/source/repos/SpaceGame/SpaceGame/magetech.txt",
+		"/C/Users/james/Downloads/DeadProject Goal2/DeadProject Goal1/update..read.txt",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Meshes/shotgun.mtl",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Meshes/laser_rifle.mtl",
+		"/C/Users/james/source/repos/SpaceGame/Resources/lasertroopers.txt",
+		"/C/Users/james/source/repos/SpaceGame/SpaceGame/README.md",
+		"/C/Users/james/source/repos/helloscala/build.sbt",
+		"/C/Users/james/source/repos/helloscala/src/main/scala/Main.scala",
+		"/C/cygwin64/home/james/.bashrc",
+		"/C/cygwin64/home/james/.vim/vimrc",
+		"/C/cygwin64/home/james/.vimrc",
+		"/C/Users/james/source/repos/helloscala/src/main/scala/main.scala",
+		"/C/Users/james/source/repos/helloscala/project/main.scala",
+		"/C/Users/james/Documents/SPACE GAME/weapons.txt",
+		"/C/Users/james/Documents/SPACE GAME/spaceships.txt",
+		"/C/Users/james/Documents/SPACE GAME/lore.txt",
+		"/C/Users/james/Documents/SPACE GAME/characters.txt",
+		"/C/Users/james/Documents/SPACE GAME/psionics.txt",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Meshes/apc.mtl",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Meshes/crate.mtl",
+		"/C/Users/james/Downloads/bullet3-master(1)/bullet3-master/examples/Vehicles/Hinge2Vehicle.cpp",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Meshes/box.obj",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Meshes/box.mtl",
+		"/C/Users/james/Documents/funya.cpp",
+		"/C/Users/james/Documents/SPACE GAME/sql.md",
+		"/C/Users/james/source/repos/SpaceGame/Resources/Meshes/crate.obj",
+		"/C/Users/james/Documents/SPACE GAME/items.txt",
+		"/C/Users/james/Documents/SPACE GAME/space game.txt",
+		"/C/Users/james/Documents/SPACE GAME/settlements.txt",
+		"/C/Users/james/Downloads/AppIelD.pdf",
+		"/C/Users/james/Downloads/ATT00001.htm",
+		"/C/Users/james/Documents/SPACE GAME/Todo list.txt",
+		"/C/Users/james/Documents/SPACE GAME/SPACE GAME.txt",
+		"/C/Program Files (x86)/Microsoft Visual Studio/2017/Community/VC/Auxiliary/VS/include/assimp/config.h",
+		"/C/Program Files (x86)/Microsoft Visual Studio/2017/Community/VC/Auxiliary/VS/include/assimp/config.h.in"
+	],
+	"find":
+	{
+		"height": 40.0
+	},
+	"find_in_files":
+	{
+		"height": 102.0,
+		"where_history":
+		[
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": false,
+		"find_history":
+		[
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": false,
+		"replace_history":
+		[
+		],
+		"reverse": false,
+		"show_context": true,
+		"use_buffer2": true,
+		"whole_word": false,
+		"wrap": true
+	},
+	"incremental_find":
+	{
+		"height": 39.0
+	},
+	"input":
+	{
+		"height": 116.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				3,
+				1
+			],
+			[
+				0,
+				1,
+				1,
+				2
+			],
+			[
+				1,
+				1,
+				2,
+				2
+			],
+			[
+				2,
+				1,
+				3,
+				2
+			]
+		],
+		"cols":
+		[
+			0.0,
+			0.33,
+			0.66,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			0.75,
+			1.0
+		]
+	},
+	"menu_visible": false,
+	"output.exec":
+	{
+		"height": 331.0
+	},
+	"output.find_results":
+	{
+		"height": 0.0
+	},
+	"pinned_build_system": "",
+	"replace":
+	{
+		"height": 71.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"main",
+				"src\\main.cpp"
+			],
+			[
+				"state",
+				"include\\state.h"
+			],
+			[
+				"stat",
+				"include\\state.h"
+			],
+			[
+				"eval",
+				"include\\eval.h"
+			],
+			[
+				"Makef",
+				"Makefile"
+			],
+			[
+				"ast.h",
+				"include\\ast.h"
+			],
+			[
+				"ast",
+				"include\\ast.h"
+			],
+			[
+				"a",
+				"Makefile"
+			],
+			[
+				"b",
+				"build.sbt"
+			]
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_symbol":
+	{
+		"height": 392.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 592.0
+	},
+	"settings":
+	{
+	},
+	"show_minimap": true,
+	"show_open_files": false,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 202.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+	}
+}

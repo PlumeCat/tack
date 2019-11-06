@@ -56,14 +56,18 @@ enum ast_operator {
     OP_DIV,
     OP_MOD,
 
-    // Binary / bitwise
+    // Binary
     OP_AND,
     OP_OR,
     OP_XOR,
     OP_LSH,
     OP_RSH,
+
+    // Boolean
     OP_BOOL_AND,
     OP_BOOL_OR,
+
+    // Unary only
     OP_NOT,
     OP_BOOL_NOT,
 };
@@ -98,7 +102,7 @@ string type_to_string(ast_type t) {
 }
 string op_to_string(ast_operator op) {
     const auto m = map<ast_operator, string> {
-        // { OP_UNKNOWN,       "OpUnknown" },
+        // assignments
         { OP_ASSIGN,        "OpAssign" },
         { OP_ASSIGN_ADD,    "OpAssignAdd" },
         { OP_ASSIGN_SUB,    "OpAssignSub" },
@@ -110,22 +114,34 @@ string op_to_string(ast_operator op) {
         { OP_ASSIGN_XOR,    "OpAssignXor" },
         { OP_ASSIGN_LSH,    "OpAssignLsh" },
         { OP_ASSIGN_RSH,    "OpAssignRsh" },
+
+        // comparisons
         { OP_EQUAL,         "OpEqual" },
         { OP_NOT_EQUAL,     "OpNoTequal" },
         { OP_LESS,          "OpLess" },
         { OP_GREATER,       "OpGreater" },
         { OP_LESS_EQUAL,    "OpLessEqual" },
         { OP_GREATER_EQUAL, "OpGreaterEqual" },
+
+        // arithmetic
         { OP_ADD,           "OpAdd" },
         { OP_SUB,           "OpSub" },
         { OP_MUL,           "OpMul" },
         { OP_DIV,           "OpDiv" },
         { OP_MOD,           "OpMod" },
+
+        // bitwise
         { OP_AND,           "OpAnd" },
         { OP_OR,            "OpOr" },
         { OP_XOR,           "OpXor" },
+        { OP_LSH,           "OpLsh" },
+        { OP_RSH,           "OpRsh" },
+
+        // boolean
         { OP_BOOL_AND,      "OpBoolAnd" },
         { OP_BOOL_OR,       "OpBoolOr" },
+
+        // unary only
         { OP_NOT,           "OpNot" },
         { OP_BOOL_NOT,      "OpBoolNot" },
     };

@@ -1,14 +1,17 @@
 TODO:
     parsing improvements:
-        - handle more binary operators
+        X handle more binary operators
         - correct operator precedence
         X handle chained postfix operators  eg hof()(), aoa[1][2]
         X handle single-argument functions
         X index operator
+        - specialise parse_string for 1 character - use invisibly in macro'd rules!
         - multithread imports
         - better error messages
 
     parser:
+        - check that associativity is working for all binary operators
+            want '/', '-', '%' to l-associate, but will r-associate due to r-recursive grammar...
         X unify macro approach (or define grammar combinators)
             - ALL parsing rules should be macro'd
         X improve right-recursive parsing

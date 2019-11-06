@@ -44,20 +44,21 @@ bool rulename(name)(parse_context& ctx, ast& result)
 // begin parsing function
 #define DEFINE_RULE(name)\
 DECLARE_RULE(name) {
-#define TRY(exp, stuff) \
-    auto cat(_restore, __LINE__) = ctx.at;\
+#define TRY2(exp, stuff, line) \
+    auto cat(_restore, line) = ctx.at;\
     try {\
         if (true exp) { \
             stuff\
             return true; \
         }\
-        ctx.at = cat(_restore, __LINE__);\
+        ctx.at = cat(_restore, line);\
     } catch (parse_end&) {\
-        ctx.at = cat(_restore, __LINE__);\
+        ctx.at = cat(_restore, line);\
     }
 #define END_RULE()\
     return false;\
 }
+#define TRY(exp, stuff) TRY2(exp, stuff, __LINE__)
 
 // parsing DSL "combinators"
 #define WS                  && parse_ws(ctx)
@@ -274,7 +275,7 @@ bool parse_assign_op(parse_context& ctx, ast_operator& result) {
 // throw if EOF
 bool parse_unary_op(parse_context& ctx, ast_operator& result) {
     // no need to catch EOF; if one throws it all would throw it
-    result = parse_char(ctx, '+') ? OP_ADD :
+    result =parse_char(ctx, '+') ? OP_ADD :
             parse_char(ctx, '-') ? OP_SUB :
             parse_char(ctx, '!') ? OP_BOOL_NOT :
             parse_char(ctx, '~') ? OP_NOT :
@@ -282,18 +283,35 @@ bool parse_unary_op(parse_context& ctx, ast_operator& result) {
     return (result != OP_UNKNOWN);
 }
 
-// consume a binary operator
+// consume a comparison operator
 // return false if not found
 // throw if EOF
-bool parse_bin_op(parse_context& ctx, ast_operator& result) {
+bool parse_cmp_op(parse_context& ctx, ast_operator& result) {
     // no need to catch EOF; if one throws it they all would throw it
     // just make sure to try them in reverse order of length to preserve this
-    // eg "<<=" might throw EOF when "+1" would not
-    result = parse_char(ctx, '+') ? OP_ADD :
+    result =parse_char(ctx, '<') ? OP_LESS :
+            parse_char(ctx, '>') ? OP_GREATER:
+            parse_string(ctx, "==") ? OP_MUL :
+            parse_string(ctx, "!=") ? OP_DIV :
+            parse_string(ctx, "<=") ? OP_MOD :
+            parse_string(ctx, ">=") ? OP_MOD :
+            OP_UNKNOWN;
+    return result != OP_UNKNOWN;
+}
+
+bool parse_bin_op(parse_context& ctx, ast_operator& result) {
+    result =parse_char(ctx, '+') ? OP_ADD :
             parse_char(ctx, '-') ? OP_SUB :
             parse_char(ctx, '*') ? OP_MUL :
             parse_char(ctx, '/') ? OP_DIV :
             parse_char(ctx, '%') ? OP_MOD :
+            parse_char(ctx, '&') ? OP_AND :
+            parse_char(ctx, '|') ? OP_OR :
+            parse_char(ctx, '^') ? OP_XOR :
+            parse_string(ctx, "<<") ? OP_LSH :
+            parse_string(ctx, ">>") ? OP_RSH :
+            parse_string(ctx, "&&") ? OP_BOOL_AND :
+            parse_string(ctx, "||") ? OP_BOOL_OR :
             OP_UNKNOWN;
     return result != OP_UNKNOWN;
 }
@@ -394,7 +412,6 @@ DEFINE_RULE(list_literal)
         })
 END_RULE()
 
-
 DEFINE_RULE(argument_list)
     auto e = ast();
     TRY(WS
@@ -463,7 +480,6 @@ DEFINE_RULE(postfix_exp)
             }
         })
 END_RULE()
-
 
 DEFINE_RULE(block_contents)
     auto p = ast();
@@ -591,6 +607,14 @@ DEFINE_RULE(for_exp)
 END_RULE()
 
 DEFINE_RULE(primary_exp)
+    // block
+    auto blk = ast();
+    TRY(WS
+        RULE(block, blk)
+        , {
+            result = blk;
+        })
+
     // if expression
     auto ifexp = ast();
     TRY(WS
@@ -708,10 +732,63 @@ DEFINE_RULE(binary_exp)
         , {})
 END_RULE()
 
+    // #define DEF_BIN_OP(_op, _opstring, _precede)\
+    //     DEFINE_RULE(_op)\
+    //         auto lhs = ast();\
+    //         auto rhs = ast();\
+    //         TRY2(WS\
+    //             RULE(_precede, lhs)  WS\
+    //             STR(_opstring)       WS\
+    //             RULE(_op, rhs)\
+    //             , {\
+    //                 result.type = BINARY_EXP;\
+    //                 result.children.push_back(lhs);\
+    //                 result.children.push_back(rhs);\
+    //                 result.op = cat(OP_, _op);\
+    //             }, 1)\
+    //         TRY2(WS\
+    //             RULE(_precede, result)\
+    //             , {\
+    //             }, 2)\
+    //     END_RULE()
+
+    // DEF_BIN_OP(MOD,         "%",   unary_exp)
+    // DEF_BIN_OP(DIV,         "/",   MOD)
+    // DEF_BIN_OP(MUL,         "*",   DIV)
+    // DEF_BIN_OP(SUB,         "-",   MUL)
+    // DEF_BIN_OP(ADD,         "+",   SUB)
+
+    // DEF_BIN_OP(RSH,         ">>",   ADD)
+    // DEF_BIN_OP(LSH,         "<<",   RSH)
+    // DEF_BIN_OP(XOR,         "^",    LSH)
+    // DEF_BIN_OP(AND,         "&",    XOR)
+    // DEF_BIN_OP(OR,          "|",    AND)
+
+    // DECLARE_RULE(comparison);
+
+    // DEF_BIN_OP(BOOL_AND,    "&&",   comparison)
+    // DEF_BIN_OP(BOOL_OR,     "||",   BOOL_AND)
+
+    // DEFINE_RULE(comparison)
+    //     auto lhs = ast();
+    //     auto rhs = ast();
+    //     auto op = ast_operator();
+    //     TRY(WS
+    //         RULE(OR, lhs)       WS
+    //         RULE(cmp_op, op)    WS
+    //         RULE(OR, rhs)
+    //         , {
+    //             result.children.push_back(lhs);
+    //             result.children.push_back(rhs);
+    //             result.type = BINARY_EXP;
+    //             result.op = op;
+    //         })
+    //     TRY(WS
+    //         RULE(OR, result)
+    //         , {})
+    // END_RULE()
+
 DEFINE_RULE(exp)
-    TRY(WS
-        RULE(block, result)
-        , {})
     TRY(WS
         RULE(binary_exp, result)
         , {})
@@ -765,8 +842,6 @@ DEFINE_RULE(program_part)
 END_RULE()
 
 void parse(const string& data, ast& result) {
-    // auto data2 = "{" + data + "}";
-    // auto ctx = parse_context(data2);
     auto ctx = parse_context(data);
     if (!parse_block_contents(ctx, result)) {
         throw invalid_program();

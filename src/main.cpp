@@ -10,6 +10,8 @@
 #include <numeric>
 #include <string_view>
 #include <algorithm>
+#include <chrono>
+#include <thread>
 
 #include <cassert>
 #include <cstring>

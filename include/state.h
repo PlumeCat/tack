@@ -90,11 +90,7 @@ ostream& operator<< (ostream& o, const value& val) {
     }
 }
 
-// using scope = map<string, value>;
-
-struct scope {
-    map<string, value> local_variables;
-}
+using scope = map<string, value>;
 struct state {
     vector<scope> scopes;
     vector<ast> functions; // interned functions
