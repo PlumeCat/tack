@@ -21,6 +21,8 @@ enum ast_type {
     RANGE_LITERAL,
     LIST_LITERAL,
     FUNC_LITERAL,
+
+    NATIVE_FUNC, // only used by define_function
 };
 
 enum ast_operator {
@@ -93,6 +95,8 @@ string type_to_string(ast_type t) {
         { LIST_LITERAL,     "ListLiteral" },
         { RANGE_LITERAL,    "RangeLiteral" },
         { FUNC_LITERAL,     "FuncLiteral" },
+
+        { NATIVE_FUNC,      "NativeFunc" },
     };
     auto f = m.find(t);
     if (f != m.end()) {
@@ -157,6 +161,7 @@ struct ast {
     ast_operator op = OP_UNKNOWN;
     string str_data;
     double num_data;
+    void* ptr_data = nullptr;
     vector<ast> children;
 
     ast() = default;
@@ -183,7 +188,9 @@ ostream& operator << (ostream& o, const ast& a) {
             << type_to_string(a.type)   << ":"
             << (a.type == DECLARATION || a.type == ASSIGNMENT || a.type == BINARY_EXP || a.type == UNARY_EXP ? (op_to_string(a.op)) : "")
             << (a.type == NUM_LITERAL ? (" " + to_string(a.num_data)) : "")
-            << (a.str_data.length() ? (" " + a.str_data) : "");
+            << (a.str_data.length() ? (" " + a.str_data) : "")
+            //<< (a.type == NATIVE_FUNC ? " " + to_string((size_t)a.ptr_data) : "")
+            ;
         for (const auto& c: a.children) {
             o << "\n";
             recurse(recurse, c, indent2);

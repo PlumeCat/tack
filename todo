@@ -1,5 +1,5 @@
 TODO:
-    parsing improvements:
+    parser:
         X handle more binary operators
         - correct operator precedence
         X handle chained postfix operators  eg hof()(), aoa[1][2]
@@ -8,21 +8,18 @@ TODO:
         - specialise parse_string for 1 character - use invisibly in macro'd rules!
         - multithread imports
         - better error messages
-
-    parser:
         - check that associativity is working for all binary operators
             want '/', '-', '%' to l-associate, but will r-associate due to r-recursive grammar...
         X unify macro approach (or define grammar combinators)
             - ALL parsing rules should be macro'd
+        - get rid of the "success" blocks
         X improve right-recursive parsing
         X implement something for left-recursive rules
         X parse_program broken??? we are hacking to use block :|
             tricky because EOF acceptable as terminator
-        - get rid of the "success" blocks
         - very inefficient, can we improve? side effect of naive rec-desc?
-            - nested TRY will help with this; (eg, see parse_if_exp)
+            - nested TRY will help with this; only parse common leading elements once
             - tighten up the whitespace rules, this will allow to early-out a lot of rules by peeking 1 or 2 chars
-        - update "grammar.bnf" :D :D :D
         - specify ast schema, add validation (subclasses?)
         - find a good way of checking exhaustively for ambiguities (and even for resolving them)
             - ordering of TRY is significant in causing ambiguities
@@ -36,27 +33,29 @@ TODO:
 
     reference vm:
         X intern functions (source code can only contain so many functions :D)
-        - print() semantically broken:
-            a = print; a("hello world") should work but won't
-            - will tie in with integrating c functions
+        - handle builtins properly, maybe a bottom-level scope?
+            a = print; a("hello world") should work but currently doesn't
         - bytecode generation
             - then can cache bytecodes between runs
 
     jitter:
+        - remove "custom" strings; make as array of char
         - extension of the reference vm
 
-    basic features:
+    language:
         X strings
         X arrays
         X if/else
         X looping
         X range literals!
-        - stdlib
-        - comments
-        - match?
+        - proper binding of c functions
         - custom data structures
             - labelled product type
             - sum type
+        - static typing
+        - comments
+        - stdlib
+        - match?
         - imports
         - closures somehow
         - remove special string, make list of char
@@ -68,6 +67,5 @@ TODO:
             - evaluate as we go
             - handle multilines nicely
         - have an optimising compiler
-            - type checker
             - [automatic] threading
             - memory management

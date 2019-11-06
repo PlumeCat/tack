@@ -1,3 +1,10 @@
-1 * 2 + 3
+let f = () => {
+    () => { print("hello world") }
+}
 
-3 + 2 * 1
+print("hello world")
+print(sqrt(2))
+
+let a = print
+
+a("ayyy")

@@ -18,16 +18,16 @@ struct _log {
     ostream& error() {
         return cout << "ERROR: ";
     }
-} log;
+} logger;
 
 struct _logfunc {
     string func;
     _logfunc(const string& f) {
         func = f;
-        log.debug() << " -- entering " << func << endl;
+        logger.debug() << " -- entering " << func << endl;
     }
     ~_logfunc() {
-        log.debug() << " -- exiting " << func << endl;
+        logger.debug() << " -- exiting " << func << endl;
     }
 };
 #define log_func() auto _logfunc_##__LINE__ = _logfunc(string(__FUNCTION__))

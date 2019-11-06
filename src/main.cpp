@@ -13,6 +13,7 @@
 #include <chrono>
 #include <thread>
 
+#include <cmath>
 #include <cassert>
 #include <cstring>
 #include <cstdlib>
@@ -29,21 +30,39 @@ using namespace std;
 #include "state.h"
 #include "eval.h"
 
+value tack_sqrt(const vector<value>& args) {
+    return value(sqrt(args[0].dval));
+}
+
+value tack_print(const vector<value>& args) {
+    for (const auto& a: args) {
+        cout << a << " ";
+    }
+    cout << endl;
+    return value(0);
+}
+
 void execute(const string& source) {
     auto ptr = (char*)source.c_str();
     auto program = ast();
     auto vmstate = state();
 
+    // invisible root scope for builtin functions only
+    vmstate.push_scope();
+    vmstate.define_local("print", define_function(tack_print, vmstate));
+    vmstate.define_local("sqrt",  define_function(tack_sqrt,  vmstate));
+
     try {
+        logger.debug() << "parsing program" << endl;
         parse(ptr, program);
-        log.debug() << program << endl;
+        logger.debug() << program << endl;
         eval(program, vmstate);
     } catch (parse_end&) {
-        log.error() << "unexpected end of file" << endl;
+        logger.error() << "unexpected end of file" << endl;
     } catch (invalid_program&) {
-        log.error() << "invalid program" << endl;
+        logger.error() << "invalid program" << endl;
     } catch (exception& e) {
-        log.error() << "runtime error: " << e.what() << endl;
+        logger.error() << "runtime error: " << e.what() << endl;
     }
 }
 
@@ -70,9 +89,9 @@ int main(int argc, char* argv[]) {
     } else {
         // source file mode
         auto fname = argv[1];
-        log.info() << "Loading: " << fname << endl;
+        logger.info() << "Loading: " << fname << endl;
         auto data = read_text_file(fname);
-        log.info() << "length: " << data.length() << " | " << strlen(&*data.begin()) << endl;
+        logger.info() << "length: " << data.length() << " | " << strlen(&*data.begin()) << endl;
         execute(data);
     }
 

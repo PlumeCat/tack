@@ -4,8 +4,8 @@ CXX := g++
 CXX_FLAGS := \
 	-I./include \
 	-std=c++17 \
-	-O5 \
-	-w
+	-w \
+	-g
 
 source := $(wildcard src/*.cpp)
 target := dist/main.exe

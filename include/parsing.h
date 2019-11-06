@@ -255,7 +255,7 @@ bool parse_declare_op(parse_context& ctx, ast_operator& result) {
 // throw if eof
 bool parse_assign_op(parse_context& ctx, ast_operator& result) {
     // see comments in parse_bin_op
-    result = parse_char(ctx, '=') ? OP_ASSIGN :
+    result =parse_char(ctx, '=') ? OP_ASSIGN :
             parse_string(ctx, "+=") ? OP_ASSIGN_ADD :
             parse_string(ctx, "-=") ? OP_ASSIGN_SUB :
             parse_string(ctx, "*=") ? OP_ASSIGN_MUL :

@@ -7,19 +7,34 @@ program-part    = declaration sep
                 | assignment sep
                 | expression sep
 
+declaration     = var-decl
+                | type-decl
 
-declaration     = "let" name
+
+        // VARIABLES
+
+var-decl        = "let" name
                 | "let" name ':' name
                 | "let" name '=' expression
                 | "let" name ':' name '=' expression
-                | "type" name type-def
-type-def        = '{' '}'
+
+
+        // TYPES
+
+type-decl       = "type" name type-def
+
+type-def        = product-type-def
+                | sum-type-def
+
+
+        // ASSIGNMENTS
 
 assignment      = locator assign-op expression
 
-locator         = name indexing
-                | name '[' exp ']'
-                | name '[' exp ']' '[' exp ']'
+locator         = exp '.' locator
+                | name
+                | indexing
+
 
         // EXPRESSIONS
 
@@ -69,7 +84,9 @@ mod-exp         = unary-exp     '%'     mod-exp
 unary-exp       = unary-op unary-exp
                 | postfix-exp
 
-postfix-exp     = postfix-exp calling                           // LEFT RECURSIVE!!
+
+        // handled left-recursion here with parsing gymnastics
+postfix-exp     = postfix-exp calling
                 | postfix-exp indexing
                 | primary-exp
 

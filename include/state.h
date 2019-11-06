@@ -2,7 +2,8 @@
 #define _STATE_H
 
 struct value;
-ostream& operator<< (ostream& o, const value& val);
+ostream& operator << (ostream&, const value&);
+using native_function = value (*)(const vector<value>&);
 
 struct value {
     enum {
@@ -90,10 +91,12 @@ ostream& operator<< (ostream& o, const value& val) {
     }
 }
 
-using scope = map<string, value>;
+
 struct state {
+    using scope = map<string, value>;
+
     vector<scope> scopes;
-    vector<ast> functions; // interned functions
+    vector<ast> functions;    // interned functions
 
     state() = default;
     state(const state&) = default;

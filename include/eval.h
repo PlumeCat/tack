@@ -152,25 +152,18 @@ value eval_indexing(const ast& a, state& s) {
 }
 
 value eval_calling(const ast& a, state& s) {
-    if (a.children[0].str_data == "print") {
-        for (int i = 1; i < a.children.size(); i++) {
-            cout << eval(a.children[i], s) << " ";
-        }
-        cout << endl;
-    } else {
-        auto fid = eval(a.children[0], s);
-        if (fid.type != value::FUNCTION) {
-            throw runtime_error("trying to call a non-function: "  + (string)fid);
-        }
-        auto func = s.functions[fid.fval.id];
+    auto fid = eval(a.children[0], s);
+    if (fid.type != value::FUNCTION) {
+        throw runtime_error("trying to call a non-function: "  + (string)fid);
+    }
 
-        if (func.type != FUNC_LITERAL) {
-            throw runtime_error("invalid function value");
-        }
+    auto func = s.functions[fid.fval.id];
+
+    // calling scripted functions
+    if (func.type == FUNC_LITERAL) {
         if (func.children.size() != a.children.size()) {
             throw runtime_error("incorrect number of arguments");
         }
-
         auto& body = func.children[func.children.size()-1];
         s.push_scope();
 
@@ -184,10 +177,23 @@ value eval_calling(const ast& a, state& s) {
         // evaluate body
         auto res = eval(body, s);
         s.pop_scope();
-
         return res;
+    } else if (func.type == NATIVE_FUNC) {
+        auto nfunc = (native_function)func.ptr_data;
+
+        // evaluate parameter tuple and put into a list
+        auto args = vector<value>();
+        for (int i = 0; i < a.children.size()-1; i++) {
+            args.push_back(eval(a.children[i+1], s));
+        }
+
+        // evaluate native function
+        auto res = nfunc(args);
+        return res;
+    } else {
+        throw runtime_error("invalid function value");
     }
-    return value(0);
+
 }
 
 value eval_range_literal(const ast& a, state& s) {
@@ -238,6 +244,14 @@ value eval(const ast& a, state& s) {
         default:
             throw runtime_error("unknown ast type: ");
     }
+}
+
+value define_function(native_function func, state& s) {
+    // TODO: is this a hack?
+    auto f = ast();
+    f.type = NATIVE_FUNC;
+    f.ptr_data = (void*)func;
+    return eval_func_literal(f, s);
 }
 
 #endif
