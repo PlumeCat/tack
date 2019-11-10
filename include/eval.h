@@ -151,18 +151,13 @@ value eval_indexing(const ast& a, state& s) {
     return l.lval[i.dval];
 }
 
-value eval_calling(const ast& a, state& s) {
-    auto fid = eval(a.children[0], s);
-    if (fid.type != value::FUNCTION) {
-        throw runtime_error("trying to call a non-function: "  + (string)fid);
-    }
-
-    auto func = s.functions[fid.fval.id];
+value eval_calling_func(const value& callee, const ast& a, state& s) {
+    auto func = s.functions[callee.fval.id];
 
     // calling scripted functions
     if (func.type == FUNC_LITERAL) {
-        if (func.children.size() != a.children.size()) {
-            throw runtime_error("incorrect number of arguments");
+        if (func.children.size() - 1 != a.children.size() - 1) {
+            throw runtime_error("incorrect number of arguments for function call");
         }
         auto& body = func.children[func.children.size()-1];
         s.push_scope();
@@ -193,7 +188,39 @@ value eval_calling(const ast& a, state& s) {
     } else {
         throw runtime_error("invalid function value");
     }
+}
 
+value eval_calling_type(const value& callee, const ast& a, state& s) {
+    auto type = s.types[callee.tval.id];
+    if (type.type == TYPE_DECL) {
+        if (type.children.size() != a.children.size() - 1) {
+            throw runtime_error("incorrect number of arguments for type constructor");
+        }
+
+        auto retval = value::object {};
+        // assign all member values
+        for (int i = 0; i < type.children.size(); i++) {
+            auto& member_decl = type.children[i];
+            auto& member_name = member_decl.children[0].str_data;
+            auto member_val = eval(a.children[i + 1], s);
+            retval[member_name] = member_val;
+        }
+        return value(retval);
+    } else {
+        throw runtime_error("invalid type value");
+    }
+}
+
+value eval_calling(const ast& a, state& s) {
+    auto callee = eval(a.children[0], s);
+    if (callee.type == value::FUNCTION) {
+        return eval_calling_func(callee, a, s);
+    } else if (callee.type == value::TYPE) {
+        return eval_calling_type(callee, a, s);
+    }
+    else {
+        throw runtime_error("invalid call expression: "  + (string)callee);
+    }
 }
 
 value eval_range_literal(const ast& a, state& s) {
@@ -211,6 +238,12 @@ value eval_func_literal(const ast& a, state& s) {
     return value(value::function { s.functions.size() - 1 });
 }
 
+value eval_type_decl(const ast& a, state& s) {
+    s.types.push_back(a);
+    s.define_local(a.str_data, value::itype { s.types.size() - 1 });
+    return value(0);
+}
+
 value eval(const ast& a, state& s) {
     switch (a.type) {
         // expressions
@@ -226,6 +259,7 @@ value eval(const ast& a, state& s) {
         case IDENTIFIER:    return s.get_local(a.str_data);
 
         // declaration and assignment
+        case TYPE_DECL:     return eval_type_decl(a, s);
         case ASSIGNMENT:    return eval_assignment(a, s);
         case DECLARATION:   return eval_declaration(a, s);
 

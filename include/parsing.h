@@ -325,8 +325,11 @@ bool parse_bin_op(parse_context& ctx, ast_operator& result) {
 DECLARE_RULE(exp);
 DECLARE_RULE(primary_exp);
 DECLARE_RULE(indexing);
-DECLARE_RULE(program_part);
 DECLARE_RULE(block);
+DECLARE_RULE(declaration);
+DECLARE_RULE(type_decl);
+DECLARE_RULE(type_def);
+DECLARE_RULE(type_def_contents);
 DECLARE_RULE(func_body);
 
 
@@ -479,38 +482,6 @@ DEFINE_RULE(postfix_exp)
                 }
             }
         })
-END_RULE()
-
-DEFINE_RULE(block_contents)
-    auto p = ast();
-    TRY(WS
-        RULE(program_part, p)           TERM
-        RULE(block_contents, result)
-        , {
-            result.children.insert(result.children.begin(), p);
-        })
-
-    p = ast();
-    TRY(WS
-        RULE(program_part, p)
-        OPT(TERM)
-        WS
-        , {
-            result.children.push_back(p);
-        })
-END_RULE()
-
-DEFINE_RULE(block)
-    TRY(WS
-        CHAR('{')    WS
-        CHAR('}')
-        , {})
-
-    TRY(WS
-        CHAR('{')                       WS
-        RULE(block_contents, result)    WS
-        CHAR('}')
-        , {})
 END_RULE()
 
 DEFINE_RULE(func_body)
@@ -732,7 +703,7 @@ DEFINE_RULE(binary_exp)
         , {})
 END_RULE()
 
-    // #define DEF_BIN_OP(_op, _opstring, _precede)\
+// #define DEF_BIN_OP(_op, _opstring, _precede)\
     //     DEFINE_RULE(_op)\
     //         auto lhs = ast();\
     //         auto rhs = ast();\
@@ -794,6 +765,46 @@ DEFINE_RULE(exp)
         , {})
 END_RULE()
 
+DEFINE_RULE(type_def_contents)
+    auto p = ast();
+    TRY(WS
+        RULE(declaration, p)            TERM
+        RULE(type_def_contents, result)
+        , {
+            result.children.insert(result.children.begin(), p);
+        })
+
+    p = ast();
+    TRY(WS
+        RULE(declaration, p)            OPT(TERM)
+        , {
+            result.children.push_back(p);
+        })
+END_RULE()
+
+DEFINE_RULE(type_def)
+    // body of type must be declarations only
+    TRY(WS
+        CHAR('{')   WS
+        CHAR('}')
+        , {})
+    TRY(WS
+        CHAR('{')                       WS
+        RULE(type_def_contents, result) WS
+        CHAR('}')
+        , {})
+END_RULE()
+
+DEFINE_RULE(type_decl)
+    TRY(WS
+        STR("type")                         WS
+        RULE(identifier, result.str_data)   WS
+        RULE(type_def, result)
+        , {
+            result.type = TYPE_DECL;
+        })
+END_RULE()
+
 DEFINE_RULE(assignment)
     auto id = string();
     auto e = ast();
@@ -835,10 +846,41 @@ DEFINE_RULE(declaration)
         })
 END_RULE()
 
-DEFINE_RULE(program_part)
+DEFINE_RULE(block_part)
+    TRY(RULE(type_decl, result), {})
     TRY(RULE(declaration, result), {})
     TRY(RULE(assignment, result), {})
     TRY(RULE(exp, result), {})
+END_RULE()
+
+DEFINE_RULE(block_contents)
+    auto p = ast();
+    TRY(WS
+        RULE(block_part, p)             TERM
+        RULE(block_contents, result)
+        , {
+            result.children.insert(result.children.begin(), p);
+        })
+
+    p = ast();
+    TRY(WS
+        RULE(block_part, p)             OPT(TERM)
+        , {
+            result.children.push_back(p);
+        })
+END_RULE()
+
+DEFINE_RULE(block)
+    TRY(WS
+        CHAR('{')    WS
+        CHAR('}')
+        , {})
+
+    TRY(WS
+        CHAR('{')                       WS
+        RULE(block_contents, result)    WS
+        CHAR('}')
+        , {})
 END_RULE()
 
 void parse(const string& data, ast& result) {

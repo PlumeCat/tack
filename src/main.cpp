@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <chrono>
 #include <thread>
+#include <cstdint>
 
 #include <cmath>
 #include <cassert>
@@ -47,7 +48,7 @@ void execute(const string& source) {
     auto program = ast();
     auto vmstate = state();
 
-    // invisible root scope for builtin functions only
+    // invisible root scope for builtin functions
     vmstate.push_scope();
     vmstate.define_local("print", define_function(tack_print, vmstate));
     vmstate.define_local("sqrt",  define_function(tack_sqrt,  vmstate));

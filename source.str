@@ -1,10 +1,29 @@
-let f = () => {
-    () => { print("hello world") }
+type mytype { let mem = 0 }
+type float3 {
+    let x = 0
+    let y = 0
+    let z = 0
 }
 
-print("hello world")
-print(sqrt(2))
+
+let f = () => {
+    [
+        () => { print("hello world") },
+        () => { print("goodbye world") }
+    ]
+}
+
+f()
+
+f()[0]()
+
+let v = float3(1, 2, 3)
+print("v:", v)
+
 
 let a = print
+let b = sqrt
 
 a("ayyy")
+print(b(2))
+f()[1]()

@@ -3,6 +3,7 @@
 
 enum ast_type {
     PROGRAM,
+    TYPE_DECL,
     DECLARATION,
     ASSIGNMENT,
 
@@ -77,6 +78,7 @@ enum ast_operator {
 string type_to_string(ast_type t) {
     const auto m = map<ast_type, string> {
         { PROGRAM,          "Program" },
+        { TYPE_DECL,        "TypeDecl" },
         { DECLARATION,      "Declaration" },
         { ASSIGNMENT,       "Assignment" },
 

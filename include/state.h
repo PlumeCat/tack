@@ -4,22 +4,31 @@
 struct value;
 ostream& operator << (ostream&, const value&);
 using native_function = value (*)(const vector<value>&);
+using int64 = int64_t;
 
 struct value {
+    using function  = struct { size_t id; };
+    using itype     = struct { size_t id; };
+    using list      = vector<value>;
+    using object    = map<string, value>;
+
     enum {
         NUMBER,
         STRING,
         LIST,
+        TYPE,
+        OBJECT,
         FUNCTION,
+        NATIVE_FUNC,
     } type;
 
-    struct function { int id; };
-
     // union {
-        double dval;
-        string sval;
-        vector<value> lval;
-        function fval;
+    double      dval;
+    string      sval;
+    list        lval;
+    object      oval;
+    function    fval;
+    itype       tval;
     // };
 
     value() {
@@ -34,23 +43,46 @@ struct value {
         type = STRING;
         sval = s;
     }
-    value(const vector<value>& l) {
+    value(const list& l) {
         type = LIST;
         lval = l;
+    }
+    value(const object& o) {
+        type = OBJECT;
+        oval = o;
     }
     value(const function& f) {
         type = FUNCTION;
         fval = f;
     }
-    value(const value&) = default;
+    value(const itype& t) {
+        type = TYPE;
+        tval = t;
+    }
+
+    value(const value& v) {
+        type = v.type;
+        switch (type) {
+            case NUMBER:    dval = v.dval; break;
+            case STRING:    sval = v.sval; break;
+            case LIST:      lval = v.lval; break;
+            case OBJECT:    oval = v.oval; break;
+            case FUNCTION:  fval = v.fval; break;
+            case TYPE:      tval = v.tval; break;
+            default:        throw runtime_error("unknown type!");
+        }
+    }
     ~value() = default;
+
     value& operator=(const value& v) {
         type = v.type;
         switch (type) {
             case NUMBER:    dval = v.dval; break;
             case STRING:    sval = v.sval; break;
             case LIST:      lval = v.lval; break;
+            case OBJECT:    oval = v.oval; break;
             case FUNCTION:  fval = v.fval; break;
+            case TYPE:      tval = v.tval; break;
             default:        throw runtime_error("Unknown type!");
         }
         return *this;
@@ -65,14 +97,24 @@ struct value {
         type = STRING;
         return *this;
     }
-    value& operator=(const vector<value>& l) {
+    value& operator=(const list& l) {
         type = LIST;
         lval = l;
+        return *this;
+    }
+    value& operator=(const object& o) {
+        type = OBJECT;
+        oval = o;
         return *this;
     }
     value& operator=(const function& f) {
         fval = f;
         type = FUNCTION;
+        return *this;
+    }
+    value& operator=(const itype& t) {
+        type = TYPE;
+        tval = t;
         return *this;
     }
     operator string() {
@@ -86,6 +128,8 @@ ostream& operator<< (ostream& o, const value& val) {
         case value::NUMBER:     return o << val.dval;
         case value::STRING:     return o << val.sval;
         case value::LIST:       return o << val.lval;
+        case value::OBJECT:     return o << val.oval;
+        case value::TYPE:       return o << "type: " << val.tval.id;
         case value::FUNCTION:   return o << "function: " << val.fval.id;
         default:                return o << "<unknown-type>";
     }
@@ -97,6 +141,7 @@ struct state {
 
     vector<scope> scopes;
     vector<ast> functions;    // interned functions
+    vector<ast> types;        // interned types
 
     state() = default;
     state(const state&) = default;
@@ -115,7 +160,6 @@ struct state {
         scopes[scopes.size()-1][name] = val;
     }
     void set_local(const string& name, const value& val) {
-        // scopes[scopes.size()-1][name] = val;
         get_local(name) = val;
     }
     value& get_local(const string& name, int frame = -1) {

@@ -33,10 +33,13 @@ TODO:
 
     reference vm:
         X intern functions (source code can only contain so many functions :D)
-        - handle builtins properly, maybe a bottom-level scope?
-            a = print; a("hello world") should work but currently doesn't
+        X handle builtins properly, maybe a bottom-level scope?
+            X a = print; a("hello world") should work but currently doesn't
         - bytecode generation
-            - then can cache bytecodes between runs
+            - then can cache bytecodes between runs? pyc style
+        - scoping is not correct
+            - if / for / expression blocks should inherit parent scope
+            - function calls should not see locals from calling scope
 
     jitter:
         - remove "custom" strings; make as array of char
@@ -48,11 +51,14 @@ TODO:
         X if/else
         X looping
         X range literals!
-        - proper binding of c functions
+        X proper binding of c functions
         - custom data structures
-            - labelled product type
+            - product type
             - sum type
         - static typing
+            - simple AST-based type checker
+            - automatic deduction
+            - better parsing of scalars (eg ```a = 0, b = 64u8, c = 0.0d, d = 1.0d```)
         - comments
         - stdlib
         - match?

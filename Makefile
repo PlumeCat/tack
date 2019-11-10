@@ -1,20 +1,22 @@
 # Makefile
 
-CXX := g++
+# CXX := g++
+CXX := clang
+
 CXX_FLAGS := \
 	-I./include \
 	-std=c++17 \
 	-w \
 	-g
 
-source := $(wildcard src/*.cpp)
-target := dist/main.exe
+SRC=$(wildcard src/*.cpp)
+TARGET=dist/main.exe
 
 clean:
 	rm -r dist
 
-build: $(source)
-	$(CXX) $(CXX_FLAGS) $(source) -o $(target)
+build: $(SRC)
+	$(CXX) $(CXX_FLAGS) $(SRC) -o $(TARGET)
 
 run: build
-	$(target) source.str
+	$(TARGET) source.str

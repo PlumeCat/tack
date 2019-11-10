@@ -7,7 +7,7 @@
 #include "definitions.h"
 
 template<typename t>
-ostream& operator<<(ostream& o, const vector<t>& c) {
+ostream& operator << (ostream& o, const vector<t>& c) {
     o << "[";
     if (c.size()) {
         o << " " << c[0];
@@ -17,6 +17,17 @@ ostream& operator<<(ostream& o, const vector<t>& c) {
         o << " ";
     }
     return o << "]";
+}
+template<typename T1, typename T2>
+ostream& operator << (ostream& o, const map<T1, T2>& c) {
+    o << "{ ";
+    if (c.size()) {
+        for (auto e = c.begin(); e != c.end(); e++) {
+            o << ((e != c.begin()) ? ", " : "") << e->first << ": " << e->second;
+        }
+        o << " ";
+    }
+    return o << "}";
 }
 
 // trim leading whitespace; return the resulting string
