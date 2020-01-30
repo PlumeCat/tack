@@ -1,29 +1,21 @@
-type mytype { let mem = 0 }
-type float3 {
+type vec3 {
     let x = 0
     let y = 0
     let z = 0
 }
 
-
-let f = () => {
-    [
-        () => { print("hello world") },
-        () => { print("goodbye world") }
-    ]
+type stuff {
+    let members = []
 }
 
-f()
+type compound {
+    let field = [ 0, 1 ]
+}
 
-f()[0]()
+let c = compound(stuff([ vec3(8,9,10), vec3(1, 2, 3) ]))
 
-let v = float3(1, 2, 3)
-print("v:", v)
+print(c)
 
+c.field.members[1].x = 100
 
-let a = print
-let b = sqrt
-
-a("ayyy")
-print(b(2))
-f()[1]()
+print(c)

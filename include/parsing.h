@@ -62,7 +62,6 @@ DECLARE_RULE(name) {
 
 // parsing DSL "combinators"
 #define WS                  && parse_ws(ctx)
-#define CHAR(c)             && parse_char(ctx, c)
 #define STR(s)              && parse_string(ctx, s)
 #define RULE(rule, res)     && rulename(rule)(ctx, res)
 #define OPT(rule)           && ((true rule) || true)
@@ -135,17 +134,6 @@ bool parse_integer(parse_context& ctx, double& num) {
     return false;
 }
 
-// consume the given character
-// return false if not found
-// throw if EOF
-bool parse_char(parse_context& ctx, char c) {
-    if (ctx.peek() != c) {
-        return false;
-    }
-    ctx.advance();
-    return true;
-}
-
 // consume the statement / expression terminator (and any leading whitespace)
 // return true if found
 // can be ';', '\n' or EOF (ergo, doesn't throw on EOF)
@@ -200,6 +188,17 @@ template<int N> bool parse_string(parse_context& ctx, const char(&str)[N]) {
     return true;
 }
 
+// consume the given character
+// return false if not found
+// throw if EOF
+bool parse_string(parse_context& ctx, char c) {
+    if (ctx.peek() != c) {
+        return false;
+    }
+    ctx.advance();
+    return true;
+}
+
 // consume a number (and leading whitespace)
 // return false if not found
 // throw if EOF
@@ -242,7 +241,7 @@ bool parse_string_literal(parse_context& ctx, string& out_str) {
 // return false if not found
 // throw if EOF
 bool parse_declare_op(parse_context& ctx, ast_operator& result) {
-    if (parse_char(ctx, '=')) {
+    if (parse_string(ctx, '=')) {
         result = OP_ASSIGN;
         return true;
     }
@@ -255,7 +254,7 @@ bool parse_declare_op(parse_context& ctx, ast_operator& result) {
 // throw if eof
 bool parse_assign_op(parse_context& ctx, ast_operator& result) {
     // see comments in parse_bin_op
-    result =parse_char(ctx, '=') ? OP_ASSIGN :
+    result =parse_string(ctx, '=') ? OP_ASSIGN :
             parse_string(ctx, "+=") ? OP_ASSIGN_ADD :
             parse_string(ctx, "-=") ? OP_ASSIGN_SUB :
             parse_string(ctx, "*=") ? OP_ASSIGN_MUL :
@@ -275,10 +274,10 @@ bool parse_assign_op(parse_context& ctx, ast_operator& result) {
 // throw if EOF
 bool parse_unary_op(parse_context& ctx, ast_operator& result) {
     // no need to catch EOF; if one throws it all would throw it
-    result =parse_char(ctx, '+') ? OP_ADD :
-            parse_char(ctx, '-') ? OP_SUB :
-            parse_char(ctx, '!') ? OP_BOOL_NOT :
-            parse_char(ctx, '~') ? OP_NOT :
+    result =parse_string(ctx, '+') ? OP_ADD :
+            parse_string(ctx, '-') ? OP_SUB :
+            parse_string(ctx, '!') ? OP_BOOL_NOT :
+            parse_string(ctx, '~') ? OP_NOT :
             OP_UNKNOWN;
     return (result != OP_UNKNOWN);
 }
@@ -289,8 +288,8 @@ bool parse_unary_op(parse_context& ctx, ast_operator& result) {
 bool parse_cmp_op(parse_context& ctx, ast_operator& result) {
     // no need to catch EOF; if one throws it they all would throw it
     // just make sure to try them in reverse order of length to preserve this
-    result =parse_char(ctx, '<') ? OP_LESS :
-            parse_char(ctx, '>') ? OP_GREATER:
+    result =parse_string(ctx, '<') ? OP_LESS :
+            parse_string(ctx, '>') ? OP_GREATER:
             parse_string(ctx, "==") ? OP_MUL :
             parse_string(ctx, "!=") ? OP_DIV :
             parse_string(ctx, "<=") ? OP_MOD :
@@ -300,14 +299,14 @@ bool parse_cmp_op(parse_context& ctx, ast_operator& result) {
 }
 
 bool parse_bin_op(parse_context& ctx, ast_operator& result) {
-    result =parse_char(ctx, '+') ? OP_ADD :
-            parse_char(ctx, '-') ? OP_SUB :
-            parse_char(ctx, '*') ? OP_MUL :
-            parse_char(ctx, '/') ? OP_DIV :
-            parse_char(ctx, '%') ? OP_MOD :
-            parse_char(ctx, '&') ? OP_AND :
-            parse_char(ctx, '|') ? OP_OR :
-            parse_char(ctx, '^') ? OP_XOR :
+    result =parse_string(ctx, '+') ? OP_ADD :
+            parse_string(ctx, '-') ? OP_SUB :
+            parse_string(ctx, '*') ? OP_MUL :
+            parse_string(ctx, '/') ? OP_DIV :
+            parse_string(ctx, '%') ? OP_MOD :
+            parse_string(ctx, '&') ? OP_AND :
+            parse_string(ctx, '|') ? OP_OR :
+            parse_string(ctx, '^') ? OP_XOR :
             parse_string(ctx, "<<") ? OP_LSH :
             parse_string(ctx, ">>") ? OP_RSH :
             parse_string(ctx, "&&") ? OP_BOOL_AND :
@@ -339,7 +338,7 @@ DEFINE_RULE(param_list)
 
     TRY(WS
         RULE(identifier, i.str_data)    WS
-        CHAR(',')                       WS
+        STR(',')                        WS
         RULE(param_list, result)
         , {
             result.children.insert(result.children.begin(), i);
@@ -355,8 +354,8 @@ END_RULE()
 DEFINE_RULE(func_literal)
     auto body = ast();
     TRY(WS
-        CHAR('(')               WS
-        CHAR(')')               WS
+        STR('(')                WS
+        STR(')')                WS
         STR("=>")               WS
         RULE(func_body, body)
         , {
@@ -366,9 +365,9 @@ DEFINE_RULE(func_literal)
     auto params = ast();
     body = ast();
     TRY(WS
-        CHAR('(')                   WS
+        STR('(')                    WS
         RULE(param_list, params)    WS
-        CHAR(')')                   WS
+        STR(')')                    WS
         STR("=>")                   WS
         RULE(func_body, body)
         , {
@@ -382,7 +381,7 @@ DEFINE_RULE(list_elements)
     auto e = ast();
     TRY(WS
         RULE(exp, e)                WS
-        CHAR(',')                   WS
+        STR(',')                    WS
         RULE(list_elements,result)
         , {
             result.children.insert(result.children.begin(), e);
@@ -399,17 +398,17 @@ END_RULE()
 DEFINE_RULE(list_literal)
     // empty list
     TRY(WS
-        CHAR('[') WS
-        CHAR(']')
+        STR('[') WS
+        STR(']')
         , {
             result.type = LIST_LITERAL;
         })
 
     // non-empty list
     TRY(WS
-        CHAR('[')                   WS
+        STR('[')                   WS
         RULE(list_elements, result) WS
-        CHAR(']')
+        STR(']')
         , {
             result.type = LIST_LITERAL;
         })
@@ -419,7 +418,7 @@ DEFINE_RULE(argument_list)
     auto e = ast();
     TRY(WS
         RULE(exp, e)    WS
-        CHAR(',')       WS
+        STR(',')       WS
         RULE(argument_list, result)
         , {
             result.children.insert(result.children.begin(), e);
@@ -435,15 +434,15 @@ END_RULE()
 
 DEFINE_RULE(calling)
     TRY(WS
-        CHAR('(')                   WS
+        STR('(')                   WS
         RULE(argument_list, result) WS
-        CHAR(')')
+        STR(')')
         , {
             result.type = CALLING;
         })
     TRY(WS
-        CHAR('(') WS
-        CHAR(')')
+        STR('(') WS
+        STR(')')
         , {
             result.type = CALLING;
         })
@@ -452,12 +451,23 @@ END_RULE()
 DEFINE_RULE(indexing)
     auto pexp = ast();
     TRY(WS
-        CHAR('[')           WS
+        STR('[')           WS
         RULE(exp, pexp)   WS
-        CHAR(']')
+        STR(']')
         , {
             result.type = INDEXING;
             result.children.push_back(pexp);
+        })
+END_RULE()
+
+DEFINE_RULE(getfield)
+    auto id = ""s;
+    TRY(WS
+        STR('.') WS // TODO: forbid whitespace?
+        RULE(identifier, id)
+        , {
+            result.type = GET_FIELD;
+            result.str_data = id;
         })
 END_RULE()
 
@@ -470,12 +480,16 @@ DEFINE_RULE(postfix_exp)
             while (true) {
                 auto call = ast();
                 auto index = ast();
+                auto getfield = ast();
                 if (parse_calling(ctx, call)) {
                     call.children.insert(call.children.begin(), pexp);
                     pexp = call;
                 } else if (parse_indexing(ctx, index)) {
                     index.children.insert(index.children.begin(), pexp);
                     pexp = index;
+                } else if (parse_getfield(ctx, getfield)) {
+                    getfield.children.insert(getfield.children.begin(), pexp);
+                    pexp = getfield;
                 } else {
                     result = pexp;
                     return true;
@@ -647,9 +661,9 @@ DEFINE_RULE(primary_exp)
     // sub-expression
     auto expr = ast();
     TRY(WS
-        CHAR('(')       WS
+        STR('(')       WS
         RULE(exp, expr) WS
-        CHAR(')')
+        STR(')')
         , {
             result = expr;
         })
@@ -785,13 +799,13 @@ END_RULE()
 DEFINE_RULE(type_def)
     // body of type must be declarations only
     TRY(WS
-        CHAR('{')   WS
-        CHAR('}')
+        STR('{')   WS
+        STR('}')
         , {})
     TRY(WS
-        CHAR('{')                       WS
+        STR('{')                       WS
         RULE(type_def_contents, result) WS
-        CHAR('}')
+        STR('}')
         , {})
 END_RULE()
 
@@ -805,22 +819,50 @@ DEFINE_RULE(type_decl)
         })
 END_RULE()
 
+DEFINE_RULE(locator)
+    // create an identifier...
+    auto loc = ast(); loc.type = LOCATOR;
+
+    TRY(WS
+        RULE(identifier, loc.str_data)
+        , {
+            // left-recursive parsing, but "inside-out" unlike parse_postfix_exp
+            // eg
+            // "a.b.c"
+            // becomes
+            // locator: a
+            //      locator: b
+            //          locator: c
+            auto* end = &loc;
+            while (true) {
+                auto index = ast();
+                auto subloc = ast(); subloc.type = LOCATOR;
+                if (parse_indexing(ctx, index)) {
+                    end->children.push_back(index);
+                    end = &end->children[end->children.size()-1];
+                } else if (parse_string(ctx, '.') && parse_identifier(ctx, subloc.str_data)) {
+                    end->children.push_back(subloc);
+                    end = &end->children[end->children.size()-1];
+                } else {
+                    result = loc;
+                    return true;
+                }
+            }
+        })
+END_RULE()
+
 DEFINE_RULE(assignment)
-    auto id = string();
+    auto loc = ast();
     auto e = ast();
     auto op = ast_operator();
     TRY(WS
-        RULE(identifier, id)    WS
-        RULE(assign_op, op)     WS
+        RULE(locator, loc)  WS
+        RULE(assign_op, op) WS
         RULE(exp, e)
         , {
-            auto identifier = ast();
-            identifier.str_data = id;
-            identifier.type = IDENTIFIER;
-
             result.type = ASSIGNMENT;
             result.op = op;
-            result.children.push_back(identifier);
+            result.children.push_back(loc);
             result.children.push_back(e);
         })
 END_RULE()
@@ -872,14 +914,14 @@ END_RULE()
 
 DEFINE_RULE(block)
     TRY(WS
-        CHAR('{')    WS
-        CHAR('}')
+        STR('{')    WS
+        STR('}')
         , {})
 
     TRY(WS
-        CHAR('{')                       WS
+        STR('{')                       WS
         RULE(block_contents, result)    WS
-        CHAR('}')
+        STR('}')
         , {})
 END_RULE()
 

@@ -1,4 +1,4 @@
-        // PROGRAM
+# PROGRAM
 
 program         = { declaration | assignment | expression }
 
@@ -11,15 +11,14 @@ declaration     = var-decl
                 | type-decl
 
 
-        // VARIABLES
+# VARIABLES
 
 var-decl        = "let" name
                 | "let" name ':' name
                 | "let" name '=' expression
                 | "let" name ':' name '=' expression
 
-
-        // TYPES
+# TYPES
 
 type-decl       = "type" name type-def
 
@@ -27,16 +26,19 @@ type-def        = product-type-def
                 | sum-type-def
 
 
-        // ASSIGNMENTS
+# ASSIGNMENTS
 
 assignment      = locator assign-op expression
 
-locator         = exp '.' locator
+locator         = locator '[' exp ']'
+                | locator '.' name
                 | name
-                | indexing
+                # Omitted "rvalue" assignments eg (eg x.get_y().z = 2)
+                # Rationale: In this example get_y() is returned by value
+                # so the new value "2" doesn't survive beyond this line
+                # as we only have the "pure value" value category
 
-
-        // EXPRESSIONS
+# EXPRESSIONS
 
 expression      = block
                 | binary-exp
@@ -44,15 +46,15 @@ expression      = block
 block           = '{' '}'
                 | '{' program '}'
 
-for-exp         = "for" identifier "in" exp block
+for-exp         = "for" name "in" exp block
 
 if-exp          = "if" exp block
 
 binary-exp      = bool-or-exp
 
-        // BINARY EXPRESSIONS
-        lower down will have higher precedence
-        note that cmp doesn't chain like the others
+# BINARY EXPRESSIONS
+# lower down will have higher precedence
+# note that cmp doesn t chain like the others
 
 bool-or-exp     = bool-and-exp "||"     bool-and-exp
                 | bool-and-exp
@@ -81,18 +83,23 @@ div-exp         = mod-exp       '/'     div-exp
 mod-exp         = unary-exp     '%'     mod-exp
                 | unary-exp
 
+# UNARY EXPRESSIONS
+
 unary-exp       = unary-op unary-exp
                 | postfix-exp
 
 
-        // handled left-recursion here with parsing gymnastics
 postfix-exp     = postfix-exp calling
                 | postfix-exp indexing
+                | postfix-exp subfield
                 | primary-exp
+                # handled left-recursion here with parsing gymnastics
 
 indexing        = '[' exp ']'
 
 calling         = '(' [ param_list ] ')'
+
+subfield        = '.' name
 
 param_list      = expression { , expression }
 

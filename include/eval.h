@@ -79,11 +79,18 @@ value eval_bin_exp(const ast& a, state& s) {
 
 value eval_assignment(const ast& a, state& s) {
     assert(a.type == ASSIGNMENT);
+
+
+    // eval locator to get the right location
+    auto* loc = nullptr;
+    auto*
     auto name = a.children[0].str_data;
+
     auto val = eval(a.children[1], s);
-    s.set_local(name, val);
-    return 1;
+    loc = val;
+    return 0;
 }
+
 value eval_declaration(const ast& a, state& s) {
     assert(a.type == DECLARATION);
     auto name = a.children[0].str_data;
@@ -135,6 +142,11 @@ value eval_for_exp(const ast& a, state& s) {
     s.pop_scope();
 
     return value(0.0); // TODO: what do for loops return (if anything???)
+}
+
+value eval_subfield(const ast& a, state& s) {
+    auto l = eval(a.children[0], s);
+    auto v = eval(a.children[1], s);
 }
 
 value eval_indexing(const ast& a, state& s) {
@@ -198,12 +210,13 @@ value eval_calling_type(const value& callee, const ast& a, state& s) {
         }
 
         auto retval = value::object {};
+        retval.type_id = callee.tval.id;
         // assign all member values
         for (int i = 0; i < type.children.size(); i++) {
             auto& member_decl = type.children[i];
             auto& member_name = member_decl.children[0].str_data;
             auto member_val = eval(a.children[i + 1], s);
-            retval[member_name] = member_val;
+            retval.fields[member_name] = member_val;
         }
         return value(retval);
     } else {
@@ -220,6 +233,16 @@ value eval_calling(const ast& a, state& s) {
     }
     else {
         throw runtime_error("invalid call expression: "  + (string)callee);
+    }
+}
+
+value eval_get_field(const ast& a, state& s) {
+    auto& fieldname = a.str_data;
+    auto container = eval(a.children[0], s);
+    if (container.type == value::OBJECT) {
+        return container.oval.fields[fieldname];
+    } else {
+        throw runtime_error("cannot get field of non-object: " + (string)container);
     }
 }
 
@@ -268,6 +291,9 @@ value eval(const ast& a, state& s) {
 
         // indexing
         case INDEXING:      return eval_indexing(a, s);
+
+        // getting field
+        case GET_FIELD:     return eval_get_field(a, s);
 
         // compound structures
         case BLOCK:

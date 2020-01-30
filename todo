@@ -72,6 +72,15 @@ TODO:
             - make the top-level parse a program-part
             - evaluate as we go
             - handle multilines nicely
+
+
         - have an optimising compiler
             - [automatic] threading
             - memory management
+            - data dependency between functions and tasks
+                - write top level code as pipelines
+                - jitting the dependency graph for super efficient dispatching
+            - improve on rust with some decorators: "@SingleThread" decorator means we promise
+                not to use the function / object from multiple threads. then we don't have to impose
+                conditions on the object's implementation, but we can check for whether the object
+                itself could be used in multiple threads
