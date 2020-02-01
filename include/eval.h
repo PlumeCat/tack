@@ -77,17 +77,23 @@ value eval_bin_exp(const ast& a, state& s) {
     }
 }
 
+// will return a pointer to some value within the given state
+value* resolve_locator(const ast& a, state& s) {
+    s.get_local(a.str_data);
+}
+
 value eval_assignment(const ast& a, state& s) {
     assert(a.type == ASSIGNMENT);
 
-
-    // eval locator to get the right location
-    auto* loc = nullptr;
-    auto*
-    auto name = a.children[0].str_data;
-
+    auto* loc = resolve_locator(a.children[0]);
     auto val = eval(a.children[1], s);
-    loc = val;
+    
+    if (loc) {
+        *loc = val;
+    } else {
+        throw runtime_error("invalid locator");
+    }
+
     return 0;
 }
 
