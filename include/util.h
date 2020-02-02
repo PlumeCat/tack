@@ -59,6 +59,24 @@ string read_text_file(const string& fname) {
 
     auto data = string(file_size, 0);
     file.read(&data[0], file_size);
+
+    // remove comments
+    while (true) {
+        auto start = data.find("//");
+        if (start == string::npos) {
+            break; // removed all comments
+        }
+
+        auto nextnewline = data.find('\n', start + 2);
+
+        if (nextnewline == string::npos) {
+            data = data.substr(0, start);
+        } else {
+            data = data.substr(0, start) + data.substr(nextnewline, data.size() - nextnewline);
+        }
+
+    }
+
     return data;
 }
 

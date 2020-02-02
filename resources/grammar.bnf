@@ -91,15 +91,12 @@ unary-exp       = unary-op unary-exp
 
 postfix-exp     = postfix-exp calling
                 | postfix-exp indexing
-                | postfix-exp subfield
                 | primary-exp
                 # handled left-recursion here with parsing gymnastics
 
 indexing        = '[' exp ']'
 
 calling         = '(' [ param_list ] ')'
-
-subfield        = '.' name
 
 param_list      = expression { , expression }
 

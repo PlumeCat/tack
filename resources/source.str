@@ -12,6 +12,13 @@ type compound {
     let field = [ 0, 1 ]
 }
 
+// i'm a comment
+
+// comment comment comment
+
+//multi
+//line
+//comment
 
 let a = [ 1, 2, 3 ]
 print(a)
