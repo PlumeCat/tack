@@ -12,10 +12,26 @@ type compound {
     let field = [ 0, 1 ]
 }
 
+
+let a = [ 1, 2, 3 ]
+print(a)
+a[2] = 4
+print(a)
+
+let s = "i'm a string"
+print(s)
+print(s + "helo")
+
+let d = 2
+print(d)
+d = vec3(1, 2, 3)
+print(d)
+d.x = 100
+print(d)
+
+
+
 let c = compound(stuff([ vec3(8,9,10), vec3(1, 2, 3) ]))
-
 print(c)
-
 c.field.members[1].x = 100
-
 print(c)

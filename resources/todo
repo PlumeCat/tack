@@ -6,10 +6,13 @@ TODO:
         X handle single-argument functions
         X index operator
         - specialise parse_string for 1 character - use invisibly in macro'd rules!
-        - multithread imports
-        - better error messages
+        - multithread imports?
+        - better error messages, line number and file etc
+            - for now, should be able to:
+                - generate error messages at a block level when an incorrect program_part is detected
+                - then skip to end of block somehow and attempt to resume
         - check that associativity is working for all binary operators
-            want '/', '-', '%' to l-associate, but will r-associate due to r-recursive grammar...
+            want '/', '-', '%' to l-associate, but will r-associate due to r-recursive grammar
         X unify macro approach (or define grammar combinators)
             - ALL parsing rules should be macro'd
         - get rid of the "success" blocks
@@ -20,30 +23,24 @@ TODO:
         - very inefficient, can we improve? side effect of naive rec-desc?
             - nested TRY will help with this; only parse common leading elements once
             - tighten up the whitespace rules, this will allow to early-out a lot of rules by peeking 1 or 2 chars
-        - specify ast schema, add validation (subclasses?)
+        - specify ast schema better, add validation (subclasses?)
         - find a good way of checking exhaustively for ambiguities (and even for resolving them)
             - ordering of TRY is significant in causing ambiguities
             - during parsing, when ambiguity is resolved, can use to generate very specific error messages
-            - for now, should be able to:
-                - generate error messages at a block level when an incorrect program_part is detected
-                - then skip to end of block somehow and attempt to resume
 
     syntax:
         - can we omit brackets for function literals?
 
     reference vm:
-        X intern functions (source code can only contain so many functions :D)
+        X intern functions
         X handle builtins properly, maybe a bottom-level scope?
             X a = print; a("hello world") should work but currently doesn't
-        - bytecode generation
-            - then can cache bytecodes between runs? pyc style
+        - bytecode
+            - then can cache bytecodes between runs? pyc approach
+            - don't have to keep ast in memory for functions
         - scoping is not correct
             - if / for / expression blocks should inherit parent scope
             - function calls should not see locals from calling scope
-
-    jitter:
-        - remove "custom" strings; make as array of char
-        - extension of the reference vm
 
     language:
         X strings
@@ -52,14 +49,16 @@ TODO:
         X looping
         X range literals!
         X proper binding of c functions
-        - custom data structures
-            - product type
+        X - custom data structures
+            X - product type
             - sum type
+        - comments
+
         - static typing
             - simple AST-based type checker
             - automatic deduction
             - better parsing of scalars (eg ```a = 0, b = 64u8, c = 0.0d, d = 1.0d```)
-        - comments
+
         - stdlib
         - match?
         - imports
@@ -67,20 +66,10 @@ TODO:
         - remove special string, make list of char
 
     other:
-        - some unit tests!!
+        - some unit tests
+
         - fix the REPL
             - make the top-level parse a program-part
             - evaluate as we go
             - handle multilines nicely
-
-
-        - have an optimising compiler
-            - [automatic] threading
-            - memory management
-            - data dependency between functions and tasks
-                - write top level code as pipelines
-                - jitting the dependency graph for super efficient dispatching
-            - improve on rust with some decorators: "@SingleThread" decorator means we promise
-                not to use the function / object from multiple threads. then we don't have to impose
-                conditions on the object's implementation, but we can check for whether the object
-                itself could be used in multiple threads
+                - requiring '\' at end of line is better than nothing

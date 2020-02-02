@@ -77,15 +77,52 @@ value eval_bin_exp(const ast& a, state& s) {
     }
 }
 
+// return a pointer to some sub-value of parent (eg member or list element)
+value* resolve_sublocator(const ast& a, state& s, value& parent) {
+    if (a.type == LOCATOR) {
+        assert(parent.type == value::OBJECT);
+        auto& sublocator = parent.oval.fields[a.str_data];
+        if (a.children.size()) {
+            return resolve_sublocator(a.children[0], s, sublocator);
+        } else {
+            return &sublocator;
+        }
+    } else if (a.type == INDEXING) {
+        assert(parent.type == value::LIST);
+        auto i = eval(a.children[0], s);
+        assert(i.type == value::NUMBER);
+        auto& sublocator = parent.lval[i.dval];
+        if (a.children.size() > 1) {
+            // indexing had another child, so we must resolve a sublocator of that list element
+            return resolve_sublocator(a.children[1], s, sublocator);
+        } else {
+            // indexing has no children, so the value being addressed is the list element itself
+            return &sublocator;
+        }
+    } else {
+        throw runtime_error("invalid locator");
+    }
+}
 // will return a pointer to some value within the given state
 value* resolve_locator(const ast& a, state& s) {
-    s.get_local(a.str_data);
+    assert(a.type == LOCATOR);
+    // locator AST:
+    //      str_data is identifier
+    //      1 child: locator || indexing || nothing
+
+    auto& local = s.get_local(a.str_data);
+
+    if (a.children.size()) {
+        return resolve_sublocator(a.children[0], s, local);
+    } else {
+        return &local;
+    }
 }
 
 value eval_assignment(const ast& a, state& s) {
     assert(a.type == ASSIGNMENT);
 
-    auto* loc = resolve_locator(a.children[0]);
+    auto loc = resolve_locator(a.children[0], s);
     auto val = eval(a.children[1], s);
     
     if (loc) {

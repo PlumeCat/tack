@@ -5,7 +5,7 @@ struct _log {
     stringstream null = stringstream();
 
     ostream& out() {
-        // return null;
+        return null;
         return cerr;
     }
 
@@ -16,7 +16,7 @@ struct _log {
         return out() << "INFO: ";
     }
     ostream& error() {
-        return cout << "ERROR: ";
+        return out() << "ERROR: ";
     }
 } logger;
 
