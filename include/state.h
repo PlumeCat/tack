@@ -127,8 +127,8 @@ ostream& operator<< (ostream& o, const value& val) {
     switch (val.type) {
         case value::NUMBER:     return o << val.dval;
         case value::STRING:     return o << val.sval;
-        case value::LIST:       return o << "list: " << val.lval;
-        case value::OBJECT:     return o << "object: " << val.oval.fields;
+        case value::LIST:       return o << "" << val.lval;
+        case value::OBJECT:     return o << "" << val.oval.fields;
         case value::TYPE:       return o << "type: " << val.tval.id;
         case value::FUNCTION:   return o << "function: " << val.fval.id;
         default:                return o << "<unknown-type>";

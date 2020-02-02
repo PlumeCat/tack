@@ -3,16 +3,36 @@ type vec3 {
     let y = 0
     let z = 0
 }
+// type stuff {
+//     let members = []
 
-type stuff {
-    let members = []
-}
+// }
 
-type compound {
-    let field = [ 0, 1 ]
-}
+// type compound {
+//     let field = [ 0, 1 ]
+// }
 
 // i'm a comment
+
+let my_func = (a, b) => {
+    a + b
+}
+
+print(my_func(1, 2))
+
+
+let c = if 1 {
+    let val = " something" + " else"
+    "hello" + val
+} else {
+    "goodbye"
+}
+print(c)
+
+let list = 0..10
+print(list)
+let list2 = for i in list { i * 2 }
+print(list2)
 
 // comment comment comment
 
@@ -20,25 +40,32 @@ type compound {
 //line
 //comment
 
-let a = [ 1, 2, 3 ]
-print(a)
-a[2] = 4
-print(a)
+// let a = [ 1, 2, 3 ]
+// print(a)
+// a[2] = 4
+// print(a)
 
-let s = "i'm a string"
-print(s)
-print(s + "helo")
+// let s = "i'm a string"
+// print(s)
+// print(s + "helo")
 
-let d = 2
-print(d)
-d = vec3(1, 2, 3)
-print(d)
-d.x = 100
-print(d)
+// let d = 2
+// print(d)
+// d = vec3(1, 2, 3)
+// print(d)
+// d.x = 100
+// print(d)
 
+// a = 0
+// if (a) {
+//     a = 2
+// } else {
+//     a = 3
+// }
+// print (a)
 
-
-let c = compound(stuff([ vec3(8,9,10), vec3(1, 2, 3) ]))
-print(c)
-c.field.members[1].x = 100
-print(c)
+// let c = compound(stuff([ vec3(8,9,10), vec3(1, 2, 3) ]))
+// print(c)
+// c.field.members[1].x = 100
+// print(c)
+1

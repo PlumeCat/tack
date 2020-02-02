@@ -176,15 +176,18 @@ value eval_for_exp(const ast& a, state& s) {
     auto loop_var = a.str_data;
     auto loop_range = eval(a.children[0], s).lval;
 
+    auto loop_results = value(value::list());
+
     s.push_scope();
     s.define_local(loop_var, 0.0);
     for (auto& val : loop_range) {
         s.set_local(loop_var, val); // update loop variable
-        eval(a.children[1], s);     // evaluate loop body
+        loop_results.lval.push_back(eval(a.children[1], s));     // evaluate loop body
     }
     s.pop_scope();
 
-    return value(0.0); // TODO: what do for loops return (if anything???)
+    return loop_results;
+    //return value(0.0); // TODO: what do for loops return (if anything???)
 }
 
 value eval_subfield(const ast& a, state& s) {

@@ -59,6 +59,7 @@ string read_text_file(const string& fname) {
 
     auto data = string(file_size, 0);
     file.read(&data[0], file_size);
+    data += "\n"; // hacky mchackface
 
     // remove comments
     while (true) {
@@ -67,13 +68,13 @@ string read_text_file(const string& fname) {
             break; // removed all comments
         }
 
-        auto nextnewline = data.find('\n', start + 2);
+        auto nextnewline = data.find('\n', start);
 
-        if (nextnewline == string::npos) {
-            data = data.substr(0, start);
-        } else {
+        // if (nextnewline == string::npos) {
+        //     data = data.substr(0, start);
+        // } else {
             data = data.substr(0, start) + data.substr(nextnewline, data.size() - nextnewline);
-        }
+        // }
 
     }
 
