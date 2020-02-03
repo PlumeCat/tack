@@ -2,10 +2,10 @@
 #define _LOGGING_H
 
 struct _log {
-    stringstream null = stringstream();
+    stringstream null_log = stringstream();
 
     ostream& out() {
-        //return null;
+        return null_log;
         return cerr;
     }
 
@@ -16,7 +16,7 @@ struct _log {
         return out() << "INFO: ";
     }
     ostream& error() {
-        return out() << "ERROR: ";
+        return cerr << "ERROR: ";
     }
 } logger;
 

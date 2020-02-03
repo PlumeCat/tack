@@ -811,7 +811,7 @@ END_RULE()
 
 DEFINE_RULE(type_decl)
     TRY(WS
-        STR("type")                         WS
+        STR("struct")                         WS
         RULE(identifier, result.str_data)   WS
         RULE(type_def, result)
         , {

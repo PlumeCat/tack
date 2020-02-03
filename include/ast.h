@@ -3,7 +3,7 @@
 
 #include "ast_operator.h"
 
-enum ast_type {
+enum _ast_type {
     PROGRAM,
     TYPE_DECL,
     DECLARATION,
@@ -63,6 +63,15 @@ string type_to_string(ast_type t) {
     }
     return "<unknown>";
 }
+
+enum class ast_type : unsigned int {
+
+};
+
+struct ast_base {};
+
+struct ast_program : ast_base {};
+struct ast_type_decl : ast_base {};
 
 struct ast {
     ast_type type = PROGRAM;
