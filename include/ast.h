@@ -1,9 +1,11 @@
 #ifndef _AST_H
 #define _AST_H
 
+#include <variant>
+
 #include "ast_operator.h"
 
-enum _ast_type {
+enum ast_type {
     PROGRAM,
     TYPE_DECL,
     DECLARATION,
@@ -64,14 +66,44 @@ string type_to_string(ast_type t) {
     return "<unknown>";
 }
 
-enum class ast_type : unsigned int {
+// enum class ast_type : unsigned int {
+//     program,
+//     type_decl,
+//     declaration, assignment, locator,
 
-};
+//     if_exp, for_exp, block, binary_exp, unary_exp,
+//     calling, indexing, get_field,
 
-struct ast_base {};
+//     identifier, num_literal, string_literal, range_literal, list_literal, func_literal,
+    
+//     native_func,
+// };
 
-struct ast_program : ast_base {};
-struct ast_type_decl : ast_base {};
+// struct ast_base {};
+
+// #define CHILD_LIST(cl) vector<cl>
+// #define CHILD_OPT(...) variant<__VA_ARGS__>
+
+// #define DEFINE_AST(_name, _children) \
+//     struct ast_##_name : ast_base { \
+//         _children children;
+//     };
+
+// struct ast_program : ast_base {
+//     vector<variant< ast_declaration,
+//                     ast_assignment,
+//                     ast_expression >> children;
+// };
+// struct ast_type_decl : ast_base {
+//     vector<ast_declaration> children;
+// };
+// struct ast_assignment : ast_base {
+//     ast_identifier lhs;
+//     ast_identifier rhs;
+// };
+// struct ast_identifier : ast_base {
+//     string str_data;
+// };
 
 struct ast {
     ast_type type = PROGRAM;

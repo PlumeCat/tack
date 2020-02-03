@@ -58,10 +58,12 @@ string read_text_file(const string& fname) {
     file.seekg(0, ios_base::beg);
 
     auto data = string(file_size, 0);
-    file.read(&data[0], file_size);
-    data += "\n"; // hacky mchackface
+    file.read(&data[0], file_size);    
 
-    // remove comments
+    // TODO: comment removal is completely naive, improve
+    //  - should ignore "//" and "/*" if they occur in the middle of a string
+
+    // remove line comments
     while (true) {
         auto start = data.find("//");
         if (start == string::npos) {
@@ -70,12 +72,26 @@ string read_text_file(const string& fname) {
 
         auto nextnewline = data.find('\n', start);
 
-        // if (nextnewline == string::npos) {
-        //     data = data.substr(0, start);
-        // } else {
+        if (nextnewline == string::npos) {
+            data = data.substr(0, start);
+        } else {
             data = data.substr(0, start) + data.substr(nextnewline, data.size() - nextnewline);
-        // }
+        }
+    }
 
+    // remove block comments
+    while (true) {
+        auto start = data.find("/*");
+        if (start == string::npos) {
+            break;
+        }
+
+        auto end = data.find("*/", start);
+        if (end == string::npos) {
+            throw runtime_error("unterminated comment");
+        } else {
+            data = data.substr(0, start) + data.substr(end+2, data.size());
+        }
     }
 
     return data;

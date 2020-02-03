@@ -895,10 +895,29 @@ DEFINE_RULE(block_part)
     TRY(RULE(exp, result), {})
 END_RULE()
 
+/*
+DEFINE_RULE(type_def_contents)
+    auto p = ast();
+    TRY(WS
+        RULE(declaration, p)            TERM
+        RULE(type_def_contents, result)
+        , {
+            result.children.insert(result.children.begin(), p);
+        })
+
+    p = ast();
+    TRY(WS
+        RULE(declaration, p)            OPT(TERM)
+        , {
+            result.children.push_back(p);
+        })
+END_RULE()
+*/
+
 DEFINE_RULE(block_contents)
     auto p = ast();
     TRY(WS
-        RULE(block_part, p)             TERM
+        RULE(block_part, p)             TERM WS
         RULE(block_contents, result)
         , {
             result.children.insert(result.children.begin(), p);
@@ -906,7 +925,7 @@ DEFINE_RULE(block_contents)
 
     p = ast();
     TRY(WS
-        RULE(block_part, p)             OPT(TERM)
+        RULE(block_part, p)             OPT(TERM) WS
         , {
             result.children.push_back(p);
         })
