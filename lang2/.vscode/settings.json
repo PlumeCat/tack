@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "string_view": "cpp",
+        "memory": "cpp",
+        "*.xmacro": "cpp"
+    },
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/include"
+    ]
+}
