@@ -13,12 +13,8 @@ using namespace std::chrono;
 #include "parse.h"
 #include "eval.h"
 
-int func(int a, int b) {
-
-
-}
-
 int main(int argc, char* argv[]) {
+    cout << "Started program" << endl;
     auto source = read_text_file(argv[1]);
 
     auto source_file = Ast {};

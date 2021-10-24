@@ -6,15 +6,17 @@
             "type": "shell",
             "command": "cd build && cmake -DCMAKE_BUILD_TYPE=Debug ..",
             "problemMatcher": [],
+            "group": "build"
+        },
+        {
+            "label": "make",
+            "type": "shell",
+            "command": "cd build && make -j 8",
+            "problemMatcher": "$gcc",
             "group": {
                 "kind": "build",
                 "isDefault": true
             }
-        }, {
-            "label": "make",
-            "type" :"shell",
-            "command": "cd build && make -j 8",
-            "problemMatcher": "$gcc"
         }
     ]
 }

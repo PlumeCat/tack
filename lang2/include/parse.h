@@ -59,6 +59,7 @@ bool skip_whitespace(string_view& s) {
 #define EXPECT(x) expect(s, x)
 #define WS skip_whitespace(s)
 
+// Abstract Syntax Tree
 struct Ast {
     enum {
         #define AST_TYPE(x) x,

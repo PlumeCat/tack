@@ -4,20 +4,18 @@ def foo(x, y) {
 
 def main() {
     var x = 1
-
     var y = 2 + x
-
     var z = 345
-
-
-    print x + y - z
 
     if (1 == 2) {
         print 1
     } else if (1 != 1) {
         print 2
     } else {
-        print 3 print 4 x = 54 print x
+        print 3
+        print 4
+        x = 54
+        print x
 
         var w = foo(1, 2) + 35
     }
