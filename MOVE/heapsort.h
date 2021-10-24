@@ -95,7 +95,7 @@ void heapsort(const std::array<Type, N>& input, std::array<Type, N>& output) {
 }
 
 template<typename Type, size_t N>
-ostream& operator << (ostream& o, array<Type, N> h) {
+ostream& operator << (ostream& o, const array<Type, N>& h) {
     if (N) {
         o << h[0];
         for (int i = 1; i < N; i++) {

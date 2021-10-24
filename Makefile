@@ -1,15 +1,20 @@
-# Makefile
-CC := gcc
-CFLAGS := -std=c11 -m64 -D_DEBUG
-TARGET := langs
+CXX = g++
+CXX_FLAGS = -c -g -Iinclude/ -std=c++17
+LD_FLAGS = 
 
-SRC := $(wildcard src/*.c)
+sources = $(wildcard src/*.cpp)
+objects = $(sources:.cpp=.o)
+output = "./bin"
+
+%.o: %.cpp
+	$(CXX) $(CXX_FLAGS) $< -o $@
+
+main: $(objects)
+	$(CXX) $(LD_FLAGS) $(objects) -o main
 
 clean:
-	@rm -rf bin/*
+	rm main
+	rm src/*.o
 
-build: $(SRC)
-	@gcc $(CFLAGS) $(SRC) -o bin/$(TARGET)
-
-run: build
-	@bin/$(TARGET)
+run: main
+	./main source.scala
