@@ -83,6 +83,7 @@ bool parse_raw_string(string_view& code, const string& c) {
 #define SUCCESS(...) { out = AstNode(__VA_ARGS__); return true; }
 #define FAIL(); { code = _c; return false; }
 
+#define paste(a, b) a##b
 #define DECLPARSER(name) bool paste(parse_, name)(string_view& code, AstNode& out)
 #define DEFPARSER(name, body) DECLPARSER(name) { auto _c = code; body; FAIL(); }
 #define SUBPARSER(name, body) auto paste(parse_, name) = [&](string_view& code, AstNode& out) -> bool { auto _c = code; body; FAIL(); };

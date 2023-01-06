@@ -34,6 +34,7 @@ using namespace std;
 
 #define ast(x) x,
 enum class AstType { ast_type() };
+#undef ast
 #define ast(x) { AstType::x, #x },
 static const unordered_map<AstType, string> type_to_string = { ast_type() };
 #undef ast
