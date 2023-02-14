@@ -8,12 +8,9 @@
 #include <chrono>
 
 #define JLIB_IMPLEMENTATION
-// #include "../../jlib/jlib/log.h"
-
 #include <jlib/log.h>
 #include <jlib/text_file.h>
 #include <jlib/hash_map.h>
-// #include <jlib/test_framework.h>
 
 using namespace std;
 using namespace std::chrono;
@@ -24,7 +21,6 @@ enum class Type {
 	Integer,
 	Number,
 	String,
-
 	//Pointer,
 	//Vector,
 	//Matrix,
@@ -49,7 +45,7 @@ uint32_t nan_unpack_int(double d) {
 #include "parsing.h"
 #include "ref_interpreter.h"
 #include "bytecode_interpreter.h"
-
+#include "bytecode2.h"
 
 int main(int argc, char* argv[]) {
 	auto check_arg = [&](const string& s) {
@@ -97,6 +93,15 @@ int main(int argc, char* argv[]) {
 			vm2.execute(program);
 			auto after = steady_clock::now();
 			log("BC done in ", duration_cast<microseconds>(after - before).count() * 1e-6, "s");
+
+
+			auto vm3 = BytecodeInterpreter2();
+			auto program2 = Program2{};
+			vm3.compile(out_ast, program2);
+			before = steady_clock::now();
+			vm3.execute(program2);
+			after = steady_clock::now();
+			log("BC2s done in", duration_cast<microseconds>(after - before).count() * 1e-6, "s");
 		} catch (exception& e) {
 			log("runtime error: ", e.what());
 		}

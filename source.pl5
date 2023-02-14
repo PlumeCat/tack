@@ -1,21 +1,28 @@
 print(2)
 let primes_found = 1
 let n = 1
+
+let foo = def(a, b) {
+    return a + b
+}
+
 while primes_found < 10000 {
     n = n + 2
     let is_prime = 1
     let test = 2
     while test * test <= n {
         if n % test == 0 {
-            "print(n)
-                        print(test)"
             is_prime = 0
         }
         test = test + 1
     }
 
+    def(x, y) {
+        let q = 1 + 2
+        print(q * 3)
+    }
+
     if is_prime {
-        "print(n)"
         primes_found = primes_found + 1
     }
 }

@@ -2,3 +2,4 @@
 *.o
 main
 /**/.DS_Store/build
+/build/

@@ -4,8 +4,8 @@
             "type": "lldb",
             "request": "launch",
             "name": "Launch",
-            "program": "${workspaceFolder}/build/pl5",
-            "args": [ "source.pl5" ],
+            "program": "${workspaceFolder}/build/Debug/pl5",
+            "args": [ "source.pl5", "-D" ],
             "preLaunchTask": "Build - Debug",
             "cwd": "${workspaceRoot}"
         }

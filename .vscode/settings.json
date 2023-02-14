@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "*.xmacro": "cpp",
+        "*.str": "rust",
+        "chrono": "cpp"
+    }
+}

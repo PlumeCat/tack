@@ -7,7 +7,7 @@
             "command": "make",
             "problemMatcher": "$gcc",
             "options": {
-                "cwd": "${workspaceRoot}/build"
+                "cwd": "${workspaceFolder}/build/Debug"
             },
             "group": {
                 "kind": "build",
@@ -17,9 +17,9 @@
         {
             "label": "CMake - Debug",
             "type": "shell",
-            "command": "cmake .. -G 'Unix Makefiles'",
+            "command": "cmake ../.. -G 'Unix Makefiles'",
             "options": {
-                "cwd": "build",
+                "cwd": "${workspaceFolder}/build/Debug",
                 "env": {
                     "CMAKE_BUILD_TYPE": "Debug"
                 }

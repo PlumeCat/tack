@@ -21,8 +21,7 @@
 enum class Opcode : uint8_t { opcodes() };
 #undef opcode
 #define opcode(x) { Opcode::x, #x },
-template<> struct default_hash<Opcode> { uint32_t operator()(Opcode o) { return (uint32_t)o + 1; }};
-hash_map<Opcode, string, default_hash<Opcode>, 0> opcode_to_string = { opcodes() };
+hash_map<Opcode, string> opcode_to_string = { opcodes() };
 #undef opcode
 
 struct Program {
@@ -49,6 +48,13 @@ struct Program {
 			s << x << ", ";
 		}
 		s << "]\n";
+
+
+		s << "Functions:\n";
+		for (auto& p: functions) {
+			s << "---------\n";
+			s << p.to_string() << "\n";
+		}
 
 		return s.str();
 	}
@@ -90,9 +96,9 @@ struct BytecodeInterpreter {
 				if (iter != program.variables.end()) {
 					throw runtime_error("Compile error: variable already exists:" + ident);
 				}
+
 				auto stackpos = program.stack.size();
 				emit(STORE, program.free_reg - 1, stackpos);
-				// program.variables[ident] = stackpos;
 				program.variables.insert(ident, stackpos);
 				program.stack.push_back(0);
 				program.free_reg--;
@@ -149,8 +155,9 @@ struct BytecodeInterpreter {
 
 				rewrite(cond, CONDJUMP, cond_reg, startwhile, endwhile);
 			}
-			handle(ReturnStat) {}
-			
+			handle(ReturnStat) {
+			}
+
 			handle(TernaryExp) {}
 			handle(OrExp) {}
 			handle(AndExp) {}
@@ -232,16 +239,19 @@ struct BytecodeInterpreter {
 				emit(BITNOT, program.free_reg - 1);
 			}
 
-			handle(CallExp) {}
+			handle(CallExp) {
+			}
 			handle(ArgList) {}
 			handle(IndexExp) {}
 			handle(AccessExp) {}
 			handle(FuncLiteral) {
-				//auto subprogram = Program{};
-				/*compile(node.children[2], subprogram);
+				auto subprogram = Program{};
+				subprogram.free_reg = program.free_reg;
+				compile(node.children[1], subprogram);
 				program.functions.push_back(subprogram);
 				program.stack.push_back(program.functions.size());
-				emit(LOAD, program.free_reg, )*/
+				emit(LOAD, program.free_reg, program.stack.size() - 1);
+				program.free_reg++;
 			}
 			handle(ParamDef) {}
 			handle(NumLiteral) {
