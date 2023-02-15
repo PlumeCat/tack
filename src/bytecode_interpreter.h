@@ -23,8 +23,7 @@
 enum class Opcode : uint8_t { opcodes() };
 #undef opcode
 #define opcode(x) { Opcode::x, #x },
-struct OpcodeHash { uint32_t operator()(Opcode o) { return (uint32_t)o; }};
-static auto opcode_to_string = hash_map<Opcode, string>  { opcodes() };
+hash_map<Opcode, string> opcode_to_string = { opcodes() };
 #undef opcode
 
 struct Program {
