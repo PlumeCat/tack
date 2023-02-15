@@ -3,11 +3,19 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Launch",
-            "program": "${workspaceFolder}/build/pl5",
-            "args": [ "source.pl5" ],
+            "name": "Launch Debug",
+            "program": "${workspaceFolder}/build/Debug/pl5",
+            "args": [ "source.rs", "-A", "-D" ],
             "preLaunchTask": "Build - Debug",
-            "cwd": "${workspaceRoot}"
+            "cwd": "${workspaceFolder}"
+        }, {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Launch Release",
+            "program": "${workspaceFolder}/build/Release/pl5",
+            "args": [ "source.rs", "-D", "-A" ],
+            "preLaunchTask": "Build - Release",
+            "cwd": "${workspaceFolder}"
         }
     ]
 }

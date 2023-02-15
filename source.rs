@@ -1,4 +1,3 @@
-print(2)
 let primes_found = 1
 let n = 1
 while primes_found < 10000 {
@@ -7,15 +6,12 @@ while primes_found < 10000 {
     let test = 2
     while test * test <= n {
         if n % test == 0 {
-            "print(n)
-                        print(test)"
             is_prime = 0
         }
         test = test + 1
     }
 
     if is_prime {
-        "print(n)"
         primes_found = primes_found + 1
     }
 }

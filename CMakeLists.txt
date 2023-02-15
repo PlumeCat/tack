@@ -1,6 +1,6 @@
 ﻿# CMakeLists.txt
 
-# cmake_minimum_required (VERSION 3.23)
+# cmake_minimum_required (VERSION 3.22)
 
 # project ("pl5")
 
@@ -22,7 +22,7 @@
 # # target_link_libraries(pl5 "${CMAKE_SOURCE_DIR}//..//lua-5.4.2//lua54.lib")
 # CMakeLists.txt
 
-cmake_minimum_required(VERSION 3.23)
+cmake_minimum_required(VERSION 3.22)
 set(PROJECT_NAME pl5)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED true)

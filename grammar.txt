@@ -134,8 +134,8 @@ Notes:
 	so will need a linked list or something
 
 	some syntax sugar:
-		let f = (x, y) {}
-		def f(x, y) {}
+		let f = fn (x, y) {}
+		fn f(x, y) {}
 
 	this is assumed to be running as part of a game engine
 	so make sure the garbage collector can be done in parallel slices multi threaded and deterministic time limits

@@ -8,74 +8,74 @@ using namespace std;
 
 
 bool is_identifier_char(char c) {
-	return isalnum(c) || c == '_';
+    return isalnum(c) || c == '_';
 }
 bool is_identifier_start_char(char c) {
-	return isalpha(c) || c == '_';
+    return isalpha(c) || c == '_';
 }
 void skip_whitespace(string_view& code) {
-	auto n = 0;
-	for (; n < code.size(); n++) {
-		if (!isspace(code[n])) {
-			break;
-		}
-	}
-	code.remove_prefix(n);
+    auto n = 0;
+    for (; n < code.size(); n++) {
+        if (!isspace(code[n])) {
+            break;
+        }
+    }
+    code.remove_prefix(n);
 }
 
 bool parse_raw_number(string_view& code, double& out) {
-	auto end = (char*)nullptr;
-	auto result = strtod(code.data(), &end);
-	auto dist = end - code.data();
-	if (dist != 0) {
-		code.remove_prefix(dist);
-		out = result;
-		return true;
-	}
-	return false;
+    auto end = (char*)nullptr;
+    auto result = strtod(code.data(), &end);
+    auto dist = end - code.data();
+    if (dist != 0) {
+        code.remove_prefix(dist);
+        out = result;
+        return true;
+    }
+    return false;
 }
 bool parse_raw_string_literal(string_view& code, string& out) {
-	skip_whitespace(code);
-	if (code.size() && code[0] == '"') {
-		for (auto n = 1; n < code.size(); n++) {
-			if (code[n] == '"') {
-				out = code.substr(1, n - 1);
-				code.remove_prefix(n + 1);
-				return true;
-			}
-		}
-		throw runtime_error("Expected closing quote '\"'");
-	}
-	return false;
+    skip_whitespace(code);
+    if (code.size() && code[0] == '"') {
+        for (auto n = 1; n < code.size(); n++) {
+            if (code[n] == '"') {
+                out = code.substr(1, n - 1);
+                code.remove_prefix(n + 1);
+                return true;
+            }
+        }
+        throw runtime_error("Expected closing quote '\"'");
+    }
+    return false;
 }
 bool parse_raw_identifier(string_view& code, string& out) {
-	skip_whitespace(code);
-	if (code.size() && is_identifier_start_char(code[0])) {
-		for (auto n = 1; n < code.size(); n++) {
-			if (!is_identifier_char(code[n])) {
-				out = code.substr(0, n);
-				code.remove_prefix(n);
-				return true;
-			}
-		}
-	}
-	return false;
+    skip_whitespace(code);
+    if (code.size() && is_identifier_start_char(code[0])) {
+        for (auto n = 1; n < code.size(); n++) {
+            if (!is_identifier_char(code[n])) {
+                out = code.substr(0, n);
+                code.remove_prefix(n);
+                return true;
+            }
+        }
+    }
+    return false;
 }
 bool parse_raw_string(string_view& code, char c) {
-	skip_whitespace(code);
-	if (code.size() && code[0] == c) {
-		code.remove_prefix(1);
-		return true;
-	}
-	return false;
+    skip_whitespace(code);
+    if (code.size() && code[0] == c) {
+        code.remove_prefix(1);
+        return true;
+    }
+    return false;
 }
 bool parse_raw_string(string_view& code, const string& c) {
-	skip_whitespace(code);
-	if (code.size() >= c.size() && code.substr(0, c.size()) == c) {
-		code.remove_prefix(c.size());
-		return true;
-	}
-	return false;
+    skip_whitespace(code);
+    if (code.size() >= c.size() && code.substr(0, c.size()) == c) {
+        code.remove_prefix(c.size());
+        return true;
+    }
+    return false;
 }
 
 
@@ -89,19 +89,19 @@ bool parse_raw_string(string_view& code, const string& c) {
 #define SUBPARSER(name, body) auto paste(parse_, name) = [&](string_view& code, AstNode& out) -> bool { auto _c = code; body; FAIL(); };
 
 #define TRY4(n1,n2,n3,n4)\
-	auto n1 = AstNode {}; auto n2 = AstNode {}; auto n3 = AstNode {}; auto n4 = AstNode {};\
-	if (paste(parse_, n1)(code, n1) && paste(parse_, n2)(code, n2) && paste(parse_, n3) && paste(parse_, n4))
+    auto n1 = AstNode {}; auto n2 = AstNode {}; auto n3 = AstNode {}; auto n4 = AstNode {};\
+    if (paste(parse_, n1)(code, n1) && paste(parse_, n2)(code, n2) && paste(parse_, n3) && paste(parse_, n4))
 #define TRY3(n1,n2,n3)\
-	auto n1 = AstNode {}; auto n2 = AstNode {}; auto n3 = AstNode {};\
-	if (paste(parse_, n1)(code, n1) && paste(parse_, n2)(code, n2) && paste(parse_, n3))
+    auto n1 = AstNode {}; auto n2 = AstNode {}; auto n3 = AstNode {};\
+    if (paste(parse_, n1)(code, n1) && paste(parse_, n2)(code, n2) && paste(parse_, n3))
 #define TRY2(n1,n2)\
-	auto n1 = AstNode {}; auto n2 = AstNode {};\
-	if (paste(parse_, n1)(code, n1) && paste(parse_, n2)(code, n2))
+    auto n1 = AstNode {}; auto n2 = AstNode {};\
+    if (paste(parse_, n1)(code, n1) && paste(parse_, n2)(code, n2))
 #define TRY(n1)\
-	auto n1 = AstNode {};\
-	if (paste(parse_, n1)(code, n1))
+    auto n1 = AstNode {};\
+    if (paste(parse_, n1)(code, n1))
 #define TRYs(s)\
-	if (parse_raw_string(code, s))
+    if (parse_raw_string(code, s))
 
 
 #define EXPECT(s) if (!parse_raw_string(code, s)) { FAIL(); }
@@ -110,32 +110,32 @@ bool parse_raw_string(string_view& code, const string& c) {
 // eg SubExpr = SubExpr '-' MulExpr
 //			  | MulExpr
 #define BINOP(name, ty, precedent, op)\
-	DEFPARSER(name, {\
-		TRY(precedent) {\
-			auto res = precedent;\
-			while (true) {\
-				TRYs(op) {\
-					TRY(precedent) {\
-						res = AstNode(AstType::ty, res, precedent);\
-					} else throw runtime_error("foo bar baz");\
-				} else break;\
-			}\
-			SUCCESS(res);\
-		}\
-	});
+    DEFPARSER(name, {\
+        TRY(precedent) {\
+            auto res = precedent;\
+            while (true) {\
+                TRYs(op) {\
+                    TRY(precedent) {\
+                        res = AstNode(AstType::ty, res, precedent);\
+                    } else throw runtime_error("foo bar baz");\
+                } else break;\
+            }\
+            SUCCESS(res);\
+        }\
+    });
 // binary operation non recursive in the grammar sense
 #define BINOP2(name, ty, precedent, op)\
-	DEFPARSER(name, {\
-		TRY(precedent) {\
-			auto lhs = precedent;\
-			TRYs(op) {\
-				TRY(precedent) {\
-					SUCCESS(AstType::ty, lhs, precedent)\
-				}\
-			}\
-			SUCCESS(lhs)\
-		}\
-	});
+    DEFPARSER(name, {\
+        TRY(precedent) {\
+            auto lhs = precedent;\
+            TRYs(op) {\
+                TRY(precedent) {\
+                    SUCCESS(AstType::ty, lhs, precedent)\
+                }\
+            }\
+            SUCCESS(lhs)\
+        }\
+    });
 
 
 
@@ -308,55 +308,55 @@ bool parse_raw_string(string_view& code, const string& c) {
 
 
 
-	//auto WS = GenericParser<void>(parse_whitespace);
-	//auto Identifier = WS + GenericParser<void>(parse_identifier) + WS;
-	//auto NumLiteral = WS + GenericParser<void>(parse_number) + WS;
-	//auto StringLiteral = WS + GenericParser<void>(parse_string_literal) + WS;
+    //auto WS = GenericParser<void>(parse_whitespace);
+    //auto Identifier = WS + GenericParser<void>(parse_identifier) + WS;
+    //auto NumLiteral = WS + GenericParser<void>(parse_number) + WS;
+    //auto StringLiteral = WS + GenericParser<void>(parse_string_literal) + WS;
 
-	//Identifier.set_label("Identifier");
-	//NumLiteral.set_label("NumLiteral");
-	//StringLiteral.set_label("StringLiteral");
-	//
-	//auto PrimaryExp
-	//	= Identifier
-	//	| NumLiteral
-	//	| StringLiteral
-	//	| SequenceParser(CharParser('('), CharParser(')')).set_label("PrimaryExp") // TODO: '(' + Exp + ')'
-	//	;
+    //Identifier.set_label("Identifier");
+    //NumLiteral.set_label("NumLiteral");
+    //StringLiteral.set_label("StringLiteral");
+    //
+    //auto PrimaryExp
+    //	= Identifier
+    //	| NumLiteral
+    //	| StringLiteral
+    //	| SequenceParser(CharParser('('), CharParser(')')).set_label("PrimaryExp") // TODO: '(' + Exp + ')'
+    //	;
 
-	//// TODO: second SubExp should be AddExp recursively
-	//auto SubExp = PrimaryExp +		Optional('-' + PrimaryExp);
-	//auto AddExp = SubExp + Optional('+' + SubExp);
+    //// TODO: second SubExp should be AddExp recursively
+    //auto SubExp = PrimaryExp +		Optional('-' + PrimaryExp);
+    //auto AddExp = SubExp + Optional('+' + SubExp);
 
-	//auto& Exp = AddExp;
+    //auto& Exp = AddExp;
 
-	//auto VarDeclStat = SequenceParser(KeywordParser("let"), Identifier, CharParser('='), Exp);
-	//auto AssignStat = SequenceParser(Identifier, CharParser('='), Exp);
-	//auto Block = CharParser('{') + '}'; // TODO:  + StatList + ...
-	//auto IfStat = KeywordParser("if") + Exp + Block;
-	//auto WhileStat = "while" + Exp + Block;
-	//
-	//auto PrintStat = KeywordParser("print") + CharParser('(') + Exp + CharParser(')');
-	//PrintStat.set_label("print");
+    //auto VarDeclStat = SequenceParser(KeywordParser("let"), Identifier, CharParser('='), Exp);
+    //auto AssignStat = SequenceParser(Identifier, CharParser('='), Exp);
+    //auto Block = CharParser('{') + '}'; // TODO:  + StatList + ...
+    //auto IfStat = KeywordParser("if") + Exp + Block;
+    //auto WhileStat = "while" + Exp + Block;
+    //
+    //auto PrintStat = KeywordParser("print") + CharParser('(') + Exp + CharParser(')');
+    //PrintStat.set_label("print");
 
-	//auto Statement
-	//	= VarDeclStat
-	//	| AssignStat
-	//	| IfStat
-	//	| PrintStat
-	//	| WhileStat
-	//	;
+    //auto Statement
+    //	= VarDeclStat
+    //	| AssignStat
+    //	| IfStat
+    //	| PrintStat
+    //	| WhileStat
+    //	;
 
-	// auto Subroutine = RepeatParser(Statement);
-	// auto result = Subroutine.parse(string_view{ source });
-	// auto result = PrintStat.parse(string_view{ source });
-	/*if (result.first) {
-		if (result.second == source.size()) {
-			log("Parsing done!");
-		} else {
-			log("Parsing incomplete");
-		}
-	} else {
-		log("Failed to parse");
-	}
-	*/
+    // auto Subroutine = RepeatParser(Statement);
+    // auto result = Subroutine.parse(string_view{ source });
+    // auto result = PrintStat.parse(string_view{ source });
+    /*if (result.first) {
+        if (result.second == source.size()) {
+            log("Parsing done!");
+        } else {
+            log("Parsing incomplete");
+        }
+    } else {
+        log("Failed to parse");
+    }
+    */

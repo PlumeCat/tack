@@ -7,7 +7,7 @@
             "command": "make",
             "problemMatcher": "$gcc",
             "options": {
-                "cwd": "${workspaceRoot}/build"
+                "cwd": "${workspaceFolder}/build/Debug"
             },
             "group": {
                 "kind": "build",
@@ -15,13 +15,38 @@
             }
         },
         {
+            "label": "Build - Release",
+            "type": "shell",
+            "command": "make",
+            "problemMatcher": "$gcc",
+            "options": {
+                "cwd": "${workspaceFolder}/build/Release",
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
             "label": "CMake - Debug",
             "type": "shell",
-            "command": "cmake .. -G 'Unix Makefiles'",
+            "command": "cmake ../.. -G 'Unix Makefiles'",
             "options": {
-                "cwd": "build",
+                "cwd": "${workspaceFolder}/build/Debug",
                 "env": {
                     "CMAKE_BUILD_TYPE": "Debug"
+                }
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "CMake - Release",
+            "type": "shell",
+            "command": "cmake ../.. -G 'Unix Makefiles'",
+            "options": {
+                "cwd": "${workspaceFolder}/build/Release",
+                "env": {
+                    "CMAKE_BUILD_TYPE": "Release"
                 }
             },
             "problemMatcher": []
