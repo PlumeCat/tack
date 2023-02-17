@@ -85,7 +85,8 @@ int main(int argc, char* argv[]) {
             log("Compiling");
             auto vm2 = BytecodeInterpreter();
             auto program = Program {};
-            vm2.compile(out_ast, program);
+            auto compiler = CompilerContext {};
+            vm2.compile(out_ast, compiler, program);
             if (check_arg("-D")) {
                 log("Program:\n", program.to_string());
             }

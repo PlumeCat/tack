@@ -97,7 +97,7 @@ DEFPARSER(literal, {
                 TRY(identifier) {
                     p.children.emplace_back(identifier);
                     TRYs(',') {} else break; // TODO: disallow trailing comma
-                }
+                } else break;
             }
             SUCCESS(p);
         })
