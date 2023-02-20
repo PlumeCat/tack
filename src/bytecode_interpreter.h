@@ -10,84 +10,28 @@
 
 #define opcodes() \
     opcode(UNKNOWN)\
+    /* binary operations:*/\
     opcode(EQUAL) opcode(NEQUAL) opcode(GREATER) opcode(LESS) opcode(GREATEREQ) opcode(LESSEQ)\
     opcode(ADD) opcode(SUB) opcode(DIV) opcode(MUL) opcode(MOD) opcode(POW)\
-    opcode(SHL) opcode(SHR)\
+    opcode(SHL) opcode(SHR) opcode(BITAND) opcode(BITOR) opcode(BITXOR) opcode(AND) opcode(OR)\
+    /* unary operation: apply inplace for value at top of stack*/\
     opcode(NEGATE) opcode(NOT) opcode(BITNOT)\
-    opcode(LOAD) opcode(STORE) opcode(MOV) \
-    opcode(JUMP) opcode(CONDJUMP)\
-    opcode(CALL) opcode(RET)\
-    opcode(PRINT)\
-    // opcode(EXIT)
+    /* stack and variable operations */\
+    opcode(LOAD) opcode(STORE) opcode(LOADCONST) opcode(GROW) opcode(SHRINK) \
+    /* Relative jump using encoded offset */\
+    opcode(JUMPF) opcode(JUMPB)\
+    /* Relative jump using encoded offset IFF stack[n--] == 0 (but pop the top regardless) */\
+    opcode(CONDJUMP)\
+    opcode(CALL) opcode(RET)/**/\
+    opcode(PRINT)/**/\
     
 
 #define opcode(x) x,
 enum class Opcode : uint8_t { opcodes() };
 #undef opcode
 #define opcode(x) { Opcode::x, #x },
-hash_map<Opcode, string> opcode_to_string = { opcodes() };
+static hash_map<Opcode, string> opcode_to_string = { opcodes() };
 #undef opcode
-
-
-struct CompilerContext {
-    vector<pair<const AstNode*, uint32_t>> functions; // code x storage location to put the start address
-    hash_map<string, uint16_t> variables;
-    uint32_t free_reg = 0;
-
-    // variable -> register
-    uint32_t lookup(const string& identifier) {
-        auto iter = variables.find(identifier);
-        if (iter == variables.end()) {
-            return -1;
-        }
-        return iter->second;
-    }
-    // set register for variable
-    void bind_register(const string& identifier, uint32_t reg) {
-        variables[identifier] = reg;
-    }
-};
-
-
-struct Program {
-    vector<uint64_t> instructions;
-    vector<double> storage; // program constant storage goes at the bottom of the stack for now
-
-    string to_string() {
-        auto s = stringstream {};
-
-        s << "  Bytecode:\n";
-        for (auto bc : instructions) {
-            auto opcode = uint16_t(bc >> 48);
-            auto r1 = uint16_t(bc >> 32);
-            auto r2 = uint16_t(bc >> 16);
-            auto r3 = uint16_t(bc);
-            s << "    " << opcode_to_string[(Opcode)opcode] << ", " << r1 << ", " << r2 << ", " << r3 << "\n";
-        }
-
-        s << "  Storage: [ ";
-        for (auto& x : storage) {
-            s << x << ", ";
-        }
-        s << "]\n";
-
-        return s.str();
-    }
-};
-
-/*
-TODO: keep a list of errors when encountered and attempt to continue compilation instead of throwing
-     - variable missing
-     - variable already exists
-
-TODO: mov folding
-    mov followed by usage can be elided
-    eg MOV 0 1 ADD 1 2
-        -> ADD 0 2
-    same applies for mov chains
-    eg MOV 0 1, MOV 1, 2
-        -> MOV 0, 2
-*/
 
 uint64_t encode_op(Opcode opcode, uint64_t i1 = 0, uint64_t i2 = 0, uint64_t i3 = 0) {
     if (i1 > UINT16_MAX || i2 > UINT16_MAX || i3 > UINT16_MAX) throw runtime_error("Out of range instruction");
@@ -98,23 +42,83 @@ uint64_t encode_op(Opcode opcode, uint64_t i1 = 0, uint64_t i2 = 0, uint64_t i3 
         uint64_t(i3)
     );
 };
-#define encode(op, ...) encode_op(Opcode::op, __VA_ARGS__)
-#define emit(op, ...) program.instructions.push_back(encode(op, __VA_ARGS__));
-#define rewrite(instr, op, ...) program.instructions[instr] = encode(op, __VA_ARGS__);
-#define handle(type) break; case AstType::type:
-#define child(n) compile_node(node.children[n], compiler, program);
-#define label(name) auto name = program.instructions.size();
-#define label_reg(name) auto name = compiler.free_reg - 1;
-#define handle_binexp(Type, Opcode)\
-    break; case AstType::Type: {\
-        child(0); child(1);\
-        emit(Opcode, compiler.free_reg - 2, compiler.free_reg - 1);\
-        compiler.free_reg -= 1; }
 
-struct BytecodeInterpreter {
-    BytecodeInterpreter() {}
+struct Program {
+    vector<uint64_t> instructions;
+    vector<double> storage; // program constant storage goes at the bottom of the stack for now
 
-    void compile(const AstNode& module, CompilerContext& compiler, Program& program) {
+    string to_string() {
+        auto s = stringstream {};
+
+        s << "Program:\n";
+        s << "   Bytecode:\n";
+        auto i = 0;
+        for (auto bc : instructions) {
+            auto opcode = uint16_t(bc >> 48);
+            auto r1 = uint16_t(bc >> 32);
+            auto r2 = uint16_t(bc >> 16);
+            auto r3 = uint16_t(bc);
+            s << "        " << i << ": " << opcode_to_string[(Opcode)opcode] << ", " << r1 << ", " << r2 << ", " << r3 << '\n';
+            i++;
+        }
+
+        s << "    Storage:\n";
+        i = 0;
+        for (auto& x : storage) {
+            s << "        " << i << ": " << x << '\n';
+            i++;
+        }
+
+        return s.str();
+    }
+};
+
+struct Compiler {
+    struct FunctionContext {
+        uint32_t storage_location;
+        const AstNode* node; // before compilation
+        hash_map<string, uint16_t> variables;
+        // hash_map<string, uint16_t> captures; // variables from lexical higher scopes
+        FunctionContext* parent_context;
+    };
+    vector<FunctionContext> func_context; // TODO:
+    
+    vector<pair<const AstNode*, uint32_t>> functions; // code x storage location to put the start address
+    struct StackFrame {
+        hash_map<string, uint16_t> variables;
+        // TODO: parent scope etc
+    };
+    vector<StackFrame> stack;
+    // uint32_t free_reg = 0;
+
+    // variable -> stack index relative to current stack frame
+    uint32_t lookup_variable(const string& identifier) {
+        auto iter = stack.back().variables.find(identifier);
+        if (iter == stack.back().variables.end()) {
+            return -1;
+        }
+        return iter->second;
+    }
+    
+    // set stack position for new variable
+    // don't bind if already exists
+    uint32_t bind_variable(const string& identifier) {
+        if (stack.back().variables.find(identifier) != stack.back().variables.end()) {
+            return -1;
+        }
+        auto stackpos = stack.back().variables.size();
+        stack.back().variables[identifier] = stackpos;
+        return stackpos;
+    }
+
+    void push_stack_frame() {
+        stack.emplace_back(StackFrame {});
+    }
+    void pop_stack_frame() {
+        stack.pop_back();
+    }
+    
+    void compile(const AstNode& module, Program& program) {
         // treat the top level of the program as a function body
         // RET will be emitted for it - don't need a special EXIT instruction
         // when the program is entered, the 0th stack frame has the last instruction+1
@@ -127,21 +131,44 @@ struct BytecodeInterpreter {
         );
 
         program.storage.emplace_back(0); // dummy address of top level body
-        compiler.functions.emplace_back(pair { &node, program.storage.size() });
+        functions.emplace_back(pair { &node, program.storage.size() });
 
         // compile all function literals and append to main bytecode
         // TODO: interesting, can this be parallelized?
-        for (auto i = 0; i < compiler.functions.size(); i++) { // can't use range-based for because compiler.functions size changes
-            auto func = compiler.functions[i].first;
-            auto storage = compiler.functions[i].second;
+        for (auto i = 0; i < functions.size(); i++) { // can't use range-based for because compiler.functions size changes
+            auto func = functions[i].first;
+            auto storage = functions[i].second;
             program.storage[storage] = program.instructions.size();
-            compile_node(func->children[1], compiler, program);
-            emit(RET, 0);
+            compile_function(*func, program);
         }
-
     }
 
-    void compile_node(const AstNode& node, CompilerContext& compiler, Program& program) {
+    #define encode(op, ...) encode_op(Opcode::op, __VA_ARGS__)
+    #define emit(op, ...) program.instructions.push_back(encode(op, __VA_ARGS__));
+    #define rewrite(instr, op, ...) program.instructions[instr] = encode(op, __VA_ARGS__);
+    #define handle(type)                break; case AstType::type:
+    #define handle_binexp(type, opcode) handle(type) { child(0); child(1); emit(opcode, 0); }
+    #define child(n) compile_node(node.children[n], program);
+    #define label(name) auto name = program.instructions.size();
+    
+    void compile_function(const AstNode& func, Program& program) {
+        push_stack_frame();
+        
+        // grow stack to make space for variables (space required will be known later)
+        label(grow); emit(GROW, 0);
+        compile_node(func.children[1], program);
+        label(shrink);emit(SHRINK, 0);
+        emit(RET, 0); // TODO: RET if there's a returned value, RETVOID otherwise. pack the shrink here
+        // return
+        
+        // space for variables
+        auto extra_stack = stack.back().variables.size();
+        rewrite(grow, GROW, extra_stack);
+        rewrite(shrink, SHRINK, extra_stack);
+        pop_stack_frame();
+    }
+
+    void compile_node(const AstNode& node, Program& program) {
         switch (node.type) {
             case AstType::Unknown: return;
             
@@ -153,67 +180,58 @@ struct BytecodeInterpreter {
             handle(VarDeclStat) {
                 child(1); // push result of expression to free register
                 
-                // find the variable
-                auto& ident = node.children[0].data_s;
-                if (compiler.lookup(ident) != -1) {
-                    throw runtime_error("Compile error: variable already exists: " + ident);
+                // make sure not already declared
+                // TODO: allow shadowing in lower scopes?
+                auto stackpos = bind_variable(node.children[0].data_s);
+                if (stackpos == -1) {
+                    throw runtime_error("Compile error: variable already exists: " + node.children[0].data_s);
                 }
-                compiler.bind_register(ident, compiler.free_reg - 1); // top register belongs to the variable now
-                compiler.free_reg++;
+                
+                emit(STORE, stackpos); // put the value at the top of the stack into stackpos
             }
             handle(AssignStat) {
                 child(1);
-                auto reg = compiler.lookup(node.children[0].data_s);
-                if (reg == -1) {
+                
+                // make sure variable exists
+                auto stackpos = lookup_variable(node.children[0].data_s);
+                if (stackpos == -1) {
                     throw runtime_error("Compile error: variable not found: " + node.children[0].data_s);
                 }
-                emit(MOV, compiler.free_reg - 1, reg);
-                compiler.free_reg--; // subsequent instructions can use this register
+                
+                emit(STORE, stackpos); // value at top of stack into stackpos
             }
             handle(PrintStat) {
                 child(0);
-                emit(PRINT, compiler.free_reg - 1);
-                compiler.free_reg--;
+                emit(PRINT, 0);//, compiler.free_reg - 1);
+                // compiler.free_reg--;
             }
             handle(IfStat) {
                 child(0); // evaluate the expression
                 
-                label(cond);
-                label_reg(cond_reg);
-                emit(CONDJUMP, 0, 0, 0); // PLACEHOLDER
+                label(condjump);emit(CONDJUMP, 0, 0, 0); // PLACEHOLDER
 
-                label(startif);
-                child(1); // compile the if body
-                label(endif);
-                emit(JUMP, 0, 0, 0); // PLACEHODLER
+                                child(1); // compile the if body
+                label(endif);   emit(JUMPF, 0, 0, 0); // PLACEHODLER TODO: not needed if there's no else-block
 
-                label(startelse);
-                if (node.children.size() == 3) {
-                    child(2); // compile the else body
-                }
+                label(startelse);if (node.children.size() == 3)
+                                child(2); // compile the else body
                 label(endelse);
                 
                 // TODO: make more efficient
-                // eg don't need to jump to startif as it's the next instruction anyway
-                // condjump probably just needs jump-or-don't-jump
-                // also can be more efficient for the case when there's no else (probably)
-                rewrite(cond, CONDJUMP, cond_reg, startif, startelse);
-                rewrite(endif, JUMP, endelse);
+                // can be more efficient for the case when there's no else (probably)
+                rewrite(condjump, CONDJUMP, startelse - condjump);
+                rewrite(endif, JUMPF, endelse - endif);
             }
             handle(WhileStat) {
-                label(eval_cond);
-                child(0); // evaluate expression
+                label(cond);    child(0); // evaluate expression
                 
-                label(cond);
-                label_reg(cond_reg);
-                emit(CONDJUMP, 0, 0, 0); // placeholder
+                label(condjump);emit(CONDJUMP, 0, 0, 0); // placeholder
 
-                label(startwhile);
-                child(1);
-                emit(JUMP, eval_cond);
-                label(endwhile);
+                                child(1); // compile the body
+                label(jumpback);emit(JUMPB, jumpback - cond); // jump to top of loop
+                label(ewhile);
 
-                rewrite(cond, CONDJUMP, cond_reg, startwhile, endwhile);
+                rewrite(condjump, CONDJUMP, ewhile - condjump);
             }
             
             handle(TernaryExp) {}
@@ -237,19 +255,14 @@ struct BytecodeInterpreter {
             handle_binexp(DivExp, DIV)
             handle_binexp(ModExp, MOD)
             handle_binexp(PowExp, POW)
-            
-            handle(NegateExp) { child(0); emit(NEGATE, compiler.free_reg - 1); }
-            handle(NotExp)    { child(0); emit(NOT, compiler.free_reg - 1); }
-            handle(BitNotExp) { child(0); emit(BITNOT, compiler.free_reg - 1); }
+
+            handle(NegateExp) { child(0); emit(NEGATE, 0); }
+            handle(NotExp)    { child(0); emit(NOT, 0); }
+            handle(BitNotExp) { child(0); emit(BITNOT, 0); }
 
             handle(ReturnStat) {
-                // TODO:
-                // 'return' will work by jumping to the end of the function body
-                // the end of the function has the JUMP back to return address
-                // that way it's easy to support multi-return, early-return etc
-                // jump folding will optimize this out hopefully
-                
-                // emit(JUMP, end_of_func);
+                // TODO: handle return value
+                emit(RET, 0);
             }
             handle(CallExp) {
                 // TODO: indirect call vs direct call
@@ -261,9 +274,8 @@ struct BytecodeInterpreter {
                 // of a function address
                 child(0);
                 
-                // call function
-                emit(CALL, compiler.free_reg - 1);
-                compiler.free_reg--;
+                // call function at top of stack
+                emit(CALL, 0);
             }
             handle(ArgList) {}
             handle(IndexExp) {}
@@ -272,19 +284,17 @@ struct BytecodeInterpreter {
                 // put a placeholder value in storage at first. when the program is linked, the placeholder is
                 // overwritten with the real start address
                 auto func_storage = program.storage.size();
-                compiler.functions.emplace_back(pair { &node, func_storage }); // compile function
-                program.storage.push_back(compiler.functions.size() * 111); // placeholder value
+                program.storage.push_back(functions.size() * 111); // placeholder value
+                functions.emplace_back(pair { &node, func_storage }); // compile function
 
                 // load the function start address
-                emit(LOAD, compiler.free_reg, func_storage);
-                compiler.free_reg++;
+                emit(LOADCONST, func_storage);
             }
             handle(ParamDef) {}
             handle(NumLiteral) {
-                // TODO: don't store the same constants twice
+                // TODO: don't store the same constant more than once
                 program.storage.push_back(node.data_d);
-                emit(LOAD, compiler.free_reg, program.storage.size() - 1);
-                compiler.free_reg++;
+                emit(LOADCONST, program.storage.size() - 1);
             }
             handle(StringLiteral) {}
             handle(ArrayLiteral) {}
@@ -292,12 +302,11 @@ struct BytecodeInterpreter {
             handle(Identifier) {
                 // reading a variable (writing is not encountered by recursive compile)
                 // so the variable exists and points to a register
-                auto reg = compiler.lookup(node.data_s);
-                if (reg == -1) {
-                    throw runtime_error("Unknown variable: " + node.data_s);
+                auto stackpos = lookup_variable(node.data_s);
+                if (stackpos == -1) {
+                    throw runtime_error("Compile error: variable not found: " + node.data_s);
                 }
-                emit(MOV, reg, compiler.free_reg);
-                compiler.free_reg++;
+                emit(LOAD, stackpos);
             }
         }
 
@@ -311,68 +320,105 @@ struct BytecodeInterpreter {
     #undef handle
     #undef child
     #undef label
-    #undef label_reg
+};
+
+
+/*
+TODO: keep a list of errors when encountered and attempt to continue compilation instead of throwing
+     - variable missing
+     - variable already exists
+
+TODO: mov folding
+    mov followed by usage can be elided
+    eg MOV 0 1 ADD 1 2
+        -> ADD 0 2
+    same applies for mov chains
+    eg MOV 0 1, MOV 1, 2
+        -> MOV 0, 2
+*/
+
+
+struct BytecodeInterpreter {
+    BytecodeInterpreter() {}
     
     void execute(Program& program) {
         // TODO: optimization, computed goto, direct threading, ...
-        auto registers = array<double, numeric_limits<uint16_t>::max()>{};
         
+        // TODO: use the same stack for function calls eventually
+        auto stack = vector<double>{};
         // HACK: sort of.
         // the top level block of the program counts as the 0th stack frame
         // so when it RETs, it needs to jump to the final instruction so the interpreter loop can terminate
-        auto call_stack = vector<uint32_t>{}; // literally just the return address
-        call_stack.emplace_back(program.instructions.size());
-        // TODO: use the registers for this somehow...
+        auto call_stack = vector<pair<uint32_t, uint32_t>>{}; // return addr, stack ptr
+        call_stack.emplace_back(program.instructions.size(), stack.size());
+        
         
         auto instruction_pointer = 0;
+        auto stackptr = 0;
         while (instruction_pointer < program.instructions.size()) {
             // decode
             auto instruction = program.instructions[instruction_pointer++];
-            auto opcode = uint16_t(instruction >> 48);
-            auto r1 = uint16_t(instruction >> 32);
-            auto r2 = uint16_t(instruction >> 16);
-            auto r3 = uint16_t(instruction);
+            auto opcode = uint16_t((instruction >> 48) & 0xffff);
+            auto r1 = uint16_t((instruction >> 32) & 0xffff);
+            auto r2 = uint16_t((instruction >> 16) & 0xffff);
+            auto r3 = uint16_t((instruction) & 0xffff);
 
-            #define handle(c) break; case (uint16_t)Opcode::c:
-            
+            #define handle(c)           break; case (uint16_t)Opcode::c:
+            #define handle_binop(c,op) handle(c) { stack[s-2] = stack[s-2] op stack[s-1]; stack.pop_back(); }
+
+            auto s = stack.size();
+
+            // TODO: clean up interaction between CALL and GROW
+            // CALL is muching the stack pointer / stack size, then GROW mucks it again,
+            // then will need more mucking to handle args and return
+            // maybe CALL / RET need to do more work, or store function metadata somewhere?
+                // could put function fixed stack growth into storage after the start address?
             // execute
             switch (opcode) {
                 case (uint16_t)Opcode::UNKNOWN:
-                handle(ADD)         registers[r1] = registers[r1] + registers[r2];
-                handle(SUB)         registers[r1] = registers[r1] - registers[r2];
-                handle(MUL)         registers[r1] = registers[r1] * registers[r2];
-                handle(DIV)         registers[r1] = registers[r1] / registers[r2];
-                handle(MOD)         registers[r1] = (double)(((uint64_t)registers[r1]) % ((uint64_t)registers[r2]));
+                // binop
+                handle_binop(ADD, +)
+                handle_binop(SUB, -)
+                handle_binop(MUL, *)
+                handle_binop(DIV, /)
+                handle_binop(EQUAL,    ==)
+                handle_binop(NEQUAL,   !=)
+                handle_binop(LESS,     <)
+                handle_binop(GREATER,  >)
+                handle_binop(LESSEQ,   <=)
+                handle_binop(GREATEREQ,>=)
+                handle(MOD)             { stack[s-2] = (double)(((uint64_t)stack[s-2]) % ((uint64_t)stack[s-1])); stack.pop_back(); }
+                // unop
+                handle(NEGATE)          { stack[s-1] = -stack[s-1]; }
+
+                handle(GROW)            { stack.resize(stack.size() + r1); }
+                handle(SHRINK)          { stack.resize(stack.size() - r1); }
+                handle(LOAD)            { stack.push_back(stack[stackptr + r1]); }
+                handle(LOADCONST)       { stack.push_back(program.storage[r1]); }
+                handle(STORE)           { stack[stackptr + r1] = stack[s-1]; stack.pop_back(); }
+                handle(PRINT)           { log<true, false>("print: ", stack[s-1]); stack.pop_back(); }
                 
-                handle(EQUAL)       registers[r1] = registers[r1] == registers[r2];
-                handle(NEQUAL)      registers[r1] = registers[r1] != registers[r2];
-                handle(LESS)        registers[r1] = registers[r1] < registers[r2];
-                handle(GREATER)     registers[r1] = registers[r1] > registers[r2];
-                handle(LESSEQ)      registers[r1] = registers[r1] <= registers[r2];
-                handle(GREATEREQ)   registers[r1] = registers[r1] >= registers[r2];
+                handle(JUMPF)           { instruction_pointer += r1 - 1; }
+                handle(JUMPB)           { instruction_pointer -= (r1 + 1); }
+                handle(CONDJUMP)        { if (!stack[s-1]) {
+                                            instruction_pointer += r1 - 1; }
+                                          stack.pop_back(); }
                 
-                handle(NEGATE)      registers[r1] = -registers[r1];
-                
-                handle(MOV)         registers[r2] = registers[r1];
-                handle(LOAD)        registers[r1] = program.storage[r2];
-                //handle(STORE)       program.storage[r2] = registers[r1];
-                
-                handle(PRINT)       log<true, false>("(print_bc)", registers[r1]);
-                handle(JUMP)        instruction_pointer = r1;
                 handle(CALL) {
-                    call_stack.push_back(instruction_pointer);
-                    instruction_pointer = registers[r1];
+                    call_stack.push_back({ instruction_pointer, stackptr });
+                    instruction_pointer = stack[s-1]; stack.pop_back();
+                    stackptr = stack.size();
+                    // stack_frame_pointer = stack.size(); // TODO: handle GROW here?
                 }
                 handle(RET) {
-                    instruction_pointer = call_stack.back();
+                    tie(instruction_pointer, stackptr) = call_stack.back();
                     call_stack.pop_back();
                 }
-                handle(CONDJUMP)    instruction_pointer = registers[r1] ? r2 : r3;
-                // handle(EXIT)        instruction_pointer = program.instructions.size(); // HACK
                 break; default: throw runtime_error("unknown instruction "s + opcode_to_string[(Opcode)opcode]);
             }
 
             #undef handle
+            #undef handle_binop
         }
     }
 };

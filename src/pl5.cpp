@@ -85,10 +85,10 @@ int main(int argc, char* argv[]) {
             log("Compiling");
             auto vm2 = BytecodeInterpreter();
             auto program = Program {};
-            auto compiler = CompilerContext {};
-            vm2.compile(out_ast, compiler, program);
+            auto compiler = Compiler {};
+            compiler.compile(out_ast, program);
             if (check_arg("-D")) {
-                log("Program:\n", program.to_string());
+                log(program.to_string());
             }
 
             auto before = steady_clock::now();
@@ -96,7 +96,7 @@ int main(int argc, char* argv[]) {
             auto after = steady_clock::now();
             log("BC done in ", duration_cast<microseconds>(after - before).count() * 1e-6, "s");
         } catch (exception& e) {
-            log("runtime error: ", e.what());
+            log(e.what());
         }
     } catch (exception& e) {
         log("parser error: ", e.what());

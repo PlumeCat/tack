@@ -1,3 +1,36 @@
+print(2)
+
+let n = 4
+while n < 10 {
+    print(n)
+    n = n + 1
+}
+
+let foo = fn(a, b, c) {
+    let bar = fn(x, y, z) {
+        let a = 1
+        let b = 2
+        let baz = fn() {
+            let e = 1
+            let f = 4
+            print(e + f)
+        }
+        baz()
+    }
+
+    print(100)
+    bar()
+    print(101)
+    bar()
+}
+
+foo()
+foo()
+
+print(300)
+
+"print(2)"
+
 "
 let x = fn() {}
 
@@ -6,11 +39,12 @@ let n = 1
 let q = 0
 
 let y = fn() {
-    print(n)
+    print(12346789)
 } ""
 
 while primes_found < 10 {
     n = n + 2
+    print(n)
 
     let is_prime = 1
     let test = 2
@@ -24,11 +58,14 @@ while primes_found < 10 {
     if is_prime {
         y()
         primes_found = primes_found + 1
+        print(n)
     }
 }
 
-print(n)
+print(n)"
+
 "
+
 let x = 1
 let y = 2
 
@@ -39,6 +76,12 @@ let w = fn() {
     let b = 20
 
     print(a + b)
+
+    x = x + 1
+    print(x)
+    if x == 3 {
+        return
+    }
 
     if maxrec < 10 {
         maxrec = maxrec + 1
@@ -54,4 +97,4 @@ let z = fn() {
 
 print(x + y)
 z()
-print(1)
+print(1)"
