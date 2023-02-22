@@ -47,8 +47,9 @@ struct AstNode {
 
     AstNode() = default;
     AstNode(const AstNode& node) = default;
-    template<typename... Children>
-    AstNode(AstType type, Children... ch) : type(type), children({ ch... }) {}	
+    template<typename... Children> AstNode(AstType type, Children... ch) : type(type), children({ ch... }) {} // TODO: check forwarding
+    AstNode(AstType type, const string& data_s): type(type), data_s(data_s) {}
+    AstNode(double d): type(AstType::NumLiteral), data_d(d) {}
 
     string tostring(const string& indent = "") const {
         auto s = indent + type_to_string.at(type) + (type == AstType::Identifier ? " " + data_s : ""s) + (type == AstType::NumLiteral ? " "s + to_string(data_d) : "");
@@ -68,26 +69,20 @@ DECLPARSER(block);
 DEFPARSER(identifier, {
     auto identifier = ""s;
     if (parse_raw_identifier(code, identifier)) {
-        out.type = AstType::Identifier;
-        out.data_s = identifier;
-        return true;
+        SUCCESS(AstType::Identifier, identifier);
     }
 });
 DEFPARSER(literal, {
     SUBPARSER(num_literal, {
         auto num = 0.0;
         if (parse_raw_number(code, num)) {
-            out.type = AstType::NumLiteral;
-            out.data_d = num;
-            return true;
+            SUCCESS(num);
         }
     });
     SUBPARSER(string_literal, {
         auto str = ""s;
         if (parse_raw_string_literal(code, str)) {
-            out.type = AstType::StringLiteral;
-            out.data_s = str;
-            return true;
+            SUCCESS(AstType::StringLiteral, str);
         }
     });
     SUBPARSER(func_literal, {
@@ -102,7 +97,8 @@ DEFPARSER(literal, {
             SUCCESS(p);
         })
         EXPECT("fn")
-        TRYs('(') {} else throw runtime_error("expected parameter definition after 'def'");
+        // TRY(identifier) {} // TODO: named vs anon functions (a named function is a VarDeclStat, so can't be an expression?)
+        TRYs('(') {} else throw runtime_error("expected parameter definition after 'fn'");
         TRY(param_def) {
             TRYs(')') {} else throw runtime_error("expected ')' after parameter definition");
             TRY(block) {

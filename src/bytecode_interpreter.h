@@ -17,7 +17,7 @@
     /* unary operation: apply inplace for value at top of stack*/\
     opcode(NEGATE) opcode(NOT) opcode(BITNOT)\
     /* stack and variable operations */\
-    opcode(LOAD) opcode(STORE) opcode(LOADCONST) opcode(GROW) opcode(SHRINK) \
+    opcode(LOAD) opcode(STORE) opcode(LOADCONST) opcode(GROW) \
     /* Relative jump using encoded offset */\
     opcode(JUMPF) opcode(JUMPB)\
     /* Relative jump using encoded offset IFF stack[n--] == 0 (but pop the top regardless) */\
@@ -58,7 +58,7 @@ struct Program {
             auto r1 = uint16_t(bc >> 32);
             auto r2 = uint16_t(bc >> 16);
             auto r3 = uint16_t(bc);
-            s << "        " << i << ": " << opcode_to_string[(Opcode)opcode] << ", " << r1 << ", " << r2 << ", " << r3 << '\n';
+            s << "        " << i << ": " << opcode_to_string[(Opcode)opcode] << ", " << r1 << '\n'; //", " << r2 << ", " << r3 << '\n';
             i++;
         }
 
@@ -74,12 +74,20 @@ struct Program {
 };
 
 struct Compiler {
+    struct VariableContext {
+        string name;
+        uint16_t stackpos;
+        bool is_captured = false; // if captured by a lower scope, allocate on heap
+    };
+    struct Scope {
+        hash_map<string, VariableContext> variables;
+    };
     struct FunctionContext {
         uint32_t storage_location;
         const AstNode* node; // before compilation
-        hash_map<string, uint16_t> variables;
-        // hash_map<string, uint16_t> captures; // variables from lexical higher scopes
-        FunctionContext* parent_context;
+        // hash_map<string, VariableContext> variables;
+        vector<Scope> scopes;
+        FunctionContext* parent_context; // variables from lexical higher scopes
     };
     vector<FunctionContext> func_context; // TODO:
     
@@ -89,7 +97,6 @@ struct Compiler {
         // TODO: parent scope etc
     };
     vector<StackFrame> stack;
-    // uint32_t free_reg = 0;
 
     // variable -> stack index relative to current stack frame
     uint32_t lookup_variable(const string& identifier) {
@@ -126,7 +133,7 @@ struct Compiler {
         // (see 'execute')
         auto node = AstNode(
             AstType::FuncLiteral,
-            AstNode(AstType::ParamDef),
+            AstNode(AstType::ParamDef, {}),
             module // parsing ensures that module is always a stat-list
         );
 
@@ -152,19 +159,32 @@ struct Compiler {
     #define label(name) auto name = program.instructions.size();
     
     void compile_function(const AstNode& func, Program& program) {
+        auto num_args = func.children[0].children.size();
+        
         push_stack_frame();
         
         // grow stack to make space for variables (space required will be known later)
         label(grow); emit(GROW, 0);
+        
+        // handle arguments; bind as variables
+        for(const auto& arg: func.children[0].children) {
+            log("Bind arg as variable: ", arg.tostring());
+            auto stackpos = bind_variable(arg.data_s);
+            if (stackpos == -1) {
+                throw runtime_error("Compile error: duplicate argument: " + arg.data_s);
+            }
+        }
+
+        // compile body
         compile_node(func.children[1], program);
-        label(shrink);emit(SHRINK, 0);
-        emit(RET, 0); // TODO: RET if there's a returned value, RETVOID otherwise. pack the shrink here
+        
         // return
+        emit(RET, 0);
         
         // space for variables
-        auto extra_stack = stack.back().variables.size();
+        auto num_variables = stack.back().variables.size();
+        auto extra_stack = num_variables - num_args; // extra space for arguments not needed, CALL will handle, we just need to emit variable bindings
         rewrite(grow, GROW, extra_stack);
-        rewrite(shrink, SHRINK, extra_stack);
         pop_stack_frame();
     }
 
@@ -174,7 +194,7 @@ struct Compiler {
             
             handle(StatList) {
                 for (auto i = 0; i < node.children.size(); i++) {
-                    child(i);
+                    child(i); // TODO: discard expression statements from stack (ideally they aren't permitted)
                 }
             }
             handle(VarDeclStat) {
@@ -262,22 +282,25 @@ struct Compiler {
 
             handle(ReturnStat) {
                 // TODO: handle return value
-                emit(RET, 0);
+                auto nret = node.children.size(); // should be 0 or 1
+                if (nret) {
+                    child(0); // push return value
+                }
+                emit(RET, nret);
             }
             handle(CallExp) {
-                // TODO: indirect call vs direct call
-                // If the LHS is an identifier, then it will be possible to get the address of the function at call time
-                // so skip the roundtrip through function index -> storage -> register -> call
-                // can do the index lookup at compile time maybe?
-
-                // The LHS of the call expression should evaluate to the storage location
-                // of a function address
-                child(0);
-                
-                // call function at top of stack
-                emit(CALL, 0);
+                // TODO: optimize direct calls vs indirect calls with some kind of symbol table?
+                // RHS of call expression is an ArgList; evaluate all arguments
+                auto nargs = node.children[1].children.size();
+                child(1); // ArgList                
+                child(0); // LHS of the call exp evaluates to storage location of a function address
+                emit(CALL, nargs); // call function at top of stack
             }
-            handle(ArgList) {}
+            handle(ArgList) {
+                for (auto i = 0; i < node.children.size(); i++) {
+                    child(i);
+                }
+            }
             handle(IndexExp) {}
             handle(AccessExp) {}
             handle(FuncLiteral) {
@@ -345,28 +368,31 @@ struct BytecodeInterpreter {
         // TODO: optimization, computed goto, direct threading, ...
         
         // TODO: use the same stack for function calls eventually
-        auto stack = vector<double>{};
+        // auto stack = vector<double>{};
         // HACK: sort of.
         // the top level block of the program counts as the 0th stack frame
         // so when it RETs, it needs to jump to the final instruction so the interpreter loop can terminate
-        auto call_stack = vector<pair<uint32_t, uint32_t>>{}; // return addr, stack ptr
-        call_stack.emplace_back(program.instructions.size(), stack.size());
-        
-        
         auto instruction_pointer = 0;
+        
+        auto call_stack = vector<pair<uint32_t, uint32_t>>{}; // return addr, stack ptr
+        call_stack.emplace_back(program.instructions.size(), 0);
+        
+        auto nan = 0xffffffffffffffff;
+        double stack[32] = { 0 };
+        for (auto i = 0; i < 32; i++) { stack[i] = *reinterpret_cast<double*>(&nan); }
         auto stackptr = 0;
+        auto stackbase = 0;
+
         while (instruction_pointer < program.instructions.size()) {
             // decode
-            auto instruction = program.instructions[instruction_pointer++];
+            auto instruction = program.instructions[instruction_pointer];
             auto opcode = uint16_t((instruction >> 48) & 0xffff);
             auto r1 = uint16_t((instruction >> 32) & 0xffff);
             auto r2 = uint16_t((instruction >> 16) & 0xffff);
             auto r3 = uint16_t((instruction) & 0xffff);
 
             #define handle(c)           break; case (uint16_t)Opcode::c:
-            #define handle_binop(c,op) handle(c) { stack[s-2] = stack[s-2] op stack[s-1]; stack.pop_back(); }
-
-            auto s = stack.size();
+            #define handle_binop(c,op) handle(c) { stack[stackptr-2] = stack[stackptr-2] op stack[stackptr-1]; stackptr--; }
 
             // TODO: clean up interaction between CALL and GROW
             // CALL is muching the stack pointer / stack size, then GROW mucks it again,
@@ -387,35 +413,50 @@ struct BytecodeInterpreter {
                 handle_binop(GREATER,  >)
                 handle_binop(LESSEQ,   <=)
                 handle_binop(GREATEREQ,>=)
-                handle(MOD)             { stack[s-2] = (double)(((uint64_t)stack[s-2]) % ((uint64_t)stack[s-1])); stack.pop_back(); }
+                handle(MOD)             { stack[stackptr-2] = (double)(((uint64_t)stack[stackptr-2]) % ((uint64_t)stack[stackptr-1])); stackptr--; }
                 // unop
-                handle(NEGATE)          { stack[s-1] = -stack[s-1]; }
+                handle(NEGATE)          { stack[stackptr-1] = -stack[stackptr-1]; }
 
-                handle(GROW)            { stack.resize(stack.size() + r1); }
-                handle(SHRINK)          { stack.resize(stack.size() - r1); }
-                handle(LOAD)            { stack.push_back(stack[stackptr + r1]); }
-                handle(LOADCONST)       { stack.push_back(program.storage[r1]); }
-                handle(STORE)           { stack[stackptr + r1] = stack[s-1]; stack.pop_back(); }
-                handle(PRINT)           { log<true, false>("print: ", stack[s-1]); stack.pop_back(); }
+                handle(GROW)            { stackptr += r1; }//stack.resize(stack.size() + r1); }
+                // handle(LOAD)            { stack.push_back(stack[stackptr + r1]); }
+                handle(LOAD)            { stack[stackptr++] = stack[stackbase + r1]; }
+                // handle(LOADCONST)       { stack.push_back(program.storage[r1]); }
+                handle(LOADCONST)       { stack[stackptr++] = program.storage[r1]; }
+                // handle(STORE)           { stack[stackptr + r1] = stack[s-1]; stack.pop_back(); }
+                handle(STORE)           {
+                    stack[stackbase+r1] = stack[--stackptr];
+                }
+                handle(PRINT)           {
+                    log<true, false>("print: ", stack[--stackptr]);
+                }
                 
                 handle(JUMPF)           { instruction_pointer += r1 - 1; }
                 handle(JUMPB)           { instruction_pointer -= (r1 + 1); }
-                handle(CONDJUMP)        { if (!stack[s-1]) {
-                                            instruction_pointer += r1 - 1; }
-                                          stack.pop_back(); }
+                handle(CONDJUMP)        { if (!stack[--stackptr]) { instruction_pointer += r1 - 1; }}
+                                          //stack.pop_back(); }
                 
                 handle(CALL) {
-                    call_stack.push_back({ instruction_pointer, stackptr });
-                    instruction_pointer = stack[s-1]; stack.pop_back();
-                    stackptr = stack.size();
-                    // stack_frame_pointer = stack.size(); // TODO: handle GROW here?
+                    call_stack.push_back({ instruction_pointer, stackbase });
+                    instruction_pointer = stack[--stackptr] - 1;
+                    stackbase = stackptr - r1;
+                    // TODO: handle grow here?
                 }
                 handle(RET) {
-                    tie(instruction_pointer, stackptr) = call_stack.back();
+                    auto nret = r1; // 1 or 0
+                    if (nret) {
+                        // easy to handle true multi-ret now
+                        stack[stackbase] = stack[stackptr-1]; // move return value to stack frame + 0 so caller can read it
+                        stackptr = stackbase + 1;
+                    } else {
+                        stackptr = stackbase;
+                    }
+                    tie(instruction_pointer, stackbase) = call_stack.back();
                     call_stack.pop_back();
                 }
                 break; default: throw runtime_error("unknown instruction "s + opcode_to_string[(Opcode)opcode]);
             }
+
+            instruction_pointer += 1;
 
             #undef handle
             #undef handle_binop

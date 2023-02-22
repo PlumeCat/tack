@@ -22,9 +22,8 @@ enum class Type {
     Number,
     String,
 
-    //Pointer,
-    //Vector,
-    //Matrix,
+    //ptr, // for C integration
+    //vec2, vec3, vec4, mat4,
     Array,
     Object,
     Function
