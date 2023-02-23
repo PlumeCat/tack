@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
         return false;
     };
     std::ios::sync_with_stdio(false);
-    auto fname = (argc >= 2) ? argv[1] : "source.rs";
+    auto fname = (argc >= 2) ? argv[1] : "source.str";
     auto s = read_text_file(fname);
     if (!s.has_value()) {
         throw runtime_error("error opening source file: "s + argv[1]);
@@ -81,7 +81,7 @@ int main(int argc, char* argv[]) {
                 log("TWI done in ", duration_cast<microseconds>(after - before).count() * 1e-6, "s");
             }
             
-            log("Compiling");
+            // log("Compiling");
             auto vm2 = BytecodeInterpreter();
             auto program = Program {};
             auto compiler = Compiler {};
@@ -93,7 +93,7 @@ int main(int argc, char* argv[]) {
             auto before = steady_clock::now();
             vm2.execute(program);
             auto after = steady_clock::now();
-            log("BC done in ", duration_cast<microseconds>(after - before).count() * 1e-6, "s");
+            // log("BC done in ", duration_cast<microseconds>(after - before).count() * 1e-6, "s");
         } catch (exception& e) {
             log(e.what());
         }

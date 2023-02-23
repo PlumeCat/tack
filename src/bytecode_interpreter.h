@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstring>
+#include <list>
+
 
 // Each instruction has up to 3 arguments
 // CONDJUMP r0 i0 i1 
@@ -34,7 +37,9 @@ static hash_map<Opcode, string> opcode_to_string = { opcodes() };
 #undef opcode
 
 uint64_t encode_op(Opcode opcode, uint64_t i1 = 0, uint64_t i2 = 0, uint64_t i3 = 0) {
-    if (i1 > UINT16_MAX || i2 > UINT16_MAX || i3 > UINT16_MAX) throw runtime_error("Out of range instruction");
+    if (i1 > UINT16_MAX || i2 > UINT16_MAX || i3 > UINT16_MAX) {
+        throw runtime_error("Out of range instruction");
+    }
     return (
         uint64_t(opcode) << 48 |
         uint64_t(i1) << 32 |
@@ -76,53 +81,60 @@ struct Program {
 struct Compiler {
     struct VariableContext {
         string name;
-        uint16_t stackpos;
+        uint32_t stackpos;
         bool is_captured = false; // if captured by a lower scope, allocate on heap
     };
-    struct Scope {
+    struct ScopeContext {
         hash_map<string, VariableContext> variables;
     };
     struct FunctionContext {
+        const AstNode* func_node; // before compilation
+        vector<ScopeContext> scopes;
+        FunctionContext* parent_context; // so we can capture variables from lexical parent scopes
         uint32_t storage_location;
-        const AstNode* node; // before compilation
-        // hash_map<string, VariableContext> variables;
-        vector<Scope> scopes;
-        FunctionContext* parent_context; // variables from lexical higher scopes
-    };
-    vector<FunctionContext> func_context; // TODO:
-    
-    vector<pair<const AstNode*, uint32_t>> functions; // code x storage location to put the start address
-    struct StackFrame {
-        hash_map<string, uint16_t> variables;
-        // TODO: parent scope etc
-    };
-    vector<StackFrame> stack;
-
-    // variable -> stack index relative to current stack frame
-    uint32_t lookup_variable(const string& identifier) {
-        auto iter = stack.back().variables.find(identifier);
-        if (iter == stack.back().variables.end()) {
+        uint32_t variable_count;
+        
+        // variable -> stack index relative to current stack frame
+        int lookup_variable(const string& identifier) {
+            // TODO: search in higher scopes starting from parent scope
+            // if the variable is found in a parent scope, mark as is_captured
+            // captured variables must be auto boxed and garbage collected/reference counted
+            // (we can also do escape analysis, eg if a reference to child function does not escape a parent function,
+            // then it can refer to captured variables via the stack)
+            for (auto s = scopes.rbegin(); s != scopes.rend(); s++) {
+                if (auto iter = (*s).variables.find(identifier); iter != (*s).variables.end()) {
+                    log(identifier, " -> ", iter->second.stackpos);
+                    return iter->second.stackpos;
+                }
+            }
             return -1;
         }
-        return iter->second;
-    }
-    
-    // set stack position for new variable
-    // don't bind if already exists
-    uint32_t bind_variable(const string& identifier) {
-        if (stack.back().variables.find(identifier) != stack.back().variables.end()) {
-            return -1;
+        
+        // set stack position for new variable
+        // don't bind if already exists in current scope
+        int bind_variable(const string& identifier) {
+            if (scopes.back().variables.find(identifier) != scopes.back().variables.end()) {
+                return -1;
+            }
+            auto stackpos = variable_count;
+            scopes.back().variables[identifier] = VariableContext { identifier, stackpos, false };
+            variable_count += 1;
+            return stackpos;
         }
-        auto stackpos = stack.back().variables.size();
-        stack.back().variables[identifier] = stackpos;
-        return stackpos;
-    }
 
-    void push_stack_frame() {
-        stack.emplace_back(StackFrame {});
-    }
-    void pop_stack_frame() {
-        stack.pop_back();
+        void push_scope() {
+            scopes.push_back({});
+        }
+        void pop_scope() {
+            scopes.pop_back();
+        }
+    };
+    
+    list<FunctionContext> funcs; // list not vector - need to push while iterating and not invalidate reference. queue would be even better
+
+
+    void add_function(const AstNode* node, uint32_t storage_location = UINT32_MAX, FunctionContext* parent_context = nullptr) {
+        funcs.emplace_back(FunctionContext { node, {}, parent_context, storage_location });
     }
     
     void compile(const AstNode& module, Program& program) {
@@ -137,16 +149,18 @@ struct Compiler {
             module // parsing ensures that module is always a stat-list
         );
 
-        program.storage.emplace_back(0); // dummy address of top level body
-        functions.emplace_back(pair { &node, program.storage.size() });
+        // program.storage.emplace_back(0); // dummy address of top level body
+        // functions.emplace_back(pair { &node, program.storage.size() });
+        add_function(&node);
 
         // compile all function literals and append to main bytecode
         // TODO: interesting, can this be parallelized?
-        for (auto i = 0; i < functions.size(); i++) { // can't use range-based for because compiler.functions size changes
-            auto func = functions[i].first;
-            auto storage = functions[i].second;
-            program.storage[storage] = program.instructions.size();
-            compile_function(*func, program);
+        for (auto f = funcs.begin(); f != funcs.end(); f++) { // can't use range-based for because compiler.functions size changes
+            auto& func = *f;
+            if (func.storage_location != UINT32_MAX) {
+                program.storage[func.storage_location] = program.instructions.size();
+            }
+            compile_function(func, program);
         }
     }
 
@@ -155,54 +169,55 @@ struct Compiler {
     #define rewrite(instr, op, ...) program.instructions[instr] = encode(op, __VA_ARGS__);
     #define handle(type)                break; case AstType::type:
     #define handle_binexp(type, opcode) handle(type) { child(0); child(1); emit(opcode, 0); }
-    #define child(n) compile_node(node.children[n], program);
+    #define child(n) compile_node(context, node.children[n], program);
     #define label(name) auto name = program.instructions.size();
     
-    void compile_function(const AstNode& func, Program& program) {
-        auto num_args = func.children[0].children.size();
-        
-        push_stack_frame();
+    void compile_function(FunctionContext& context, Program& program) {
+        auto num_args = context.func_node->children[0].children.size();
         
         // grow stack to make space for variables (space required will be known later)
         label(grow); emit(GROW, 0);
         
         // handle arguments; bind as variables
-        for(const auto& arg: func.children[0].children) {
-            log("Bind arg as variable: ", arg.tostring());
-            auto stackpos = bind_variable(arg.data_s);
+        context.push_scope();
+        for(const auto& arg: context.func_node->children[0].children) {
+            // bind arg as variable
+            // it's at the top of the stack so it's mutable
+            auto stackpos = context.bind_variable(arg.data_s);
             if (stackpos == -1) {
                 throw runtime_error("Compile error: duplicate argument: " + arg.data_s);
             }
         }
-
         // compile body
-        compile_node(func.children[1], program);
+        compile_node(context, context.func_node->children[1], program);
+        context.pop_scope();
         
         // return
         emit(RET, 0);
         
         // space for variables
-        auto num_variables = stack.back().variables.size();
-        auto extra_stack = num_variables - num_args; // extra space for arguments not needed, CALL will handle, we just need to emit variable bindings
-        rewrite(grow, GROW, extra_stack);
-        pop_stack_frame();
+        auto num_variables = context.variable_count;
+        auto extra_stack = num_variables - num_args; // extra space for arguments not needed, CALL will handle, we just need to allow space for variable bindings
+        rewrite(grow, GROW, max(extra_stack, (size_t)0));
     }
 
-    void compile_node(const AstNode& node, Program& program) {
+    void compile_node(FunctionContext& context, const AstNode& node, Program& program) {
         switch (node.type) {
             case AstType::Unknown: return;
             
             handle(StatList) {
+                context.push_scope();
                 for (auto i = 0; i < node.children.size(); i++) {
                     child(i); // TODO: discard expression statements from stack (ideally they aren't permitted)
                 }
+                context.pop_scope();
             }
             handle(VarDeclStat) {
-                child(1); // push result of expression to free register
+                child(1); // push result of expression
                 
                 // make sure not already declared
                 // TODO: allow shadowing in lower scopes?
-                auto stackpos = bind_variable(node.children[0].data_s);
+                auto stackpos = context.bind_variable(node.children[0].data_s);
                 if (stackpos == -1) {
                     throw runtime_error("Compile error: variable already exists: " + node.children[0].data_s);
                 }
@@ -213,7 +228,7 @@ struct Compiler {
                 child(1);
                 
                 // make sure variable exists
-                auto stackpos = lookup_variable(node.children[0].data_s);
+                auto stackpos = context.lookup_variable(node.children[0].data_s);
                 if (stackpos == -1) {
                     throw runtime_error("Compile error: variable not found: " + node.children[0].data_s);
                 }
@@ -222,14 +237,12 @@ struct Compiler {
             }
             handle(PrintStat) {
                 child(0);
-                emit(PRINT, 0);//, compiler.free_reg - 1);
-                // compiler.free_reg--;
+                emit(PRINT, 0);
             }
             handle(IfStat) {
                 child(0); // evaluate the expression
                 
                 label(condjump);emit(CONDJUMP, 0, 0, 0); // PLACEHOLDER
-
                                 child(1); // compile the if body
                 label(endif);   emit(JUMPF, 0, 0, 0); // PLACEHODLER TODO: not needed if there's no else-block
 
@@ -246,7 +259,6 @@ struct Compiler {
                 label(cond);    child(0); // evaluate expression
                 
                 label(condjump);emit(CONDJUMP, 0, 0, 0); // placeholder
-
                                 child(1); // compile the body
                 label(jumpback);emit(JUMPB, jumpback - cond); // jump to top of loop
                 label(ewhile);
@@ -306,12 +318,13 @@ struct Compiler {
             handle(FuncLiteral) {
                 // put a placeholder value in storage at first. when the program is linked, the placeholder is
                 // overwritten with the real start address
-                auto func_storage = program.storage.size();
-                program.storage.push_back(functions.size() * 111); // placeholder value
-                functions.emplace_back(pair { &node, func_storage }); // compile function
+                auto storage = program.storage.size();
+                program.storage.push_back(0); // placeholder value
+                // funcs.emplace_back(pair { &node, func_storage }); // compile function
+                add_function(&node, storage, &context);
 
                 // load the function start address
-                emit(LOADCONST, func_storage);
+                emit(LOADCONST, storage);
             }
             handle(ParamDef) {}
             handle(NumLiteral) {
@@ -324,8 +337,8 @@ struct Compiler {
             handle(ObjectLiteral) {}
             handle(Identifier) {
                 // reading a variable (writing is not encountered by recursive compile)
-                // so the variable exists and points to a register
-                auto stackpos = lookup_variable(node.data_s);
+                // so the variable exists and points to a stackpos
+                auto stackpos = context.lookup_variable(node.data_s);
                 if (stackpos == -1) {
                     throw runtime_error("Compile error: variable not found: " + node.data_s);
                 }
@@ -378,8 +391,10 @@ struct BytecodeInterpreter {
         call_stack.emplace_back(program.instructions.size(), 0);
         
         auto nan = 0xffffffffffffffff;
-        double stack[32] = { 0 };
-        for (auto i = 0; i < 32; i++) { stack[i] = *reinterpret_cast<double*>(&nan); }
+        const auto STACK_SIZE = 1024;
+        double stack[STACK_SIZE] = { 0 };
+        memset((void*)stack, 0xffffffff, sizeof(double) * STACK_SIZE);
+        // for (auto i = 0; i < 32; i++) { stack[i] = *reinterpret_cast<double*>(&nan); }
         auto stackptr = 0;
         auto stackbase = 0;
 
@@ -427,7 +442,7 @@ struct BytecodeInterpreter {
                     stack[stackbase+r1] = stack[--stackptr];
                 }
                 handle(PRINT)           {
-                    log<true, false>("print: ", stack[--stackptr]);
+                    log<true, false>("print:", stack[--stackptr]);
                 }
                 
                 handle(JUMPF)           { instruction_pointer += r1 - 1; }
