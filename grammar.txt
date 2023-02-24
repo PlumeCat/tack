@@ -118,7 +118,7 @@ Types:
 	ref types
 		array		[ 0, 1, 2, ... ]
 		object		{ a = 1, b = 2, ... }
-		function	(x, y, z) {} // closures are passed by-ref as well
+		function	fn (x, y, z) {} // closures are passed by-ref as well
 
 Notes:
 	objects will need some kind of 'prototype' or 'index' field to implement classes
@@ -153,4 +153,83 @@ Notes:
 	nan happens when exp is all 1, frac is non-zero (sign bit ignored)
 	quick and safe to set first 16 bits to 1, and use the remaining 48 bits for whatever
 
+Notes:
+	Exceptions / error handling
 
+	The interpreter loop is stackless - maintains its own stack
+	This means we don't need exceptions, longjmp, goto or anything
+	too problematic for error handling. Instead we can just jump out of the interpreter loop
+	to a defined error handler, maintain the program state and provide the option
+	to jump back in.
+	
+	For example if C code calls a function and provides an error handler, if instruction N
+	causes an error (eg trying to call a non-function) we can let the error handler
+	decide whether to continue or not from instruction N+1
+	(although it is likely the program continues to malfunction if the assumption is that instruction N was executed)
+	eg:
+		void foo() {
+			tack_error_handler([](int error_code, const char* error_msg) -> int {
+				if (error_code == MISSING_FILE) {
+					return TACK_CONTINUE;
+				} else{
+					log("Unrecoverable error: ", error_msg);
+					return TACK_EXIT;
+				}
+			})
+			tack_execute(program) // throws a tack error
+		}
+
+
+Notes:
+	Functions vs closures vs "quasi-closures"
+
+	A function would be a simple "pure-ish" function that takes some arguments, returns some value, and
+	maybe has a few local variables. It does not close over variables from lexical higher scopes, so it would
+	not constrain the lifetimes of any part of the lexical higher scopes.
+
+	A closure would close over some of the variables in the LHS, so it will affect those variable's lifetimes.
+	eg. 
+		fn counter() {
+			let i = 0
+			fn inner() {
+				i = i + 1
+				return i
+			}
+			return inner
+		}
+	Because inner uses i from the outer scope, i must be boxed and ref-counted
+	We will do this by generating an invisible tuple which contains all the captures (by reference)
+	and is passed around with the function as a pair, participates in garbage collection, etc.
+	Scalars which are captured in this manner must be auto-boxed.
+	All the captures can be resolved at compile time, so even if there are captured variables from scopes that are multiple
+	levels up, the reference that the closure uses is directly available in this invisible tuple
+
+	There is a commonly occurring special case of closures that can be optimized however, which we can call "quasi-closures"
+	This is the case of closure that uses variables from the parent scope, but itself is not used outside the parent scope
+	eg. a function that is used as a sorting predicate
+
+		fn quasi_closure_test() {
+			let foo = 1
+			
+			// predicate() is a quasi-closure
+			fn predicate() {
+				// Capture a variable from the parent scope
+				if foo {
+					...
+				}
+			}
+
+			// Use predicate in this function
+			sorted_data = sort(some_data, predicate)
+		}
+
+	Because predicate is not used outside quasi_closure_test, we don't need to box any of the captures
+	because the function lifetime is strictly shorter than the parent function, therefore everything that the child
+	function needs to use should be found on the stack, and therefore should be accessible to the child function
+	(It might need the parent scope's stack offset at runtime however, so some LOADs might become LOAD_WITH_OFFSET)
+	We can use escape analysis to figure out whether the inner function escapes the outer function, and
+	therefore whether it is a quasi-closure or not.
+
+	Any named recursive function needs to capture itself so it can call itself.
+	However what we are really doing is 
+	

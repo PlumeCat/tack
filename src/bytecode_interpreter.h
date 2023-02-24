@@ -25,7 +25,7 @@
     opcode(JUMPF) opcode(JUMPB)\
     /* Relative jump using encoded offset IFF stack[n--] == 0 (but pop the top regardless) */\
     opcode(CONDJUMP)\
-    opcode(CALL) opcode(RET)/**/\
+    opcode(PRECALL) opcode(CALL) opcode(RET)/**/\
     opcode(PRINT)/**/\
     
 
@@ -93,6 +93,8 @@ struct Compiler {
         FunctionContext* parent_context; // so we can capture variables from lexical parent scopes
         uint32_t storage_location;
         uint32_t variable_count;
+
+        // number string object array function
         
         // variable -> stack index relative to current stack frame
         int lookup_variable(const string& identifier) {
@@ -304,6 +306,7 @@ struct Compiler {
                 // TODO: optimize direct calls vs indirect calls with some kind of symbol table?
                 // RHS of call expression is an ArgList; evaluate all arguments
                 auto nargs = node.children[1].children.size();
+                emit(PRECALL, 0);
                 child(1); // ArgList                
                 child(0); // LHS of the call exp evaluates to storage location of a function address
                 emit(CALL, nargs); // call function at top of stack
@@ -380,23 +383,25 @@ struct BytecodeInterpreter {
     void execute(Program& program) {
         // TODO: optimization, computed goto, direct threading, ...
         
-        // TODO: use the same stack for function calls eventually
-        // auto stack = vector<double>{};
         // HACK: sort of.
         // the top level block of the program counts as the 0th stack frame
         // so when it RETs, it needs to jump to the final instruction so the interpreter loop can terminate
         auto instruction_pointer = 0;
-        
-        auto call_stack = vector<pair<uint32_t, uint32_t>>{}; // return addr, stack ptr
-        call_stack.emplace_back(program.instructions.size(), 0);
-        
-        auto nan = 0xffffffffffffffff;
         const auto STACK_SIZE = 1024;
-        double stack[STACK_SIZE] = { 0 };
-        memset((void*)stack, 0xffffffff, sizeof(double) * STACK_SIZE);
-        // for (auto i = 0; i < 32; i++) { stack[i] = *reinterpret_cast<double*>(&nan); }
+        double stack[STACK_SIZE]; memset((void*)stack, 0xffffffff, sizeof(double) * STACK_SIZE);
         auto stackptr = 0;
         auto stackbase = 0;
+
+        auto stack_push = [&](double d) {
+            stack[stackptr++] = d;
+        };
+        auto stack_pop = [&]() -> double {
+            return stack[--stackptr];
+        };
+
+        stack_push(program.instructions.size()); // base return address is end of code
+        stack_push(0); // base frame ptr
+        stackbase = 2;
 
         while (instruction_pointer < program.instructions.size()) {
             // decode
@@ -432,41 +437,37 @@ struct BytecodeInterpreter {
                 // unop
                 handle(NEGATE)          { stack[stackptr-1] = -stack[stackptr-1]; }
 
-                handle(GROW)            { stackptr += r1; }//stack.resize(stack.size() + r1); }
-                // handle(LOAD)            { stack.push_back(stack[stackptr + r1]); }
-                handle(LOAD)            { stack[stackptr++] = stack[stackbase + r1]; }
-                // handle(LOADCONST)       { stack.push_back(program.storage[r1]); }
-                handle(LOADCONST)       { stack[stackptr++] = program.storage[r1]; }
-                // handle(STORE)           { stack[stackptr + r1] = stack[s-1]; stack.pop_back(); }
-                handle(STORE)           {
-                    stack[stackbase+r1] = stack[--stackptr];
-                }
-                handle(PRINT)           {
-                    log<true, false>("print:", stack[--stackptr]);
-                }
+                handle(GROW)            { stackptr += r1; }
+                handle(LOAD)            { stack_push(stack[stackbase + r1]); }
+                handle(LOADCONST)       { stack_push(program.storage[r1]); }
+                handle(STORE)           { stack[stackbase+r1] = stack_pop(); }
+                handle(PRINT)           { log<true, false>("print:", stack_pop()); }
                 
                 handle(JUMPF)           { instruction_pointer += r1 - 1; }
                 handle(JUMPB)           { instruction_pointer -= (r1 + 1); }
-                handle(CONDJUMP)        { if (!stack[--stackptr]) { instruction_pointer += r1 - 1; }}
-                                          //stack.pop_back(); }
+                handle(CONDJUMP)        { if (!stack_pop()) { instruction_pointer += r1 - 1; }}
                 
+                handle(PRECALL) {
+                    stack_push(0); // placeholder for return address
+                    stack_push(stackbase); // return frame pointer
+                }
                 handle(CALL) {
-                    call_stack.push_back({ instruction_pointer, stackbase });
-                    instruction_pointer = stack[--stackptr] - 1;
-                    stackbase = stackptr - r1;
-                    // TODO: handle grow here?
+                    auto call_addr = stack_pop();
+                    stackbase = stackptr - r1;// arguments were already pushed
+                    stack[stackbase - 2] = instruction_pointer;// rewrite the return address lower down the stack
+                    instruction_pointer = call_addr - 1; // -1 because we have instruction_pointer++ later; (TODO: optimize out?)
                 }
                 handle(RET) {
-                    auto nret = r1; // 1 or 0
-                    if (nret) {
-                        // easy to handle true multi-ret now
-                        stack[stackbase] = stack[stackptr-1]; // move return value to stack frame + 0 so caller can read it
-                        stackptr = stackbase + 1;
-                    } else {
-                        stackptr = stackbase;
+                    auto retval = 0;
+                    if (r1) {
+                        retval = stack_pop();
                     }
-                    tie(instruction_pointer, stackbase) = call_stack.back();
-                    call_stack.pop_back();
+                    stackptr = stackbase;                    
+                    stackbase = stack_pop();
+                    instruction_pointer = stack_pop();
+                    if (r1) {
+                        stack_push(retval);
+                    }
                 }
                 break; default: throw runtime_error("unknown instruction "s + opcode_to_string[(Opcode)opcode]);
             }
