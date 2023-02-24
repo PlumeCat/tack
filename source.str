@@ -2,7 +2,8 @@ let fac = fn(n, f) {
     if n == 0 {
         return 1
     }
-    return f(n - 1, f) * n
+    let m = n - 1
+    return f(m, f) * n
 }
 
 print(fac(7, fac))
