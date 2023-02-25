@@ -20,7 +20,7 @@ using namespace std;
     ast(EqExp) ast(NotEqExp) ast(LessExp) ast(GreaterExp) ast(LessEqExp) ast(GreaterEqExp)\
     ast(ShiftLeftExp) ast(ShiftRightExp)\
     ast(AddExp) ast(SubExp) ast(MulExp) ast(DivExp) ast(ModExp) ast(PowExp)\
-    ast(NegateExp) ast(NotExp) ast(BitNotExp)\
+    ast(NegateExp) ast(NotExp) ast(BitNotExp) ast(LenExp)\
     \
     ast(CallExp) ast(ArgList)\
     ast(IndexExp)\
@@ -85,6 +85,26 @@ DEFPARSER(literal, {
             SUCCESS(AstType::StringLiteral, str);
         }
     });
+    SUBPARSER(object_literal, {
+        TRYs('{') {
+            EXPECT('}');
+            SUCCESS(AstType::ObjectLiteral)
+        }
+    });
+    SUBPARSER(array_literal, {
+        TRYs('[') {
+            auto res = AstNode(AstType::ArrayLiteral);
+            while (true) {
+                TRY(exp) {
+                    res.children.emplace_back(exp);
+                    TRYs(',') {} else break;
+                } else break; // throw runtime_error("unexpected symbol in array literal");
+            }
+
+            EXPECT(']');
+            SUCCESS(res);
+        }
+    });
     SUBPARSER(func_literal, {
         SUBPARSER(param_def, {
             auto p = AstNode(AstType::ParamDef);
@@ -107,8 +127,10 @@ DEFPARSER(literal, {
         }
     });
     TRY(string_literal) SUCCESS(string_literal);
-    TRY(num_literal) SUCCESS(num_literal);
+    TRY(array_literal) SUCCESS(array_literal);
+    TRY(object_literal) SUCCESS(object_literal);
     TRY(func_literal) SUCCESS(func_literal);
+    TRY(num_literal) SUCCESS(num_literal);
 })
 DEFPARSER(primary_exp, {
     TRY(literal) SUCCESS(literal)
@@ -139,23 +161,23 @@ DEFPARSER(postfix_exp, {
             } else throw runtime_error("expected expression in square brackets");
         }
     });
-    SUBPARSER(arg_list, {
-        auto res = AstNode(AstType::ArgList);
-
-        TRY(exp) {
-            res.children.emplace_back(exp);
-        } else SUCCESS(res)
-
-        while (true) {
-            TRYs(',') {
-                TRY(exp) {
-                    res.children.emplace_back(exp);
-                } else throw runtime_error("unexpected symbol in argument list");
-            } else break;
-        }
-        SUCCESS(res)
-    });
     SUBPARSER(call_postfix, {
+        SUBPARSER(arg_list, {
+            auto res = AstNode(AstType::ArgList);
+
+            TRY(exp) {
+                res.children.emplace_back(exp);
+            } else SUCCESS(res)
+
+            while (true) {
+                TRYs(',') {
+                    TRY(exp) {
+                        res.children.emplace_back(exp);
+                    } else throw runtime_error("unexpected symbol in argument list");
+                } else break;
+            }
+            SUCCESS(res)
+        });
         TRYs('(') {
             TRY(arg_list) {
                 TRYs(')') {
@@ -190,6 +212,8 @@ DEFPARSER(prefix_exp, {
         TRY(prefix_exp) SUCCESS(AstType::NotExp, prefix_exp);
     } else TRYs('~') {
         TRY(prefix_exp) SUCCESS(AstType::BitNotExp, prefix_exp);
+    } else TRYs('#') {
+        TRY(prefix_exp) SUCCESS(AstType::LenExp, prefix_exp);
     }
     TRY(postfix_exp) SUCCESS(postfix_exp)
 });

@@ -18,13 +18,15 @@
     opcode(ADD) opcode(SUB) opcode(DIV) opcode(MUL) opcode(MOD) opcode(POW)\
     opcode(SHL) opcode(SHR) opcode(BITAND) opcode(BITOR) opcode(BITXOR) opcode(AND) opcode(OR)\
     /* unary operation: apply inplace for value at top of stack*/\
-    opcode(NEGATE) opcode(NOT) opcode(BITNOT)\
+    opcode(NEGATE) opcode(NOT) opcode(BITNOT) opcode(LEN) \
     /* stack and variable operations */\
-    opcode(LOAD) opcode(STORE) opcode(LOADCONST) opcode(GROW) \
+    opcode(PUSH) opcode(LOAD) opcode(LOAD_ARRAY) opcode(LOAD_OBJECT) opcode(STORE) opcode(STORE_ARRAY) opcode(STORE_OBJECT) opcode(LOAD_CONST)\
+    opcode(GROW) \
     /* Relative jump using encoded offset */\
     opcode(JUMPF) opcode(JUMPB)\
     /* Relative jump using encoded offset IFF stack[n--] == 0 (but pop the top regardless) */\
     opcode(CONDJUMP)\
+    opcode(ALLOC_OBJECT) opcode(ALLOC_ARRAY)\
     opcode(PRECALL) opcode(CALL) opcode(RET)/**/\
     opcode(PRINT)/**/\
     
@@ -227,15 +229,29 @@ struct Compiler {
                 emit(STORE, stackpos); // put the value at the top of the stack into stackpos
             }
             handle(AssignStat) {
-                child(1);
-                
-                // make sure variable exists
-                auto stackpos = context.lookup_variable(node.children[0].data_s);
-                if (stackpos == -1) {
-                    throw runtime_error("Compile error: variable not found: " + node.children[0].data_s);
+                auto& lhs = node.children[0];
+                auto& rhs = node.children[1];
+
+                if (lhs.type == AstType::AccessExp) {
+                    // pass
+                } else if (lhs.type == AstType::IndexExp) {
+                    // put the array at the top of the stack
+                    compile_node(context, lhs.children[0], program); // array
+                    compile_node(context, lhs.children[1], program); // index
+                    child(1); // value
+                    emit(STORE_ARRAY, 0);
+                } else if (lhs.type == AstType::Identifier) {
+                    // make sure variable exists
+                    auto stackpos = context.lookup_variable(node.children[0].data_s);
+                    if (stackpos == -1) {
+                        throw runtime_error("Compile error: variable not found: " + node.children[0].data_s);
+                    }
+                    child(1);
+                    emit(STORE, stackpos); // value at top of stack into stackpos
+                } else {
+                    throw runtime_error("Compile error: invalid LHS for assignment statement");
                 }
                 
-                emit(STORE, stackpos); // value at top of stack into stackpos
             }
             handle(PrintStat) {
                 child(0);
@@ -274,7 +290,8 @@ struct Compiler {
             handle(BitOrExp) {}
             handle(BitAndExp) {}
             handle(BitXorExp) {}
-            handle(ShiftLeftExp) {}
+            // handle(ShiftLeftExp) {}
+            handle_binexp(ShiftLeftExp, SHL)
             handle(ShiftRightExp) {}
             
             handle_binexp(EqExp, EQUAL)
@@ -293,6 +310,14 @@ struct Compiler {
             handle(NegateExp) { child(0); emit(NEGATE, 0); }
             handle(NotExp)    { child(0); emit(NOT, 0); }
             handle(BitNotExp) { child(0); emit(BITNOT, 0); }
+            handle(LenExp)    { child(0); emit(LEN, 0); }
+
+            handle(IndexExp) {
+                child(0); // push the array
+                child(1); // push the index
+                emit(LOAD_ARRAY, 0);
+            }
+            handle(AccessExp) {}
 
             handle(ReturnStat) {
                 // TODO: handle return value
@@ -316,8 +341,6 @@ struct Compiler {
                     child(i);
                 }
             }
-            handle(IndexExp) {}
-            handle(AccessExp) {}
             handle(FuncLiteral) {
                 // put a placeholder value in storage at first. when the program is linked, the placeholder is
                 // overwritten with the real start address
@@ -327,17 +350,30 @@ struct Compiler {
                 add_function(&node, storage, &context);
 
                 // load the function start address
-                emit(LOADCONST, storage);
+                emit(LOAD_CONST, storage);
             }
             handle(ParamDef) {}
             handle(NumLiteral) {
                 // TODO: don't store the same constant more than once
                 program.storage.push_back(node.data_d);
-                emit(LOADCONST, program.storage.size() - 1);
+                emit(LOAD_CONST, program.storage.size() - 1);
             }
             handle(StringLiteral) {}
-            handle(ArrayLiteral) {}
-            handle(ObjectLiteral) {}
+            handle(ArrayLiteral) {
+                emit(ALLOC_ARRAY, node.children.size());
+                // emit STORE_ARRAY for each element
+                for (auto i = 0; i < node.children.size(); i++) {
+                    emit(PUSH, 0); // re-push the array... bit annoying
+                    program.storage.push_back(i);
+                    emit(LOAD_CONST, program.storage.size() - 1);
+                    child(i);
+                    emit(STORE_ARRAY, 0);
+                }
+            }
+            handle(ObjectLiteral) {
+                emit(ALLOC_OBJECT, 0);
+                // TODO: emit STORE_OBJECT for each result
+            }
             handle(Identifier) {
                 // reading a variable (writing is not encountered by recursive compile)
                 // so the variable exists and points to a stackpos
@@ -376,7 +412,6 @@ TODO: mov folding
         -> MOV 0, 2
 */
 
-
 struct BytecodeInterpreter {
     BytecodeInterpreter() {}
     
@@ -391,6 +426,12 @@ struct BytecodeInterpreter {
         double stack[STACK_SIZE]; memset((void*)stack, 0xffffffff, sizeof(double) * STACK_SIZE);
         auto stackptr = 0;
         auto stackbase = 0;
+
+        auto array_heap = vector<vector<double>>{};
+        auto object_heap = vector<hash_map<string, double>>{};
+
+        // heap
+        // auto heap = ProgramHeap {};
 
         auto stack_push = [&](double d) {
             stack[stackptr++] = d;
@@ -436,11 +477,31 @@ struct BytecodeInterpreter {
                 handle(MOD)             { stack[stackptr-2] = (double)(((uint64_t)stack[stackptr-2]) % ((uint64_t)stack[stackptr-1])); stackptr--; }
                 // unop
                 handle(NEGATE)          { stack[stackptr-1] = -stack[stackptr-1]; }
+                handle(LEN)             { stack[stackptr-1] = array_heap[stack[stackptr-1]].size(); }
+                handle(SHL)             { array_heap[stack[stackptr-2]].emplace_back(stack_pop()); }
 
                 handle(GROW)            { stackptr += r1; }
+                handle(PUSH)            { stack_push(stack[stackptr - (r1 + 1)]); }
                 handle(LOAD)            { stack_push(stack[stackbase + r1]); }
-                handle(LOADCONST)       { stack_push(program.storage[r1]); }
+                handle(LOAD_CONST)      { stack_push(program.storage[r1]); }
+                handle(LOAD_ARRAY)      {
+                    auto index = stack_pop();
+                    auto arr = stack_pop();
+                    stack_push(array_heap[arr][index]);
+                }
+                
                 handle(STORE)           { stack[stackbase+r1] = stack_pop(); }
+                handle(STORE_ARRAY)     {
+                    auto value = stack_pop();
+                    auto index = stack_pop();
+                    auto arr = stack_pop();
+                    array_heap[arr][index] = value;
+                }
+                handle(ALLOC_ARRAY)     {
+                    array_heap.emplace_back(r1);
+                    stack_push(array_heap.size() - 1);
+                }
+                
                 handle(PRINT)           { log<true, false>("print:", stack_pop()); }
                 
                 handle(JUMPF)           { instruction_pointer += r1 - 1; }
