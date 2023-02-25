@@ -11,6 +11,8 @@
 // can mitigate by making it a relative jump (?) but still problematic
 #include <jlib/hash_map.h>
 
+#include "value.h"
+
 #define opcodes() \
     opcode(UNKNOWN)\
     /* binary operations:*/\
@@ -35,24 +37,42 @@
 enum class Opcode : uint8_t { opcodes() };
 #undef opcode
 #define opcode(x) { Opcode::x, #x },
-static hash_map<Opcode, string> opcode_to_string = { opcodes() };
+string to_string(Opcode opcode) {
+    static hash_map<Opcode, string> opcode_to_string = { opcodes() };
+    return opcode_to_string[opcode];
+}
 #undef opcode
 
-uint64_t encode_op(Opcode opcode, uint64_t i1 = 0, uint64_t i2 = 0, uint64_t i3 = 0) {
-    if (i1 > UINT16_MAX || i2 > UINT16_MAX || i3 > UINT16_MAX) {
-        throw runtime_error("Out of range instruction");
+
+using Instruction = uint32_t;
+
+
+Instruction encode_instruction(Opcode opcode, uint32_t operand = 0) {
+    // if (i1 > UINT16_MAX || i2 > UINT16_MAX || i3 > UINT16_MAX) {
+    //     throw runtime_error("Out of range instruction");
+    // }
+    // return (
+    //     uint64_t(opcode) << 48 |
+    //     uint64_t(i1) << 32 |
+    //     uint64_t(i2) << 16 |
+    //     uint64_t(i3)
+    // );
+    if (operand > UINT16_MAX) {
+        throw runtime_error("Out of range operand");
     }
-    return (
-        uint64_t(opcode) << 48 |
-        uint64_t(i1) << 32 |
-        uint64_t(i2) << 16 |
-        uint64_t(i3)
+    return Instruction(
+        uint32_t(opcode) << 16 |
+        uint32_t(operand)
     );
 };
+void decode_instruction(Instruction instruction, Opcode& out_opcode, uint16_t& out_operand) {
+    out_opcode = (Opcode)(uint16_t)(instruction >> 16);
+    out_operand = (uint16_t)(instruction & 0xffff);
+}
 
 struct Program {
-    vector<uint64_t> instructions;
-    vector<double> storage; // program constant storage goes at the bottom of the stack for now
+    vector<Instruction> instructions;
+    vector<Value> storage; // program constant storage goes at the bottom of the stack for now
 
     string to_string() {
         auto s = stringstream {};
@@ -61,11 +81,11 @@ struct Program {
         s << "   Bytecode:\n";
         auto i = 0;
         for (auto bc : instructions) {
-            auto opcode = uint16_t(bc >> 48);
-            auto r1 = uint16_t(bc >> 32);
-            auto r2 = uint16_t(bc >> 16);
-            auto r3 = uint16_t(bc);
-            s << "        " << i << ": " << opcode_to_string[(Opcode)opcode] << ", " << r1 << '\n'; //", " << r2 << ", " << r3 << '\n';
+            auto op = (Opcode)uint16_t(bc >> 16);
+            auto r1 = uint16_t(bc & 0xffff);
+            //auto r2 = uint16_t(bc >> 16);
+            //auto r3 = uint16_t(bc);
+            s << "        " << i << ": " << ::to_string(op) << ", " << r1 << '\n'; //", " << r2 << ", " << r3 << '\n';
             i++;
         }
 
@@ -168,7 +188,7 @@ struct Compiler {
         }
     }
 
-    #define encode(op, ...) encode_op(Opcode::op, __VA_ARGS__)
+    #define encode(op, ...) encode_instruction(Opcode::op, __VA_ARGS__)
     #define emit(op, ...) program.instructions.push_back(encode(op, __VA_ARGS__));
     #define rewrite(instr, op, ...) program.instructions[instr] = encode(op, __VA_ARGS__);
     #define handle(type)                break; case AstType::type:
@@ -260,9 +280,9 @@ struct Compiler {
             handle(IfStat) {
                 child(0); // evaluate the expression
                 
-                label(condjump);emit(CONDJUMP, 0, 0, 0); // PLACEHOLDER
+                label(condjump);emit(CONDJUMP, 0); // PLACEHOLDER
                                 child(1); // compile the if body
-                label(endif);   emit(JUMPF, 0, 0, 0); // PLACEHODLER TODO: not needed if there's no else-block
+                label(endif);   emit(JUMPF, 0); // PLACEHODLER TODO: not needed if there's no else-block
 
                 label(startelse);if (node.children.size() == 3)
                                 child(2); // compile the else body
@@ -276,7 +296,7 @@ struct Compiler {
             handle(WhileStat) {
                 label(cond);    child(0); // evaluate expression
                 
-                label(condjump);emit(CONDJUMP, 0, 0, 0); // placeholder
+                label(condjump);emit(CONDJUMP, 0); // placeholder
                                 child(1); // compile the body
                 label(jumpback);emit(JUMPB, jumpback - cond); // jump to top of loop
                 label(ewhile);
@@ -423,21 +443,26 @@ struct BytecodeInterpreter {
         // so when it RETs, it needs to jump to the final instruction so the interpreter loop can terminate
         auto instruction_pointer = 0;
         const auto STACK_SIZE = 1024;
-        double stack[STACK_SIZE]; memset((void*)stack, 0xffffffff, sizeof(double) * STACK_SIZE);
+        auto stack = array<Value, STACK_SIZE>{}; memset((void*)stack.data(), 0xffffffff, stack.size() * sizeof(Value));
         auto stackptr = 0;
         auto stackbase = 0;
 
-        auto array_heap = vector<vector<double>>{};
-        auto object_heap = vector<hash_map<string, double>>{};
+        auto array_heap = vector<vector<Value>>{};
+        auto object_heap = vector<hash_map<string, Value>>{};
+        auto string_heap = vector<string>{}; // TODO: refcounting
+        // auto vec2_heap = vector<vec2>{}; // TODO: refcounting; swiss vector
 
         // heap
         // auto heap = ProgramHeap {};
 
-        auto stack_push = [&](double d) {
+        auto stack_push = [&](Value d) {
             stack[stackptr++] = d;
         };
-        auto stack_pop = [&]() -> double {
+        auto stack_pop = [&]() -> Value {
             return stack[--stackptr];
+        };
+        auto typecheck = [](Value val, Type type) {
+
         };
 
         stack_push(program.instructions.size()); // base return address is end of code
@@ -446,13 +471,14 @@ struct BytecodeInterpreter {
 
         while (instruction_pointer < program.instructions.size()) {
             // decode
-            auto instruction = program.instructions[instruction_pointer];
-            auto opcode = uint16_t((instruction >> 48) & 0xffff);
-            auto r1 = uint16_t((instruction >> 32) & 0xffff);
-            auto r2 = uint16_t((instruction >> 16) & 0xffff);
-            auto r3 = uint16_t((instruction) & 0xffff);
+            //auto instruction = program.instructions[instruction_pointer];
+            //auto opcode = (Opcode)uint16_t((instruction >> 48) & 0xffff);
+            //auto r1 = uint16_t((instruction >> 32) & 0xffff);
+            auto opcode = Opcode{};
+            auto r1 = uint16_t{0};
+            decode_instruction(program.instructions[instruction_pointer], opcode, r1);
 
-            #define handle(c)           break; case (uint16_t)Opcode::c:
+            #define handle(c)           break; case Opcode::c:
             #define handle_binop(c,op) handle(c) { stack[stackptr-2] = stack[stackptr-2] op stack[stackptr-1]; stackptr--; }
 
             // TODO: clean up interaction between CALL and GROW
@@ -462,7 +488,7 @@ struct BytecodeInterpreter {
                 // could put function fixed stack growth into storage after the start address?
             // execute
             switch (opcode) {
-                case (uint16_t)Opcode::UNKNOWN:
+                case Opcode::UNKNOWN:
                 // binop
                 handle_binop(ADD, +)
                 handle_binop(SUB, -)
@@ -530,7 +556,7 @@ struct BytecodeInterpreter {
                         stack_push(retval);
                     }
                 }
-                break; default: throw runtime_error("unknown instruction "s + opcode_to_string[(Opcode)opcode]);
+                break; default: throw runtime_error("unknown instruction "s + to_string(opcode));
             }
 
             instruction_pointer += 1;

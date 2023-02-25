@@ -8,39 +8,11 @@
 #include <chrono>
 
 #define JLIB_IMPLEMENTATION
-
 #include <jlib/log.h>
 #include <jlib/text_file.h>
 
 using namespace std;
 using namespace std::chrono;
-
-enum class Type {
-    Null,
-    Boolean,
-    Integer,
-    Number,
-    String,
-
-    //ptr, // for C integration
-    //vec2, vec3, vec4, mat4,
-    Array,
-    Object,
-    Function
-};
-
-double nan_pack_int(uint32_t i) {
-    // TODO: endianness
-    auto top_16 = (uint64_t(0b0111111111111111)) << 48;
-    auto _i = uint64_t(i) | top_16; // bottom bits not all 0
-    auto d = *reinterpret_cast<double*>(&_i);
-    return d;
-}
-uint32_t nan_unpack_int(double d) {
-    auto i = *reinterpret_cast<uint64_t*>(&d);
-    return i & 0xffffffff;
-}
-
 
 #include "parsing.h"
 #include "ref_interpreter.h"
@@ -72,13 +44,13 @@ int main(int argc, char* argv[]) {
             }
 
             if (check_arg("--twi")) {
-                log("Running with reference TWI");
-                auto vm = RefInterpreter {};
-                auto before = steady_clock::now();
-                auto e = vm.eval(out_ast);
-                auto after = steady_clock::now();
-                log("Evaling", e);
-                log("TWI done in ", duration_cast<microseconds>(after - before).count() * 1e-6, "s");
+                // log("Running with reference TWI");
+                // auto vm = RefInterpreter {};
+                // auto before = steady_clock::now();
+                // auto e = vm.eval(out_ast);
+                // auto after = steady_clock::now();
+                // log("Evaling", e);
+                // log("TWI done in ", duration_cast<microseconds>(after - before).count() * 1e-6, "s");
             }
             
             // log("Compiling");
