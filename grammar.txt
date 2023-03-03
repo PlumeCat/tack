@@ -140,9 +140,6 @@ Notes:
 	this is assumed to be running as part of a game engine
 	so make sure the garbage collector can be done in parallel slices multi threaded and deterministic time limits
 
-	also make it possible to jit some of the hot functions / hot loops
-	(once we have a bytecode interpreter)
-
 Notes:
 	bits of double: 1 sign 11 exp 52 frac
 	nan: exp==1, frac!=0
@@ -179,6 +176,62 @@ Notes:
 			tack_execute(program) // throws a tack error
 		}
 
+
+Notes:
+	Type analysis might be useful for optimization
+	eg.
+		let c = a + b
+	what are the types of a and b? number, string, array, other?
+	normally we need to emit typechecks when performing the add
+	so we would have to treat the normal ADD instruction as possibly having any types
+	however if the types of a and b are known, then we can emit a faster opcode that skips the checks
+		ADD_ANY vs ADD_NUM, ADD_STR, ADD_ARRAY
+	this also allows us to deduce the type of c, which can be used later in expressions involving c, etc etc
+	
+	so how to deduce the types? if assigned from literals, it's easy enough
+		let a = 0
+		let b = 1
+		let greeting = "hello world"
+		let foo = { ... }
+	the ast can be walked and every expression can be type-deduced as much as possible.
+	then when emitting code, we use the deduced type information
+
+	if a function has no return sites, then the return type is null (?)
+	otherwise it's the union of all the types of all the return sites.
+	as every function has the implicit final return, it will be useful to elide this (as it adds null everywhere, which is not desirable)
+	(It will be useful to mark dead code after a return statement, or maybe forbid it syntactically like lua does)
+	This dead code removal can be used to elide the final implicit 'return null'
+	(in fact, prioritize this as it's currently cluttering the bytecode)
+
+	We can do some compile-time type checking for free at this point eg
+		let a = fn() { return "foo" } let b = a() let c = 1 + b
+	should be able to detect an error immediately without having to actually execute the code
+
+	now once we have jitted the code (lol), the branch predictor will come to our aid
+	for example a generic add looks like this: (pseudocode)
+		if (type(a) == INT && type(b) == INT) {
+			ADD_INT
+		} else if (type(b) == STR && type(b) == STR) {
+
+		} ... {
+			...
+		} else {
+			error()
+		}
+	for any given function, it is likely to be used for one particular type 
+
+	inline caching and monomorphization:
+	call signature: the type resulting from the product of the argument types for a function call site
+	prediction: most call signatures will be the same, with the odd change
+	eg:
+		f(1, 2, 3);		// CS = tuple<int,int,int>;
+		f(1, 2, "foo"); // CS = tuple<int,int,string>;
+		( For variadic functions/calls, the variadic part will be treated like an array,
+		but perhaps is possible to monomorphize arrays as well?)
+	MoMo: 
+		emit different code for each call signature, and if possible use type deduction at the call site
+		to decide which code to call
+		inline caching: deciding the call at runtime as quickly as possible.
 
 Notes:
 	Functions vs closures vs "quasi-closures"

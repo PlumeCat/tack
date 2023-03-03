@@ -1,0 +1,78 @@
+-- lua_sort_test.lua
+
+math.randomseed(os.time())
+
+-- generate random array
+function table_random(N, M)
+    local array = {}
+    for i = 1, N do
+        array[#array+1] = math.random(1, M)
+    end
+    return array
+end
+
+
+-- merging tables
+function table_join(a, b)
+    local c = {}
+    local na = #a
+    for i = 1, na do c[i] = a[i] end
+    for i = 1, #b do c[i+na] = b[i] end
+    return c
+end
+
+-- print table
+function table_print(t)
+    print("{ " .. table.concat(t, ", ") .. " }")
+end
+
+function table_minmax(t)
+    local n = #t
+    if n == 0 then return end
+    if n == 1 then return t[1], t[1] end
+    local min = t[1]
+    local max = t[1]
+    for i = 2, n do
+        min = math.min(t[i], min)
+        max = math.max(t[i], max)
+    end
+    return min, max
+end
+
+-- quicksort
+function table_quicksort(t)
+    local n = #t
+    if n <= 1 then return t end
+    local min, max = table_minmax(t)
+    if min == max then return t end
+    local mid = (min + max) / 2
+    local upper = {}
+    local lower = {}
+    local un = 0
+    local ul = 0
+    for i = 1, n do
+        local _t = t[i]
+        if _t > mid then
+            upper[un+1] = _t
+            un = un + 1
+        else
+            lower[ul+1] = _t
+            ul = ul + 1
+        end
+    end
+    return table_join(
+        table_quicksort(lower),
+        table_quicksort(upper)
+    )
+end
+
+local N = 10000
+local A = table_random(N, N)
+-- table_print(A)
+
+local before = os.clock()
+local B = table_quicksort(A)
+local after = os.clock()
+-- table_print(B)
+print("Time taken: " .. tostring(after - before))
+

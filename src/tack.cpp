@@ -15,8 +15,9 @@ using namespace std;
 using namespace std::chrono;
 
 #include "parsing.h"
-#include "ref_interpreter.h"
-#include "bytecode_interpreter.h"
+#include "value.h"
+#include "compiler.h"
+#include "interpreter.h"
 
 
 int main(int argc, char* argv[]) {
@@ -42,19 +43,8 @@ int main(int argc, char* argv[]) {
             if (check_arg("-A")) {
                 log("AST: ", out_ast.tostring());
             }
-
-            if (check_arg("--twi")) {
-                // log("Running with reference TWI");
-                // auto vm = RefInterpreter {};
-                // auto before = steady_clock::now();
-                // auto e = vm.eval(out_ast);
-                // auto after = steady_clock::now();
-                // log("Evaling", e);
-                // log("TWI done in ", duration_cast<microseconds>(after - before).count() * 1e-6, "s");
-            }
             
-            // log("Compiling");
-            auto vm2 = BytecodeInterpreter();
+            auto vm = Interpreter();
             auto program = Program {};
             auto compiler = Compiler {};
             compiler.compile(out_ast, program);
@@ -63,9 +53,9 @@ int main(int argc, char* argv[]) {
             }
 
             auto before = steady_clock::now();
-            vm2.execute(program);
+            vm.execute(program);
             auto after = steady_clock::now();
-            // log("BC done in ", duration_cast<microseconds>(after - before).count() * 1e-6, "s");
+            log("BC done in ", duration_cast<microseconds>(after - before).count() * 1e-6, "s");
         } catch (exception& e) {
             log(e.what());
         }

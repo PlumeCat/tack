@@ -1,18 +1,35 @@
 let map = fn (f, a) {
+    print(f)
+    print(a)
     let i = 0
-    let n = #a  "hashtag operator to get array length, lua style"
+    let n = #a  "'hashtag operator to get array length, lua style'"
     let r = []
     while i < n {
-        r << f(a[i]) "shift-left to append to end of array"
+        r << f(a[i]) "'shift-left to append to end of array'"
         i = i + 1
     }
     return r
 }
 
 let x = [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ]
-let y = map(fn(a) { return a * a }, x)
+
+let w = map(fn(a) { return a * a }, x)
+
+let y = [ 1, 4, 9, 16 ]
+
+print(#x)
 
 print(y[0])
 print(y[1])
 print(y[2])
 print(y[3])
+
+"
+let z = [ 1, 2, 3 ]
+z[2] = [ 4, 5, 6 ]
+
+
+z[2][1] = 32
+
+print(z[2][1])
+"
