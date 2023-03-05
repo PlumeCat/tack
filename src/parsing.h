@@ -9,7 +9,7 @@ using namespace std;
     \
     ast(VarDeclStat)\
     ast(AssignStat)\
-    ast(PrintStat)\
+    ast(PrintStat) \
     ast(IfStat)\
     ast(WhileStat)\
     ast(ReturnStat)\
@@ -25,6 +25,9 @@ using namespace std;
     ast(CallExp) ast(ArgList)\
     ast(IndexExp)\
     ast(AccessExp)\
+    \
+    ast(ClockExp)\
+    ast(RandomExp)\
     \
     ast(FuncLiteral)\
     ast(ParamDef)\
@@ -117,12 +120,12 @@ DEFPARSER(literal, {
             SUCCESS(p);
         })
         EXPECT("fn")
-        // TRY(identifier) {} // TODO: named vs anon functions (a named function is a VarDeclStat, so can't be an expression?)
+        TRY(identifier) {} // TODO: named vs anon functions (a named function is a VarDeclStat, so can't be an expression?)
         TRYs('(') {} else throw runtime_error("expected parameter definition after 'fn'");
         TRY(param_def) {
             TRYs(')') {} else throw runtime_error("expected ')' after parameter definition");
             TRY(block) {
-                SUCCESS(AstType::FuncLiteral, param_def, block)
+                SUCCESS(AstType::FuncLiteral, param_def, block, identifier)
             } else throw runtime_error("expected block after parameter definition");
         }
     });
@@ -132,7 +135,18 @@ DEFPARSER(literal, {
     TRY(func_literal) SUCCESS(func_literal);
     TRY(num_literal) SUCCESS(num_literal);
 })
+// TODO: remove
+DEFPARSER(clock_exp, {
+    EXPECT("clock") EXPECT('(') EXPECT(')')
+    SUCCESS(AstType::ClockExp)
+})
+DEFPARSER(random_exp, {
+    EXPECT("random") EXPECT('(') EXPECT(')')
+    SUCCESS(AstType::RandomExp)
+})
 DEFPARSER(primary_exp, {
+    TRY(random_exp) SUCCESS(random_exp)
+    TRY(clock_exp) SUCCESS(clock_exp)
     TRY(literal) SUCCESS(literal)
     TRY(identifier) SUCCESS(identifier)
     TRYs('(') {
@@ -141,7 +155,7 @@ DEFPARSER(primary_exp, {
             SUCCESS(exp)
         }
     }
-});
+})
 DEFPARSER(postfix_exp, {
     SUBPARSER(access_postfix, {
         // access expr
@@ -157,8 +171,8 @@ DEFPARSER(postfix_exp, {
             TRY(exp) {
                 TRYs(']') {
                     SUCCESS(exp)
-                } else throw runtime_error("expected ']'");
-            } else throw runtime_error("expected expression in square brackets");
+                } //else throw runtime_error("expected ']'");
+            } //else throw runtime_error("expected expression in square brackets");
         }
     });
     SUBPARSER(call_postfix, {
@@ -291,11 +305,12 @@ DEFPARSER(block, {
     }
     })
 DEFPARSER(return_stat, {
-    EXPECT("return")
-    TRY(exp) {
-        SUCCESS(AstType::ReturnStat, exp);
+    TRYs("return") {
+        TRY(exp) {
+            SUCCESS(AstType::ReturnStat, exp);
+        }
+        SUCCESS(AstType::ReturnStat);
     }
-    SUCCESS(AstType::ReturnStat);
 });
 
 // TODO: remove

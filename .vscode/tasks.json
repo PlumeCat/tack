@@ -30,9 +30,10 @@
         {
             "label": "CMake - Debug",
             "type": "shell",
-            "command": "cmake -DCMAKE_BUILD_TYPE=Debug DCMAKE_CXX_FLAGS_DEBUG=\"-g -O0\" ../.. -G 'Unix Makefiles'",
+            "command": "cmake -DCMAKE_BUILD_TYPE=Debug ../.. -G 'Unix Makefiles'",
             "options": {
                 "cwd": "${workspaceFolder}/build/Debug",
+                "env": { "CMAKE_BUILD_TYPE": "Debug" }
             },
             "problemMatcher": []
         },
@@ -42,6 +43,7 @@
             "command": "cmake -DCMAKE_BUILD_TYPE=Release ../.. -G 'Unix Makefiles'",
             "options": {
                 "cwd": "${workspaceFolder}/build/Release",
+                "env": { "CMAKE_BUILD_TYPE": "Release" }
             },
             "problemMatcher": []
         }

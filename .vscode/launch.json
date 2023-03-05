@@ -4,7 +4,7 @@
             "type": "lldb",
             "request": "launch",
             "name": "Launch Debug",
-            "program": "${workspaceFolder}/build/Debug/pl5",
+            "program": "${workspaceFolder}/build/Debug/tack",
             "args": [ "source.str", "-A", "-D" ],
             "preLaunchTask": "Build - Debug",
             "cwd": "${workspaceFolder}"
@@ -12,7 +12,7 @@
             "type": "lldb",
             "request": "launch",
             "name": "Launch Release",
-            "program": "${workspaceFolder}/build/Release/pl5",
+            "program": "${workspaceFolder}/build/Release/tack",
             "args": [ "source.str", "-D", "-A" ],
             "preLaunchTask": "Build - Release",
             "cwd": "${workspaceFolder}"

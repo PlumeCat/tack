@@ -27,39 +27,79 @@ struct Interpreter {
         auto instruction_pointer = 0;
 
         // stack
-        const auto STACK_SIZE = 1024;
-        auto stack = array<Value, STACK_SIZE>{}; memset((void*)stack.data(), 0xffffffff, stack.size() * sizeof(Value));
-        auto stackptr = 0;
-        auto stackbase = 0;
+        const auto STACK_SIZE = 1024u;
+        auto _stack = array<Value, STACK_SIZE>{}; memset((void*)_stack.data(), 0xffffffff, _stack.size() * sizeof(Value));
+        auto _stackptr = 0;
+        auto _stackbase = 0;
 
         // heap
-        auto heap = swiss_vector<Value>((size_t)1024); // where variables live (unless stack allocated)
-        
-        // allocated types
-        auto all_strings = swiss_vector<StringType>((size_t)1024);
-        auto all_objects = swiss_vector<ObjectType>((size_t)1024);
-        auto all_arrays = swiss_vector<ArrayType>((size_t)1024);
+        auto max_heap_env = std::getenv("STRAW_MAX_HEAP");
+        auto default_heap = (char*)"4096";
+        max_heap_env = max_heap_env ? max_heap_env : default_heap;
+        auto max_heap = stoi(max_heap_env);
+        log("Max heap: ", max_heap);
+        auto _heap = swiss_vector<Value, false>((size_t)max_heap); // where variables live (unless stack allocated)
+        //
+        //// allocated types
+        auto _strings = swiss_vector<StringType, false>((size_t)4096);
+        auto _objects = swiss_vector<ObjectType, false>((size_t)4096);
+        auto _arrays = swiss_vector<ArrayType, false>((size_t)4096);
+
+        auto alloc_box = [&]() -> Value {
+            return value_from_boxed(_heap.index_to_pointer(_heap.add(value_null())));
+        };
+        auto alloc_string = [&](const auto& s = "") -> Value {
+            return value_from_string(_strings.index_to_pointer(_strings.add(s)));
+        };
+        auto alloc_object = [&]() -> Value {
+            return value_from_object(_objects.index_to_pointer(_objects.add({})));
+        };
+        auto alloc_array = [&](auto size) -> Value {
+            auto arr = _arrays.index_to_pointer(_arrays.add(ArrayType(size)));
+            if (size) { // TODO: fast but a bit dangerous?
+                memcpy(arr->data(), &_stack[_stackptr - size], sizeof(Value) * size);
+                _stackptr -= size;
+            }
+            return value_from_array(arr);
+        };
 
         // some stack manipulation
+        auto error = [&](const string& s)  -> Value {
+            throw runtime_error("runtime error: " + s);
+            return value_null();
+        };
         auto stack_push = [&](Value v) {
-            stack[stackptr++] = v;
+            if (_stackptr >= STACK_SIZE - 1) {
+                error("stack overflow");
+            }
+            _stack[_stackptr++] = v;
         };
         auto stack_pop = [&]() -> Value {
-            return stack[--stackptr];
+            return _stack[--_stackptr];
         };
-        auto error = [&](const string& s) {
-            throw runtime_error("runtime error: " + s);
+        auto stack_get = [&](int index) -> Value {
+            return (index >= 0) ? _stack[index] : _stack[_stackptr+index];
+        };
+        auto stack_set = [&](int index, Value value) {
+            _stack[index] = value;
         };
         auto print_value = [&](Value v) {
-            log<true, false>("print: ", v);
+            log<true, false>(v);
+        };
+        auto stack_dump = [&] {
+            log("===== STACK =====");
+            for (auto i = 0; i < _stackptr; i++) {
+                log<true>("  ", _stack[i]);
+            }
+            log("=================");
         };
 
         // HACK: sort of.
         // the top level block of the program counts as the 0th stack frame
         // so when it RETs, it needs to jump to the final instruction so the interpreter loop can terminate
-        stack_push({ program.instructions.size() }); // base return address is end of code
-        stack_push({ 0 }); // base frame ptr
-        stackbase = 2;
+        stack_push(value_from_function(program.instructions.size())); // base return address is end of code
+        stack_push(value_from_integer(0)); // base frame ptr
+        _stackbase = 2;
 
         while (instruction_pointer < program.instructions.size()) {
             // decode
@@ -67,15 +107,23 @@ struct Interpreter {
             auto r1 = uint16_t{0};
             decode_instruction(program.instructions[instruction_pointer], opcode, r1);
 
-            #define check(index, type)  (value_get_type(stack[index]) == Type::type)
-            #define echeck(index, type, msg) if (!check(index, type)) { auto s = stringstream{}; s << "invalid types: " msg "; "; s << stack[index]; error(s.str()); }
+            #define check(val, type)  (value_get_type(val) == Type::type)
+            #define echeck(val, type, msg) if (!check(val, type)) { auto s = stringstream{}; s << "invalid types: " msg "; "; s << val; error(s.str()); }
             #define handle(c)           break; case Opcode::c:
-            #define handle_binop(c, cast, op) handle(c) {\
-                    if (check(stackptr-2, Number) && check(stackptr-1, Number)) {\
-                        stack[stackptr--] = { .d = (double)((cast)stack[stackptr-2].d op (cast)stack[stackptr-1].d) };\
-                    } else { error("invalid types for operation"); }}
-                //stack[stackptr-2] = stack[stackptr-2] op stack[stackptr-1]; stackptr--;
-                //}
+            #define handle_binop(c, op, cast) handle(c) {\
+                    auto r = stack_pop();\
+                    auto l = stack_pop();\
+                    auto lhs = check(l, Number)\
+                        ? value_to_number(l)\
+                        : check(l, Integer)\
+                            ? (double)value_to_integer(l)\
+                            : value_to_number(error("expect number or integer"));\
+                    auto rhs = check(r, Number)\
+                        ? value_to_number(r)\
+                        : check(r, Integer)\
+                            ? (double)value_to_integer(r)\
+                            : value_to_number(error("expect number or integer"));\
+                    stack_push(cast(lhs op rhs));}
 
             // TODO: clean up interaction between CALL and GROW
             // CALL is muching the stack pointer / stack size, then GROW mucks it again,
@@ -83,125 +131,168 @@ struct Interpreter {
             // maybe CALL / RET need to do more work, or store function metadata somewhere?
                 // could put function fixed stack growth into storage after the start address?
             // execute
+
+            // TODO: arity checking for arguments and return values, (otherwise we risk damaging the stack)
+
+            // TODO: leave variables that aren't captured on the stack, and use PUSH / SET to read them rather than READ_VAR / WRITE_VAR
+            // in fact lets do that by default, and rename READ_VAR/WRITE_VAR to READ_BOX/WRITE_BOX
+            // TODO: add a 'const' keyword
+            //      then detect variables that are never reassigned and mark them as const
+            //      const stuff can be captured by-value, then the copy is also marked const
+            //      so it can be copied rather than boxed and copy the box
+            //      will be especially important for recursive functions
+
+            auto before_stackptr = _stackptr;
+
             switch (opcode) {
                 case Opcode::UNKNOWN:
-                // binop
-                handle_binop(ADD,       double,     +)
-                handle_binop(SUB,       double,     -)
-                handle_binop(MUL,       double,     *)
-                handle_binop(DIV,       double,     /)
-                handle_binop(EQUAL,     double,     ==)
-                handle_binop(NEQUAL,    double,     !=)
-                handle_binop(LESS,      double,     <)
-                handle_binop(GREATER,   double,     >)
-                handle_binop(LESSEQ,    double,     <=)
-                handle_binop(GREATEREQ, double,     >=)
-                handle_binop(MOD,       uint64_t,   %)
 
-                // string concat
-                handle(BITAND)          { auto& s1 = *value_to_string(stack[stackptr-2]);
-                                          auto& s2 = *value_to_string(stack[stackptr-1]);
-                                          stack[stackptr--] = value_from_string(all_strings.index_to_pointer(all_strings.add(s1 + s2)));
-                                        }
+                handle_binop(ADD,       +,  value_from_number)
+                handle_binop(SUB,       -,  value_from_number)
+                handle_binop(MUL,       *,  value_from_number)
+                handle_binop(DIV,       /,  value_from_number)
+                // handle_binop(MOD,       %,  value_from_integer)
+                handle_binop(EQUAL,     ==,  value_from_boolean)
+                handle_binop(NEQUAL,    !=,  value_from_boolean)
+                handle_binop(LESS,      <,   value_from_boolean)
+                handle_binop(GREATER,   >,   value_from_boolean)
+                handle_binop(LESSEQ,    <=,  value_from_boolean)
+                handle_binop(GREATEREQ, >=,  value_from_boolean)
+
                 // unop
-                handle(NEGATE)          { echeck(stackptr-1, Number, "unary negate"); stack[stackptr-1] = { .d = -stack[stackptr-1].d }; }
-                handle(LEN)             { echeck(stackptr-1, Array, "array len");     stack[stackptr-1] = value_from_integer(value_to_array(stack[stackptr-1])->size()); }
-                handle(SHL)             { echeck(stackptr-2, Array, "array append");  value_to_array(stack[stackptr-2])->emplace_back(stack_pop()); }
-
-                handle(GROW)            { stackptr += r1;
-                                          for (auto i = 0; i < r1; i++) {
-                                            auto _n = heap.add(value_null());
-                                            auto _p = heap.index_to_pointer(_n);
-                                            stack[stackbase+i] = value_from_boxed(_p);
-                                          }
-                                        }
-                handle(PUSH)            { stack_push(stack[stackptr - (r1 + 1)]); }
+                handle(NEGATE)          { echeck(stack_get(-1), Number, "unary negate"); stack_push(value_from_number(-value_to_number(stack_pop()))); }
+                handle(LEN)             { echeck(stack_get(-1), Array, "array len");     stack_push(value_from_integer(value_to_array(stack_pop())->size())); }
+                handle(SHL)             {
+                    auto v = stack_pop();
+                    auto a = stack_pop();
+                    echeck(a, Array, "array append");
+                    value_to_array(a)->emplace_back(v);
+                }
+                handle(GROW)            { for (auto i = 0; i < r1; i++) {
+                                            // stack_push(alloc_box());
+                                            stack_push(value_null());
+                                        }}
+                handle(PUSH)            { stack_push(stack_get(-(r1 + 1))); }
                 handle(READ_VAR)        {
-                    assert((stack[stackbase+r1].i & type_bits == type_bits_boxed, "R VAR"));
-                    stack_push(*value_to_box(stack[stackbase+r1]));
+                    auto var = stack_get(_stackbase + r1);
+                    if (value_is_boxed(var)) {
+                        var = *value_to_box(var);
+                    }
+                    stack_push(var);
                 }
                 handle(WRITE_VAR)       {
-                    assert((stack[stackbase+r1].i & type_bits == type_bits_boxed, "W VAR"));
-                    // auto p = stack_pop();
-                    *value_to_box(stack[stackbase+r1]) = stack_pop();
-                    // print_value(p);
+                    auto val = stack_pop();
+                    auto var = stack_get(_stackbase + r1);
+                    if (value_is_boxed(var)) {
+                        *value_to_box(var) = val;
+                    } else {
+                        stack_set(_stackbase + r1, val);
+                    }
                 }
                 handle(LOAD_CONST)      { stack_push(program.storage[r1]); }
                 handle(LOAD_STRING)     { stack_push(value_from_string(&program.strings[r1])); /* TODO: allow more than 2**16 strings in the program */ }
                 handle(LOAD_ARRAY)      {
-                    echeck(stackptr-1, Integer, "expected integer index");
-                    auto index = value_to_integer(stack_pop());
-                    echeck(stackptr-1, Array, "expected array");
+                    auto _index = stack_pop();
+                    auto index = check(_index, Number)
+                        ? (int32_t)value_to_number(_index)
+                        : check(_index, Integer)
+                            ? value_to_integer(_index)
+                            : value_to_integer(error("expect number or integer"));
+                    echeck(stack_get(-1), Array, "expected array");
                     auto arr = value_to_array(stack_pop());
                     stack_push(arr->data()[index]);
                 }
-                handle(LOAD_OBJECT)     {
-                    // auto key = stack_pop();
-                    // auto object = stack_pop();
-                    // stack_push(object_heap[obj][key]);
-                }
-                
-                // handle(STORE)           { stack[stackbase+r1] = stack_pop(); }
+                handle(LOAD_OBJECT)     {}
                 handle(STORE_ARRAY)     {
                     auto value = stack_pop();
                     auto index = value_to_integer(stack_pop());
                     auto arr = value_to_array(stack_pop());
                     (*arr)[index] = value;
                 }
-                handle(STORE_OBJECT)    {
-                    // auto value = stack_pop();
-                    // auto key = stack_pop();
-                    // auto obj = stack_pop();
-                    // object_heap[obj][key] = value;
-                }
+                handle(STORE_OBJECT)    {}
                 handle(ALLOC_ARRAY)     {
-                    stack_push(value_from_array(all_arrays.index_to_pointer(all_arrays.add(ArrayType(r1)))));
+                    stack_push(alloc_array(r1));
                 }
                 handle(ALLOC_OBJECT) {
-                    stack_push(value_from_object(all_objects.index_to_pointer(all_objects.add(ObjectType{}))));
+                    stack_push(alloc_object());
                 }
                 
-                handle(PRINT)           { print_value(stack_pop()); }
+                handle(RANDOM)          { stack_push(value_from_integer(rand() % 10000)); }
+                handle(CLOCK)           {
+                    stack_push(value_from_number(duration_cast<microseconds>(steady_clock::now().time_since_epoch()).count() / 1e6));
+                }
+                handle(PRINT)           {
+                    auto v = stack_pop();
+                    print_value(v);
+                }
+                handle(DUMP)            {}
                 
                 handle(JUMPF)           { instruction_pointer += r1 - 1; }
                 handle(JUMPB)           { instruction_pointer -= (r1 + 1); }
-                handle(CONDJUMP)        { if (!value_to_boolean(stack_pop())) { instruction_pointer += r1 - 1; }}
+                handle(CONDJUMP)        {
+                    auto val = stack_pop();
+                    auto cond = value_to_boolean(val);
+                    if (!cond) {
+                        instruction_pointer += r1 - 1;
+                    }
+                }
                 
                 handle(PRECALL) {
-                    stack_push({ .i = 0 }); // placeholder for return address
-                    stack_push({ .i = (uint64_t)stackbase }); // return frame pointer
+                    stack_push(value_null());// placeholder for return address
+                    stack_push(value_from_integer(_stackbase));// return frame pointer
+                    // alloc spaces for arguments
+                    _stackptr += r1;
                 }
                 handle(CALL) {
-                    auto call_addr = stack_pop().i;
-                    stackbase = stackptr - r1;// arguments were already pushed
-                    stack[stackbase - 2] = { .i = (uint64_t)instruction_pointer };// rewrite the return address lower down the stack
+                    auto func = stack_pop();
+                    if (!value_is_function(func)) {
+                        error("tried to call non-function");
+                    }
+                    auto call_addr = value_to_function(func);
+                    _stackbase = _stackptr - r1 * 2;
+                    _stack[_stackbase - 2] = value_from_integer(instruction_pointer);// rewrite the return address lower down the stack
+                    
+                    // assign arguments
+                    // TODO: works but a bit messy, clean it up and simplify
+                    for (auto i = 0; i < r1; i++) {
+                        // auto param = _stack[_stackbase + r1 - (i + 1)];
+                        auto param_ptr = &_stack[_stackbase + r1 - (i+1)];
+                        if (value_is_boxed(*param_ptr)) {
+                            param_ptr = value_to_box(*param_ptr);
+                        }
+                        *param_ptr = stack_pop();
+                    }
+
                     instruction_pointer = call_addr - 1; // -1 because we have instruction_pointer++ later; (TODO: optimize out?)
                 }
                 handle(RET) {
-                    // TODO: figure out how to handle when there's no return value but one was expected
-                    // eg 
-                    // let a = fn() { return } let b = a()
-                    // if nothing pushed to stack, assign to b will corrupt the stack with current implementation
-                    // maybe push null if there's no retval?
                     auto retval = value_null();
                     if (r1) {
                         retval = stack_pop();
                     }
-                    stackptr = stackbase;                    
-                    stackbase = stack_pop().i;
-                    instruction_pointer = stack_pop().i;
-                    if (r1) {
+                    _stackptr = _stackbase;
+                    _stackbase = value_to_integer(stack_pop());
+                    instruction_pointer = value_to_integer(stack_pop());
+                    //if (r1) {
                         stack_push(retval);
-                    }
+                    //}
                 }
-                break; default: throw runtime_error("unknown instruction "s + to_string(opcode));
+                break; default: error("unknown instruction "s + to_string(opcode)); break;
             }
 
-            instruction_pointer += 1;
+            auto after_stackptr = _stackptr;
 
             #undef handle
             #undef handle_binop
+
+
+            instruction_pointer += 1;
+
         }
+        log("Boxes: ", _heap.count());
+        log("Strings: ", _strings.count());
+        log("Arrays: ", _arrays.count());
+        log("Objects: ", _objects.count());
     }
 };
 

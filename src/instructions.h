@@ -14,6 +14,7 @@
     opcode(READ_VAR) \
     opcode(WRITE_VAR) \
     \
+    opcode(CLOCK) opcode(RANDOM) \
     opcode(LOAD_CONST) opcode(LOAD_STRING) opcode(LOAD_ARRAY) opcode(LOAD_OBJECT) opcode(STORE_ARRAY) opcode(STORE_OBJECT) \
     opcode(GROW) \
     /* Relative jump using encoded offset */\
@@ -22,10 +23,12 @@
     opcode(CONDJUMP)\
     opcode(ALLOC_OBJECT) opcode(ALLOC_ARRAY)\
     opcode(PRECALL) opcode(CALL) opcode(RET)/**/\
-    opcode(PRINT)/**/\
+    opcode(PRINT) \
+    opcode(DUMP) /* dump stack */\
     opcode(OPCODE_MAX)
     
 
+#include <unordered_map>
 #define opcode(x) x,
 enum class Opcode : uint8_t { opcodes() };
 #undef opcode

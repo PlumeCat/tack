@@ -66,13 +66,14 @@ function table_quicksort(t)
     )
 end
 
-local N = 10000
+local N = 1000
 local A = table_random(N, N)
 -- table_print(A)
 
 local before = os.clock()
 local B = table_quicksort(A)
 local after = os.clock()
+
 -- table_print(B)
 print("Time taken: " .. tostring(after - before))
 

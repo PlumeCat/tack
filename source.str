@@ -1,35 +1,78 @@
-let map = fn (f, a) {
-    print(f)
-    print(a)
+let array_random = fn(M) {
     let i = 0
-    let n = #a  "'hashtag operator to get array length, lua style'"
-    let r = []
-    while i < n {
-        r << f(a[i]) "'shift-left to append to end of array'"
+    let arr = []
+    while i < M {
         i = i + 1
+        arr << random()
     }
-    return r
+    return arr
 }
 
-let x = [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ]
+let join = fn(a, b) {
+    let c = []
 
-let w = map(fn(a) { return a * a }, x)
+    let i = 0
+    let na = #a
+    while i < na {
+        c << a[i]
+        i = i + 1
+    }
 
-let y = [ 1, 4, 9, 16 ]
+    let j = 0
+    let nb = #b
+    while j < nb {
+        c << b[j]
+        j = j + 1
+    }
 
-print(#x)
+    return c
+}
+let minmax = fn(arr) {
+    let n = #arr
 
-print(y[0])
-print(y[1])
-print(y[2])
-print(y[3])
+    if n == 0 { return [ 0, 0 ] }
+    if n == 1 { return [ arr[0], arr[0] ] }
 
-"
-let z = [ 1, 2, 3 ]
-z[2] = [ 4, 5, 6 ]
+    let min = arr[0]
+    let max = arr[0]
+    let i = 1
+    while i < n {
+        if min > arr[i] { min = arr[i] }
+        if max < arr[i] { max = arr[i] }
+        i = i + 1
+    }
 
+    return [ min, max ]
+}
+let quicksort = fn(arr, qs, join, minmax) {
+    let n = #arr
 
-z[2][1] = 32
+    if n <= 1 { return arr }
+    let mm = minmax(arr)
+    let min = mm[0]
+    let max = mm[1]
+    if min == max { return arr }
+    let mid = (min + max) / 2
+    let upper = []
+    let lower = []
 
-print(z[2][1])
-"
+    let i = 0
+    while i < n {
+        let e = arr[i]
+        if e < mid { lower << e }
+        else { upper << e }
+        i = i + 1
+    }
+
+    return join(qs(lower, qs, join, minmax), qs(upper, qs, join, minmax))
+}
+
+let N = 1000
+let A = array_random(N)
+
+let before = clock()
+let B = quicksort(A, quicksort, join, minmax)
+let after = clock()
+
+print("time taken: ")
+print(after - before)

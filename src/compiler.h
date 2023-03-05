@@ -14,6 +14,7 @@ struct Program {
     vector<Instruction> instructions;
     vector<Value> storage; // program constant storage goes at the bottom of the stack for now
     vector<string> strings; // string constants and literals storage - includes identifiers for objects
+    hash_map<uint32_t, string> addr_to_function;
 
     string to_string() {
         auto s = stringstream {};
@@ -31,7 +32,7 @@ struct Program {
         s << "    Storage:\n";
         i = 0;
         for (auto& x : storage) {
-            s << std::hex << "        " << i << ": " << x.i << '\n';
+            s << "        " << i << ": " << x << '\n';
             i++;
         }
 
@@ -65,7 +66,7 @@ struct FunctionContext {
         // then it can refer to captured variables via the stack)
         for (auto s = scopes.rbegin(); s != scopes.rend(); s++) {
             if (auto iter = (*s).variables.find(identifier); iter != (*s).variables.end()) {
-                log(identifier, " -> ", iter->second.stackpos);
+                // log(identifier, " -> ", iter->second.stackpos);
                 return iter->second.stackpos;
             }
         }
@@ -116,7 +117,9 @@ struct Compiler {
         for (auto f = funcs.begin(); f != funcs.end(); f++) { // can't use range-based for because compiler.functions size changes
             auto& func = *f;
             if (func.storage_location != UINT32_MAX) {
-                program.storage[func.storage_location] = Value { program.instructions.size() };
+                auto start_address = program.instructions.size();
+                program.storage[func.storage_location] = value_from_function(start_address);
+                // program.addr_to_function[start_address] = program.strings[program.storage[func.storage_location +1].d];
             }
             compile_function(func, program);
         }
@@ -285,7 +288,7 @@ struct Compiler {
                 // TODO: handle return value
                 auto nret = node.children.size(); // should be 0 or 1
                 if (nret) {
-                    child(0); // push return value
+                    child(0); // push return value. will never need to be boxed
                 }
                 emit(RET, nret);
             }
@@ -293,23 +296,31 @@ struct Compiler {
                 // TODO: optimize direct calls vs indirect calls with some kind of symbol table?
                 // RHS of call expression is an ArgList; evaluate all arguments
                 auto nargs = node.children[1].children.size();
+                // emit(DUMP, 0);
                 emit(PRECALL, 0);
-                child(1); // ArgList                
-                child(0); // LHS of the call exp evaluates to storage location of a function address
+                emit(GROW, nargs); // allocate space for arguments
+                child(1);          // push all arguments
+                child(0);          // LHS of the call exp evaluates to a function address
                 emit(CALL, nargs); // call function at top of stack
             }
             handle(ArgList) {
+                // top of stack contains args. 
                 for (auto i = 0; i < node.children.size(); i++) {
-                    child(i);
+                    child(i); // push child value to stack
                 }
             }
             handle(FuncLiteral) {
                 // put a placeholder value in storage at first. when the program is linked, the placeholder is
                 // overwritten with the real start address
                 auto storage_index = program.storage.size();
-                program.storage.emplace_back(value_from_integer(0)); // placeholder value
+                program.storage.emplace_back(value_from_function(0)); // insptr (placeholder value)
+                program.storage.emplace_back(value_from_integer(program.strings.size())); // index of string name
+                auto& name = (context.func_node->children.size() == 3) ? context.func_node->children[2].data_s : "(anonymous)";
+                program.strings.emplace_back(name); // string name if there is one
                 // funcs.emplace_back(pair { &node, func_storage }); // compile function
                 add_function(&node, storage_index, &context);
+                // load the function start address
+                emit(LOAD_CONST, storage_index);
 
                 /*
                 TODO: closure capture
@@ -322,8 +333,6 @@ struct Compiler {
                 */
                 
 
-                // load the function start address
-                emit(LOAD_CONST, storage_index);
             }
             handle(ParamDef) {}
             handle(NumLiteral) {
@@ -344,24 +353,31 @@ struct Compiler {
                 emit(LOAD_STRING, program.strings.size() - 1);
             }
             handle(ArrayLiteral) {
+                // push the contents of the array to stack
+                // ALLOC_ARRAY will copy them
+                for (auto i = 0; i < node.children.size(); i++) {
+                    child(i);
+                }
                 emit(ALLOC_ARRAY, node.children.size());
                 // emit STORE_ARRAY for each element
-                for (auto i = 0; i < node.children.size(); i++) {
-                    // re-push the array... bit annoying
-                    emit(PUSH, 0);
-                    // push index. index is 
-                    program.storage.emplace_back(value_from_integer(i));
-                    emit(LOAD_CONST, program.storage.size() - 1);
-                    // push value
-                    child(i);
-                    // store
-                    emit(STORE_ARRAY, 0);
-                }
+                //for (auto i = 0; i < node.children.size(); i++) {
+                //    // re-push the array... bit annoying
+                //    emit(PUSH, 0);
+                //    // push index. index is 
+                //    program.storage.emplace_back(value_from_integer(i));
+                //    emit(LOAD_CONST, program.storage.size() - 1);
+                //    // push value
+                //    child(i);
+                //    // store
+                //    emit(STORE_ARRAY, 0);
+                //}
             }
             handle(ObjectLiteral) {
                 emit(ALLOC_OBJECT, 0);
                 // TODO: emit STORE_OBJECT for any provided fields
             }
+            handle(ClockExp) { emit(CLOCK, 0); } // TODO: remove
+            handle(RandomExp) { emit(RANDOM, 0); } // TODO: remove
             handle(Identifier) {
                 // reading a variable (writing is not encountered by recursive compile)
                 // so the variable exists and points to a stackpos

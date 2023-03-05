@@ -6,8 +6,12 @@
 #include <array>
 #include <unordered_map>
 #include <chrono>
+#include <filesystem>
 
 #define JLIB_IMPLEMENTATION
+#if (defined _MSC_VER && defined _DEBUG)
+#define JLIB_LOG_VISUALSTUDIO
+#endif
 #include <jlib/log.h>
 #include <jlib/text_file.h>
 
@@ -29,6 +33,7 @@ int main(int argc, char* argv[]) {
         }
         return false;
     };
+
     std::ios::sync_with_stdio(false);
     auto fname = (argc >= 2) ? argv[1] : "source.str";
     auto s = read_text_file(fname);
@@ -39,28 +44,24 @@ int main(int argc, char* argv[]) {
     auto out_ast = AstNode {};
     try {
         parse(source, out_ast);
-        try {
-            if (check_arg("-A")) {
-                log("AST: ", out_ast.tostring());
-            }
-            
-            auto vm = Interpreter();
-            auto program = Program {};
-            auto compiler = Compiler {};
-            compiler.compile(out_ast, program);
-            if (check_arg("-D")) {
-                log(program.to_string());
-            }
-
-            auto before = steady_clock::now();
-            vm.execute(program);
-            auto after = steady_clock::now();
-            log("BC done in ", duration_cast<microseconds>(after - before).count() * 1e-6, "s");
-        } catch (exception& e) {
-            log(e.what());
+        if (check_arg("-A")) {
+            log("AST: ", out_ast.tostring());
         }
+        
+        auto vm = Interpreter();
+        auto program = Program {};
+        auto compiler = Compiler {};
+        compiler.compile(out_ast, program);
+        if (check_arg("-D")) {
+            log(program.to_string());
+        }
+
+        auto before = steady_clock::now();
+        vm.execute(program);
+        auto after = steady_clock::now();
+        log("BC done in ", duration_cast<microseconds>(after - before).count() * 1e-6, "s");
     } catch (exception& e) {
-        log("parser error: ", e.what());
+        log(e.what());
     }
 
     if (argc < 2) {
