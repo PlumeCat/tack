@@ -5,12 +5,13 @@
     /* binary operations:*/\
     opcode(EQUAL) opcode(NEQUAL) opcode(GREATER) opcode(LESS) opcode(GREATEREQ) opcode(LESSEQ)\
     opcode(ADD) opcode(SUB) opcode(DIV) opcode(MUL) opcode(MOD) opcode(POW)\
+    opcode(ADDI) \
     opcode(SHL) opcode(SHR) opcode(BITAND) opcode(BITOR) opcode(BITXOR) opcode(AND) opcode(OR)\
     /* unary operation: apply inplace for value at top of stack*/\
     opcode(NEGATE) opcode(NOT) opcode(BITNOT) opcode(LEN) \
     \
     /* stack and variable operations */\
-    opcode(PUSH) \
+    /*opcode(PUSH)*/ \
     opcode(READ_VAR) \
     opcode(WRITE_VAR) \
     \
@@ -34,7 +35,7 @@ enum class Opcode : uint8_t { opcodes() };
 #undef opcode
 #define opcode(x) { Opcode::x, #x },
 string to_string(Opcode opcode) {
-    static hash_map<Opcode, string> opcode_to_string = { opcodes() };
+    static const hash_map<Opcode, string> opcode_to_string = { opcodes() };
     return opcode_to_string[opcode];
 }
 #undef opcode

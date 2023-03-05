@@ -1,6 +1,6 @@
 #pragma once
 
-#include "parser_lib.h"
+#include <jlib/hash_map.h>
 
 using namespace std;
 
@@ -39,7 +39,14 @@ using namespace std;
 enum class AstType { ast_type() };
 #undef ast
 #define ast(x) { AstType::x, #x },
-static const unordered_map<AstType, string> type_to_string = { ast_type() };
+
+string to_string(AstType type) {
+    static const hash_map<AstType, string> type_to_string = { ast_type() };
+    //static const hash_map<Opcode, string> opcode_to_string = { opcodes() };
+    //return opcode_to_string[opcode];
+    return type_to_string[type];
+}
+
 #undef ast
 
 struct AstNode {
@@ -55,13 +62,146 @@ struct AstNode {
     AstNode(double d): type(AstType::NumLiteral), data_d(d) {}
 
     string tostring(const string& indent = "") const {
-        auto s = indent + type_to_string.at(type) + (type == AstType::Identifier ? " " + data_s : ""s) + (type == AstType::NumLiteral ? " "s + to_string(data_d) : "");
+        auto s = indent + to_string(type) + (type == AstType::Identifier ? " " + data_s : ""s) + (type == AstType::NumLiteral ? " "s + to_string(data_d) : "");
         for (const auto& c : children) {
             s += "\n" + indent + c.tostring(indent + "  ");
         }
         return s;
     }
 };
+
+// parsing utils
+
+bool is_identifier_char(char c) {
+    return isalnum(c) || c == '_';
+}
+bool is_identifier_start_char(char c) {
+    return isalpha(c) || c == '_';
+}
+void skip_whitespace(string_view& code) {
+    auto n = 0;
+    for (; n < code.size(); n++) {
+        if (!isspace(code[n])) {
+            break;
+        }
+    }
+    code.remove_prefix(n);
+}
+
+bool parse_raw_number(string_view& code, double& out) {
+    auto end = (char*)nullptr;
+    auto result = strtod(code.data(), &end);
+    auto dist = end - code.data();
+    if (dist != 0) {
+        code.remove_prefix(dist);
+        out = result;
+        return true;
+    }
+    return false;
+}
+bool parse_raw_string_literal(string_view& code, string& out) {
+    skip_whitespace(code);
+    if (code.size() && code[0] == '"') {
+        for (auto n = 1; n < code.size(); n++) {
+            if (code[n] == '"') {
+                out = code.substr(1, n - 1);
+                code.remove_prefix(n + 1);
+                return true;
+            }
+        }
+        throw runtime_error("Expected closing quote '\"'");
+    }
+    return false;
+}
+bool parse_raw_identifier(string_view& code, string& out) {
+    skip_whitespace(code);
+    if (code.size() && is_identifier_start_char(code[0])) {
+        for (auto n = 1; n < code.size(); n++) {
+            if (!is_identifier_char(code[n])) {
+                out = code.substr(0, n);
+                code.remove_prefix(n);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+bool parse_raw_string(string_view& code, char c) {
+    skip_whitespace(code);
+    if (code.size() && code[0] == c) {
+        code.remove_prefix(1);
+        return true;
+    }
+    return false;
+}
+bool parse_raw_string(string_view& code, const string& c) {
+    skip_whitespace(code);
+    if (code.size() >= c.size() && code.substr(0, c.size()) == c) {
+        code.remove_prefix(c.size());
+        return true;
+    }
+    return false;
+}
+
+
+
+#define SUCCESS(...) { out = AstNode(__VA_ARGS__); return true; }
+#define FAIL(); { code = _c; return false; }
+
+#define paste(a, b) a##b
+#define DECLPARSER(name) bool paste(parse_, name)(string_view& code, AstNode& out)
+#define DEFPARSER(name, body) DECLPARSER(name) { auto _c = code; body; FAIL(); }
+#define SUBPARSER(name, body) auto paste(parse_, name) = [&](string_view& code, AstNode& out) -> bool { auto _c = code; body; FAIL(); };
+
+#define TRY4(n1,n2,n3,n4)\
+    auto n1 = AstNode {}; auto n2 = AstNode {}; auto n3 = AstNode {}; auto n4 = AstNode {};\
+    if (paste(parse_, n1)(code, n1) && paste(parse_, n2)(code, n2) && paste(parse_, n3) && paste(parse_, n4))
+#define TRY3(n1,n2,n3)\
+    auto n1 = AstNode {}; auto n2 = AstNode {}; auto n3 = AstNode {};\
+    if (paste(parse_, n1)(code, n1) && paste(parse_, n2)(code, n2) && paste(parse_, n3))
+#define TRY2(n1,n2)\
+    auto n1 = AstNode {}; auto n2 = AstNode {};\
+    if (paste(parse_, n1)(code, n1) && paste(parse_, n2)(code, n2))
+#define TRY(n1)\
+    auto n1 = AstNode {};\
+    if (paste(parse_, n1)(code, n1))
+#define TRYs(s)\
+    if (parse_raw_string(code, s))
+
+
+#define EXPECT(s) if (!parse_raw_string(code, s)) { FAIL(); }
+
+// left recursive binary operation
+// eg SubExpr = SubExpr '-' MulExpr
+//			  | MulExpr
+#define BINOP(name, ty, precedent, op)\
+    DEFPARSER(name, {\
+        TRY(precedent) {\
+            auto res = precedent;\
+            while (true) {\
+                TRYs(op) {\
+                    TRY(precedent) {\
+                        res = AstNode(AstType::ty, res, precedent);\
+                    } else throw runtime_error("foo bar baz");\
+                } else break;\
+            }\
+            SUCCESS(res);\
+        }\
+    });
+// binary operation non recursive in the grammar sense
+#define BINOP2(name, ty, precedent, op)\
+    DEFPARSER(name, {\
+        TRY(precedent) {\
+            auto lhs = precedent;\
+            TRYs(op) {\
+                TRY(precedent) {\
+                    SUCCESS(AstType::ty, lhs, precedent)\
+                }\
+            }\
+            SUCCESS(lhs)\
+        }\
+    });
+
 
 
 // language

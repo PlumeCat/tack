@@ -1,0 +1,87 @@
+let array_random = fn(M) {
+    let i = 0
+    let arr = []
+    while i < M {
+        i = i + 1
+        arr << random()
+    }
+    return arr
+}
+
+let join = fn(a, b) {
+    let c = []
+
+    let i = 0
+    let na = #a
+    while i < na {
+        c << a[i]
+        i = i + 1
+    }
+
+    let j = 0
+    let nb = #b
+    while j < nb {
+        c << b[j]
+        j = j + 1
+    }
+
+    return c
+}
+let minmax = fn(arr) {
+    let n = #arr
+
+    if n == 0 { return [ 0, 0 ] }
+    if n == 1 { return [ arr[0], arr[0] ] }
+
+    let min = arr[0]
+    let max = arr[0]
+    let i = 1
+    while i < n {
+        if min > arr[i] { min = arr[i] }
+        if max < arr[i] { max = arr[i] }
+        i = i + 1
+    }
+
+    return [ min, max ]
+}
+let quicksort = fn(arr, qs, join, minmax) {
+    let n = #arr
+    if n <= 1 { return arr }
+    
+    let mm = minmax(arr)
+    let min = mm[0]
+    let max = mm[1]
+    
+    if min == max { return arr }
+    let mid = (min + max) / 2
+    let upper = []
+    let lower = []
+
+    "print(mid)"
+
+    let i = 0
+    while i < n {
+        let e = arr[i]
+        if e < mid { lower << e }
+        else { upper << e }
+        i = i + 1
+    }
+
+    return join(qs(lower, qs, join, minmax), qs(upper, qs, join, minmax))
+}
+
+let N = 1000
+let A = array_random(N)
+A = []
+let i = 0
+while i < N {
+    i = i + 1
+    A << i
+}
+
+let before = clock()
+let B = quicksort(A, quicksort, join, minmax)
+let after = clock()
+
+print("time taken: ")
+print(after - before)

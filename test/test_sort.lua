@@ -2,9 +2,15 @@
 
 math.randomseed(os.time())
 
+alloc_count = 0
+function alloc_table()
+    alloc_count = alloc_count + 1
+    return {}
+end
+
 -- generate random array
 function table_random(N, M)
-    local array = {}
+    local array = alloc_table()
     for i = 1, N do
         array[#array+1] = math.random(1, M)
     end
@@ -14,7 +20,7 @@ end
 
 -- merging tables
 function table_join(a, b)
-    local c = {}
+    local c = alloc_table()
     local na = #a
     for i = 1, na do c[i] = a[i] end
     for i = 1, #b do c[i+na] = b[i] end
@@ -46,8 +52,8 @@ function table_quicksort(t)
     local min, max = table_minmax(t)
     if min == max then return t end
     local mid = (min + max) / 2
-    local upper = {}
-    local lower = {}
+    local upper = alloc_table()
+    local lower = alloc_table()
     local un = 0
     local ul = 0
     for i = 1, n do
@@ -76,4 +82,4 @@ local after = os.clock()
 
 -- table_print(B)
 print("Time taken: " .. tostring(after - before))
-
+print("Table allocations: ", alloc_count)

@@ -1,31 +1,4 @@
 Grammar:
-
-	module
-		stat-list
-	
-	stat-list
-		stat stat-list
-
-	stat
-		if-stat
-		for-in-stat
-		var-decl
-		assign-stat
-		exp
-
-	if-stat
-		if-block
-		if-block else-block
-		
-		if-block
-			'if' exp block
-		else-block
-			'else' if-stat // chained else-if here
-			'else' block   // terminating else
-
-	for-in-stat
-		'for' ident 'in' exp block
-	
 	block
 		'{' stat-list '}'
 	
@@ -33,12 +6,9 @@ Grammar:
 		'let' ident '=' exp
 
 	assign-stat
-		locator '=' exp
-
-	locator
-		access-exp
-		index-exp
-		primary-exp
+		access-exp '=' exp
+		index-exp  '=' exp
+		ident '=' exp
 
 	exp:
 		ternary-exp
@@ -46,86 +16,85 @@ Grammar:
 			binary-exp
 
 	binary-exp
-			or-exp		and-exp [ || or-exp ]			// left-assoc because of short circuiting
-			and-exp		bit-or-exp [ && and-exp ]		// left-assoc because of short circuiting
+		or-exp		and-exp [ || or-exp ]			// left-assoc because of short circuiting
+		and-exp		bit-or-exp [ && and-exp ]		// left-assoc because of short circuiting
 
-			bit-or-exp	bit-xor-exp [ | bit-or-exp ]	// left assoc
-			bit-xor-exp	bit-and-exp [ ^ bit-xor-exp ]	// associative
-			bit-and-exp cmp-exp [ & bit-and-exp ]		// associative
+		bit-or-exp	bit-xor-exp [ | bit-or-exp ]	// left assoc
+		bit-xor-exp	bit-and-exp [ ^ bit-xor-exp ]	// associative
+		bit-and-exp cmp-exp [ & bit-and-exp ]		// associative
 
-			cmp-exp		shl-exp [ cmp-op cmp-exp ]		// TODO: don't allow chained comparisons a == b == c
+		cmp-exp		shl-exp [ cmp-op cmp-exp ]		// TODO: don't allow chained comparisons a == b == c
 
-			shl-exp		shr-exp [ << shl-exp ]			// left associative
-			shr-exp		add-exp [ >> adr-exp ]			// left associative
+		shl-exp		shr-exp [ << shl-exp ]			// left associative
+		shr-exp		add-exp [ >> adr-exp ]			// left associative
 
-			add-exp		sub-exp [ + add-exp ]			// associative
-			sub-exp		mul-exp	[ - sub-exp ]			// left associative
-			mul-exp		div-exp [ * mul-exp ]			// associative
-			div-exp		mod-exp [ / div-exp ]			// left associative
-			mod-exp		pow-exp [ % mod-exp ]			// left associative
-			pow-exp		unary-exp [ ** pow-exp ]		// left associative
+		add-exp		sub-exp [ + add-exp ]			// associative
+		sub-exp		mul-exp	[ - sub-exp ]			// left associative
+		mul-exp		div-exp [ * mul-exp ]			// associative
+		div-exp		mod-exp [ / div-exp ]			// left associative
+		mod-exp		pow-exp [ % mod-exp ]			// left associative
+		pow-exp		unary-exp [ ** pow-exp ]		// left associative
 		
-		unary-exp
-			'-' unary-exp
-			'!' unary-exp
-			'~' unary-exp
-			postfix-exp
-
+	unary-exp
+		'-' unary-exp
+		'!' unary-exp
+		'~' unary-exp
 		postfix-exp
-			call-exp
-			access-exp
-			index-exp
-			primary-exp
 
-			call-exp
-				postfix-exp '(' args-list ')'
-
-			access-exp
-				postfix-exp '.' identifier
-		
-			index-exp
-				postfix-exp '[' exp ']'
-
+	postfix-exp
+		call-exp
+		access-exp
+		index-exp
 		primary-exp
-			literal
-			identifier
-			'(' exp ')'
 
+		call-exp
+			postfix-exp '(' args-list ')'
+
+		access-exp
+			postfix-exp '.' identifier
+		
+		index-exp
+			postfix-exp '[' exp ']'
+
+	primary-exp
 		literal
-			'null'
-			'true'
-			'false'
-			literal-number
-			literal-string
-			literal-object
-			literal-array
-			literal-function
+		identifier
+		'(' exp ')'
+
+	literal
+		'null'
+		'true'
+		'false'
+		literal-number
+		literal-string
+		literal-object
+		literal-array
+		literal-function
 			
 
 Types:
-	scalarvalue types
-		null:		null
-		bool:		true, false
-		int:		64 bit integer
-		pointer:	32 or 64 bit opaque pointer for c/c++/(rust?) interop
-		double		64 bit float
-		string		utf8 string
-					can do short string optimization
-					can do interning for longer strings
-		vector      2x or 3x or 4x
-		matrix		{ 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 }
+	null:		null
+	bool:		true, false
+	int:		64 bit integer
+	pointer:	32 or 64 bit opaque pointer for c/c++/(rust?) interop
+	double		64 bit float
+	string		utf8 string
+				can do short string optimization
+				can do interning for longer strings
+	vec2
+	vec3
+	vec4
+	mat4
 
-	ref types
-		array		[ 0, 1, 2, ... ]
-		object		{ a = 1, b = 2, ... }
-		function	fn (x, y, z) {} // closures are passed by-ref as well
+	array		[ 0, 1, 2, ... ]
+	object		{ a = 1, b = 2, ... }
+	function	fn (x, y, z) {} // closures are passed by-ref as well
+	// boxed
 
 Notes:
 	objects will need some kind of 'prototype' or 'index' field to implement classes
 
-	array is not just object in disguise, it can be implemented completely differently (fast indexing, no holes, etc)
-
-	might do some operator overloading python or lua style
+	arrays are true arrays, not just object in disguise
 
 	function value could implement with pointer-to-code and pointer-to-closure
 	for a class function we could use the "self" object as the closure
@@ -161,7 +130,7 @@ Notes:
 	
 	For example if C code calls a function and provides an error handler, if instruction N
 	causes an error (eg trying to call a non-function) we can let the error handler
-	decide whether to continue or not from instruction N+1
+	decide whether to continue or not from instruction N+1 (or can jump to a different error handler instruction)
 	(although it is likely the program continues to malfunction if the assumption is that instruction N was executed)
 	eg:
 		void foo() {
@@ -175,6 +144,9 @@ Notes:
 			})
 			tack_execute(program) // throws a tack error
 		}
+
+	make sure that if an instruction errors and we choose to continue, the stack is preserved, ie the expected
+	pops/pushes have occurred
 
 
 Notes:

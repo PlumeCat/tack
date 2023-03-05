@@ -259,7 +259,43 @@ struct Compiler {
             handle_binexp(GreaterExp, GREATER)
             handle_binexp(LessEqExp, LESSEQ)
             handle_binexp(GreaterEqExp, GREATEREQ)
-            handle_binexp(AddExp, ADD)
+            
+            // handle_binexp(AddExp, ADD)
+            handle(AddExp) {
+                auto& c0 = node.children[0];
+                auto& c1 = node.children[1];
+                //if (c0.type == AstType::NumLiteral && trunc(c0.data_d) == c0.data_d && abs(c0.data_d) <= INT16_MAX) {
+                //    if (c1.type == AstType::NumLiteral && trunc(c1.data_d) == c1.data_d && abs(c1.data_d) <= INT16_MAX) {
+                //        // const fold
+                //        program.storage.emplace_back(value_from_number(c0.data_d + c1.data_d));
+                //        emit(LOAD_CONST, program.storage.size() - 1);
+                //    } else {
+                //        child(1);
+                //        // ADDI left
+                //        int16_t _i[2] = { 0, int16_t(c0.data_d) };
+                //        auto i = uint32_t(Opcode::ADDI) << 16 | *reinterpret_cast<uint32_t*>(_i);
+                //        program.instructions.emplace_back(i);
+                //    }
+                //} else 
+
+                static auto A = true;
+                if (A && c1.type == AstType::NumLiteral && trunc(c1.data_d) == c1.data_d && abs(c0.data_d) <= INT16_MAX) {
+                    A = false;
+                    child(0);
+                    // ADDI right (commutative)
+                    int16_t _i[2] = { int16_t(c1.data_d), 0 };
+                    auto i = uint32_t(Opcode::ADDI) << 16 | *reinterpret_cast<uint32_t*>(_i);
+                    program.instructions.emplace_back(i);
+
+                } else 
+                {
+                    // full add
+                child(0);
+                child(1);
+                emit(ADD, 0);
+                }
+            }
+            
             handle_binexp(SubExp, SUB)
             handle_binexp(MulExp, MUL)
             handle_binexp(DivExp, DIV)

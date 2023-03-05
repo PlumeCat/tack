@@ -55,12 +55,17 @@ struct Interpreter {
             return value_from_object(_objects.index_to_pointer(_objects.add({})));
         };
         auto alloc_array = [&](auto size) -> Value {
-            auto arr = _arrays.index_to_pointer(_arrays.add(ArrayType(size)));
             if (size) { // TODO: fast but a bit dangerous?
+                auto arr = _arrays.index_to_pointer(_arrays.add(ArrayType(size)));
                 memcpy(arr->data(), &_stack[_stackptr - size], sizeof(Value) * size);
                 _stackptr -= size;
+                return value_from_array(arr);
+            } else {
+                auto _arr = ArrayType();
+                _arr.reserve(16);
+                auto arr = _arrays.index_to_pointer(_arrays.add(_arr));
+                return value_from_array(arr);
             }
-            return value_from_array(arr);
         };
 
         // some stack manipulation
@@ -68,6 +73,13 @@ struct Interpreter {
             throw runtime_error("runtime error: " + s);
             return value_null();
         };
+
+        #define stack_pop() _stack[--_stackptr]
+        #define stack_push(v) if (_stackptr >= STACK_SIZE-1) { error("stack overflow!"); } _stack[_stackptr++] = v
+        #define stack_at(i)    _stack[(i > 0) ? i : _stackptr+i]
+        // #define stack_set(i, v) _stack[(i > 0) ? i : _stackptr+i] = v
+        
+        /*
         auto stack_push = [&](Value v) {
             if (_stackptr >= STACK_SIZE - 1) {
                 error("stack overflow");
@@ -83,6 +95,8 @@ struct Interpreter {
         auto stack_set = [&](int index, Value value) {
             _stack[index] = value;
         };
+        */
+
         auto print_value = [&](Value v) {
             log<true, false>(v);
         };
@@ -108,7 +122,6 @@ struct Interpreter {
             decode_instruction(program.instructions[instruction_pointer], opcode, r1);
 
             #define check(val, type)  (value_get_type(val) == Type::type)
-            #define echeck(val, type, msg) if (!check(val, type)) { auto s = stringstream{}; s << "invalid types: " msg "; "; s << val; error(s.str()); }
             #define handle(c)           break; case Opcode::c:
             #define handle_binop(c, op, cast) handle(c) {\
                     auto r = stack_pop();\
@@ -147,47 +160,82 @@ struct Interpreter {
             switch (opcode) {
                 case Opcode::UNKNOWN:
 
+                handle(ADDI) {
+                    // convert r1 to signed 16 bit int
+                    auto l = stack_at(-1);
+                    auto lhs = check(l, Number)\
+                        ? value_to_number(l)\
+                        : check(l, Integer)\
+                            ? (double)value_to_integer(l)\
+                            : value_to_number(error("expect number or integer"));
+                    auto i = *(reinterpret_cast<int16_t*>(&r1));
+                    stack_at(-1) = value_from_number(lhs + i);
+                }
+
                 handle_binop(ADD,       +,  value_from_number)
                 handle_binop(SUB,       -,  value_from_number)
                 handle_binop(MUL,       *,  value_from_number)
                 handle_binop(DIV,       /,  value_from_number)
                 // handle_binop(MOD,       %,  value_from_integer)
-                handle_binop(EQUAL,     ==,  value_from_boolean)
-                handle_binop(NEQUAL,    !=,  value_from_boolean)
+                
+                handle(EQUAL)  { stack_at(-2) = value_from_boolean(stack_at(-2)._i == stack_at(-1)._i); stack_pop(); }
+                handle(NEQUAL) { stack_at(-2) = value_from_boolean(stack_at(-2)._i != stack_at(-1)._i); stack_pop(); }
+                    /*auto r = stack_pop(); \
+                    auto l = stack_pop(); \
+                    auto lhs = check(l, Number)\
+                        ? value_to_number(l)\
+                        : check(l, Integer)\
+                            ? (double)value_to_integer(l)\
+                            : value_to_number(error("expect number or integer")); \
+                    auto rhs = check(r, Number)\
+                        ? value_to_number(r)\
+                        : check(r, Integer)\
+                            ? (double)value_to_integer(r)\
+                            : value_to_number(error("expect number or integer")); \
+                    stack_push(cast(lhs op rhs));*/
+                //handle_binop(EQUAL,     ==,  value_from_boolean)
+                //handle_binop(NEQUAL,    !=,  value_from_boolean)
+                
                 handle_binop(LESS,      <,   value_from_boolean)
                 handle_binop(GREATER,   >,   value_from_boolean)
                 handle_binop(LESSEQ,    <=,  value_from_boolean)
                 handle_binop(GREATEREQ, >=,  value_from_boolean)
 
                 // unop
-                handle(NEGATE)          { echeck(stack_get(-1), Number, "unary negate"); stack_push(value_from_number(-value_to_number(stack_pop()))); }
-                handle(LEN)             { echeck(stack_get(-1), Array, "array len");     stack_push(value_from_integer(value_to_array(stack_pop())->size())); }
+                // handle(NEGATE)          { echeck(stack_get(-1), Number, "unary negate"); stack_push(value_from_number(-value_to_number(stack_pop()))); }
+                handle(LEN)             {
+                    // echeck(stack_get(-1), Array, "array len");
+                    auto arr = stack_pop();
+                    if (!check(arr, Array)) {
+                        error("array len");
+                    }
+                    stack_push(value_from_integer(value_to_array(arr)->size())); }
                 handle(SHL)             {
                     auto v = stack_pop();
                     auto a = stack_pop();
-                    echeck(a, Array, "array append");
+                    if (!check(a, Array)) { error("array append"); }
                     value_to_array(a)->emplace_back(v);
                 }
                 handle(GROW)            { for (auto i = 0; i < r1; i++) {
                                             // stack_push(alloc_box());
                                             stack_push(value_null());
                                         }}
-                handle(PUSH)            { stack_push(stack_get(-(r1 + 1))); }
+                // handle(PUSH)            { stack_push(stack_get(-(r1 + 1))); }
                 handle(READ_VAR)        {
-                    auto var = stack_get(_stackbase + r1);
-                    if (value_is_boxed(var)) {
+                    auto var = stack_at(_stackbase + r1);
+                    /*if (value_is_boxed(var)) {
                         var = *value_to_box(var);
-                    }
+                    }*/
                     stack_push(var);
                 }
                 handle(WRITE_VAR)       {
                     auto val = stack_pop();
-                    auto var = stack_get(_stackbase + r1);
-                    if (value_is_boxed(var)) {
-                        *value_to_box(var) = val;
-                    } else {
-                        stack_set(_stackbase + r1, val);
-                    }
+                    // auto var = stack_at(_stackbase + r1);
+                    //if (value_is_boxed(var)) {
+                        //*value_to_box(var) = val;
+                    //} else {
+                        stack_at(_stackbase + r1) = val;
+                    //}
                 }
                 handle(LOAD_CONST)      { stack_push(program.storage[r1]); }
                 handle(LOAD_STRING)     { stack_push(value_from_string(&program.strings[r1])); /* TODO: allow more than 2**16 strings in the program */ }
@@ -198,9 +246,12 @@ struct Interpreter {
                         : check(_index, Integer)
                             ? value_to_integer(_index)
                             : value_to_integer(error("expect number or integer"));
-                    echeck(stack_get(-1), Array, "expected array");
-                    auto arr = value_to_array(stack_pop());
-                    stack_push(arr->data()[index]);
+                    //echeck(stack_get(-1), Array, "expected array");
+                    auto arr = stack_pop();
+                    if (!check(arr, Array)) {
+                        error("expected array");
+                    }
+                    stack_push(value_to_array(arr)->data()[index]);
                 }
                 handle(LOAD_OBJECT)     {}
                 handle(STORE_ARRAY)     {
@@ -257,9 +308,9 @@ struct Interpreter {
                     for (auto i = 0; i < r1; i++) {
                         // auto param = _stack[_stackbase + r1 - (i + 1)];
                         auto param_ptr = &_stack[_stackbase + r1 - (i+1)];
-                        if (value_is_boxed(*param_ptr)) {
+                        /*if (value_is_boxed(*param_ptr)) {
                             param_ptr = value_to_box(*param_ptr);
-                        }
+                        }*/
                         *param_ptr = stack_pop();
                     }
 

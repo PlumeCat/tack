@@ -64,9 +64,5 @@ int main(int argc, char* argv[]) {
         log(e.what());
     }
 
-    if (argc < 2) {
-        getchar();
-    }
-
     return 0;
 }
