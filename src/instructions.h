@@ -11,20 +11,17 @@
     opcode(NEGATE) opcode(NOT) opcode(BITNOT) opcode(LEN) \
     \
     /* stack and variable operations */\
-    /*opcode(PUSH)*/ \
     opcode(READ_VAR) \
     opcode(WRITE_VAR) \
     \
-    opcode(CLOCK) opcode(RANDOM) \
-    opcode(LOAD_CONST) opcode(LOAD_STRING) opcode(LOAD_ARRAY) opcode(LOAD_OBJECT) opcode(STORE_ARRAY) opcode(STORE_OBJECT) \
+    opcode(LOAD_CONST) opcode(LOAD_STRING) \
+    opcode(LOAD_ARRAY) opcode(LOAD_OBJECT) opcode(STORE_ARRAY) opcode(STORE_OBJECT) \
     opcode(GROW) \
-    /* Relative jump using encoded offset */\
-    opcode(JUMPF) opcode(JUMPB)\
-    /* Relative jump using encoded offset IFF stack[n--] == 0 (but pop the top regardless) */\
-    opcode(CONDJUMP)\
+    \
+    opcode(JUMPF) opcode(JUMPB) opcode(CONDJUMP)\
     opcode(ALLOC_OBJECT) opcode(ALLOC_ARRAY)\
     opcode(PRECALL) opcode(CALL) opcode(RET)/**/\
-    opcode(PRINT) \
+    opcode(PRINT) opcode(CLOCK) opcode(RANDOM) \
     opcode(DUMP) /* dump stack */\
     opcode(OPCODE_MAX)
     

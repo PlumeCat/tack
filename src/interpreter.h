@@ -46,24 +46,24 @@ struct Interpreter {
         auto _arrays = swiss_vector<ArrayType, false>((size_t)4096);
 
         auto alloc_box = [&]() -> Value {
-            return value_from_boxed(_heap.index_to_pointer(_heap.add(value_null())));
+            return value_from_boxed(&_heap.data()[_heap.add(value_null())]);
         };
         auto alloc_string = [&](const auto& s = "") -> Value {
-            return value_from_string(_strings.index_to_pointer(_strings.add(s)));
+            return value_from_string(&_strings.data()[_strings.add(s)]);
         };
         auto alloc_object = [&]() -> Value {
-            return value_from_object(_objects.index_to_pointer(_objects.add({})));
+            return value_from_object(&_objects.data()[_objects.add({})]);
         };
         auto alloc_array = [&](auto size) -> Value {
             if (size) { // TODO: fast but a bit dangerous?
-                auto arr = _arrays.index_to_pointer(_arrays.add(ArrayType(size)));
+                auto arr = &_arrays.data()[_arrays.add(ArrayType(size))];
                 memcpy(arr->data(), &_stack[_stackptr - size], sizeof(Value) * size);
                 _stackptr -= size;
                 return value_from_array(arr);
             } else {
                 auto _arr = ArrayType();
                 _arr.reserve(16);
-                auto arr = _arrays.index_to_pointer(_arrays.add(_arr));
+                auto arr = &_arrays.data()[_arrays.add(_arr)];
                 return value_from_array(arr);
             }
         };
@@ -220,7 +220,6 @@ struct Interpreter {
                                             // stack_push(alloc_box());
                                             stack_push(value_null());
                                         }}
-                // handle(PUSH)            { stack_push(stack_get(-(r1 + 1))); }
                 handle(READ_VAR)        {
                     auto var = stack_at(_stackbase + r1);
                     /*if (value_is_boxed(var)) {
@@ -239,6 +238,9 @@ struct Interpreter {
                 }
                 handle(LOAD_CONST)      { stack_push(program.storage[r1]); }
                 handle(LOAD_STRING)     { stack_push(value_from_string(&program.strings[r1])); /* TODO: allow more than 2**16 strings in the program */ }
+                handle(ALLOC_ARRAY)     {
+                    stack_push(alloc_array(r1));
+                }
                 handle(LOAD_ARRAY)      {
                     auto _index = stack_pop();
                     auto index = check(_index, Number)
@@ -253,19 +255,29 @@ struct Interpreter {
                     }
                     stack_push(value_to_array(arr)->data()[index]);
                 }
-                handle(LOAD_OBJECT)     {}
                 handle(STORE_ARRAY)     {
                     auto value = stack_pop();
                     auto index = value_to_integer(stack_pop());
                     auto arr = value_to_array(stack_pop());
                     (*arr)[index] = value;
                 }
-                handle(STORE_OBJECT)    {}
-                handle(ALLOC_ARRAY)     {
-                    stack_push(alloc_array(r1));
-                }
                 handle(ALLOC_OBJECT) {
+                    // TODO: put key/values from stack
                     stack_push(alloc_object());
+                }
+                handle(LOAD_OBJECT)     {
+                    auto obj = stack_pop();
+                    if (!check(obj, Object)) { error("expect an object 1"); }
+                    // auto val = stack_pop();
+                    auto key = program.strings[r1];
+                    stack_push((*value_to_object(obj))[key]);
+                }
+                handle(STORE_OBJECT)    {
+                    auto val = stack_pop();
+                    auto obj = stack_pop();
+                    if (!check(obj, Object)) { error("expect an object"); }
+                    auto key = program.strings[r1];
+                    (*value_to_object(obj))[key] = val;
                 }
                 
                 handle(RANDOM)          { stack_push(value_from_integer(rand() % 10000)); }

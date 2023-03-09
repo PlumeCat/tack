@@ -1,1 +1,17 @@
-print("hello world")
+let foo = {}
+foo.x = 1
+foo.y = 2
+print(foo)
+
+"
+// let main = fn(foo, bar) {
+//     let foo2 = foo * foo
+//     let bar2 = (bar + foo) * 32 + 15
+
+//     if foo2 > bar2 {
+
+//     }
+// }
+
+// main(43, 52)
+"

@@ -36,6 +36,13 @@ struct Program {
             i++;
         }
 
+        s << "    Strings:\n";
+        i = 0;
+        for (auto& _s: strings) {
+            s << "        " << i << ": " << _s << '\n';
+            i++;
+        }
+
         return s.str();
     }
 };
@@ -54,8 +61,6 @@ struct FunctionContext {
     FunctionContext* parent_context; // so we can capture variables from lexical parent scopes
     uint32_t storage_location;
     uint32_t variable_count = 0;
-
-    // number string object array function
     
     // variable -> stack index relative to current stack frame
     int lookup_variable(const string& identifier) {
@@ -188,11 +193,12 @@ struct Compiler {
                 auto& rhs = node.children[1];
 
                 if (lhs.type == AstType::AccessExp) {
-                    // // pass
-                    // compile_node(context, lhs.children[0], program); // object
-                    // compile_node(context, lhs.children[1], program); // key
-                    // child(1); // value
-                    // emit(STORE_OBJECT, 0);
+                    // put array, value on stack
+                    // the identifier to use is in program strings, index is encoded in instruction
+                    compile_node(context, lhs.children[0], program); // object
+                    child(1); // value
+                    program.strings.emplace_back(lhs.children[1].data_s);
+                    emit(STORE_OBJECT, program.strings.size() - 1);
                 } else if (lhs.type == AstType::IndexExp) {
                     // put array, index, value on the stack
                     compile_node(context, lhs.children[0], program); // array
@@ -264,35 +270,18 @@ struct Compiler {
             handle(AddExp) {
                 auto& c0 = node.children[0];
                 auto& c1 = node.children[1];
-                //if (c0.type == AstType::NumLiteral && trunc(c0.data_d) == c0.data_d && abs(c0.data_d) <= INT16_MAX) {
-                //    if (c1.type == AstType::NumLiteral && trunc(c1.data_d) == c1.data_d && abs(c1.data_d) <= INT16_MAX) {
-                //        // const fold
-                //        program.storage.emplace_back(value_from_number(c0.data_d + c1.data_d));
-                //        emit(LOAD_CONST, program.storage.size() - 1);
-                //    } else {
-                //        child(1);
-                //        // ADDI left
-                //        int16_t _i[2] = { 0, int16_t(c0.data_d) };
-                //        auto i = uint32_t(Opcode::ADDI) << 16 | *reinterpret_cast<uint32_t*>(_i);
-                //        program.instructions.emplace_back(i);
-                //    }
-                //} else 
-
-                static auto A = true;
-                if (A && c1.type == AstType::NumLiteral && trunc(c1.data_d) == c1.data_d && abs(c0.data_d) <= INT16_MAX) {
-                    A = false;
+                if (c1.type == AstType::NumLiteral && trunc(c1.data_d) == c1.data_d && abs(c0.data_d) <= INT16_MAX) {
                     child(0);
                     // ADDI right (commutative)
                     int16_t _i[2] = { int16_t(c1.data_d), 0 };
                     auto i = uint32_t(Opcode::ADDI) << 16 | *reinterpret_cast<uint32_t*>(_i);
                     program.instructions.emplace_back(i);
 
-                } else 
-                {
-                    // full add
-                child(0);
-                child(1);
-                emit(ADD, 0);
+                } else {
+                    // generic add
+                    child(0);
+                    child(1);
+                    emit(ADD, 0);
                 }
             }
             
@@ -314,8 +303,8 @@ struct Compiler {
             }
             handle(AccessExp) {
                 child(0); // push the object
-                child(1); // push the string key
-                emit(LOAD_OBJECT, 0);
+                program.strings.emplace_back(node.children[1].data_s);
+                emit(LOAD_OBJECT, program.strings.size() - 1);
             }
 
             // TODO: for loops
@@ -365,9 +354,8 @@ struct Compiler {
                 as a sort of secondary stack when the function is reading/writing variables
 
                 eg 
-                LOAD_CONST storage_index
+                 storage_index
                 */
-                
 
             }
             handle(ParamDef) {}
@@ -395,22 +383,10 @@ struct Compiler {
                     child(i);
                 }
                 emit(ALLOC_ARRAY, node.children.size());
-                // emit STORE_ARRAY for each element
-                //for (auto i = 0; i < node.children.size(); i++) {
-                //    // re-push the array... bit annoying
-                //    emit(PUSH, 0);
-                //    // push index. index is 
-                //    program.storage.emplace_back(value_from_integer(i));
-                //    emit(LOAD_CONST, program.storage.size() - 1);
-                //    // push value
-                //    child(i);
-                //    // store
-                //    emit(STORE_ARRAY, 0);
-                //}
             }
             handle(ObjectLiteral) {
+                // TODO: push any key-values
                 emit(ALLOC_OBJECT, 0);
-                // TODO: emit STORE_OBJECT for any provided fields
             }
             handle(ClockExp) { emit(CLOCK, 0); } // TODO: remove
             handle(RandomExp) { emit(RANDOM, 0); } // TODO: remove
