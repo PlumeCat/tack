@@ -1,7 +1,20 @@
 let foo = {}
 foo.x = 1
 foo.y = 2
+
 print(foo)
+
+let bar = {}
+bar.foo = foo
+
+let get_foo = fn (f) {
+    return f.foo
+}
+
+let foo2 = get_foo(bar)
+
+print(foo2.x)
+print(foo2)
 
 "
 // let main = fn(foo, bar) {
