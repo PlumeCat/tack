@@ -16,6 +16,9 @@
         "string_view": "cpp",
         "random": "cpp",
         "cmath": "cpp",
-        "iosfwd": "cpp"
+        "iosfwd": "cpp",
+        "__split_buffer": "cpp",
+        "deque": "cpp",
+        "list": "cpp"
     }
 }

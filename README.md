@@ -12,11 +12,11 @@ make
 ## TODO:
 
 ### Features
-Objects
-Closures
-C functions
-Algebraics
-Garbage collector
+- [x] Objects
+- [ ] Closures
+- [ ] calling C functions and vice versa
+- [ ] Garbage collector
+- [ ] Algebraics
 
 ### Other
 Try the lua sliding register window approach, maybe only 16 registers - fit into 4 bits

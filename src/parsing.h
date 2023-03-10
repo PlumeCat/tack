@@ -230,8 +230,23 @@ DEFPARSER(literal, {
     });
     SUBPARSER(object_literal, {
         TRYs('{') {
+            auto res = AstNode(AstType::ObjectLiteral);
+            
+            while (true) {
+                TRY(identifier) {
+                    TRYs('=') {
+                        TRY(exp) {
+                            res.children.emplace_back(AstType::AssignStat, identifier, exp);
+                            TRYs(',') {
+                                log("foudn comma");
+                            } else break;
+                        } else FAIL();
+                    } else FAIL();
+                } else break;
+            }
+            
             EXPECT('}');
-            SUCCESS(AstType::ObjectLiteral)
+            SUCCESS(res);
         }
     });
     SUBPARSER(array_literal, {
@@ -443,7 +458,7 @@ DEFPARSER(block, {
         EXPECT('}')
         SUCCESS(stat_list)
     }
-    })
+})
 DEFPARSER(return_stat, {
     TRYs("return") {
         TRY(exp) {
@@ -451,7 +466,7 @@ DEFPARSER(return_stat, {
         }
         SUCCESS(AstType::ReturnStat);
     }
-});
+})
 
 // TODO: remove
 DEFPARSER(print_stat, {

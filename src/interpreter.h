@@ -45,14 +45,33 @@ struct Interpreter {
         auto _objects = swiss_vector<ObjectType, false>((size_t)4096);
         auto _arrays = swiss_vector<ArrayType, false>((size_t)4096);
 
+        // some stack manipulation
+        auto error = [&](const string& s)  -> Value {
+            throw runtime_error("runtime error: " + s);
+            return value_null();
+        };
+
+        #define stack_pop() _stack[--_stackptr]
+        #define stack_push(v) if (_stackptr >= STACK_SIZE-1) { error("stack overflow!"); } _stack[_stackptr++] = v
+        #define stack_at(i)    _stack[(i > 0) ? i : _stackptr+i]
+        // #define stack_set(i, v) _stack[(i > 0) ? i : _stackptr+i] = v
+
         auto alloc_box = [&]() -> Value {
             return value_from_boxed(&_heap.data()[_heap.add(value_null())]);
         };
         auto alloc_string = [&](const auto& s = "") -> Value {
             return value_from_string(&_strings.data()[_strings.add(s)]);
         };
-        auto alloc_object = [&]() -> Value {
-            return value_from_object(&_objects.data()[_objects.add({})]);
+        auto alloc_object = [&](auto size) -> Value {
+            auto obj = &_objects.data()[_objects.add({})];
+            for (auto i = 0; i < size; i++) {
+                // pop value
+                auto val = stack_pop();
+                auto key = value_to_string(stack_pop());
+                obj->insert(*key, val);
+                // pop key                
+            }
+            return value_from_object(obj);
         };
         auto alloc_array = [&](auto size) -> Value {
             if (size) { // TODO: fast but a bit dangerous?
@@ -67,17 +86,6 @@ struct Interpreter {
                 return value_from_array(arr);
             }
         };
-
-        // some stack manipulation
-        auto error = [&](const string& s)  -> Value {
-            throw runtime_error("runtime error: " + s);
-            return value_null();
-        };
-
-        #define stack_pop() _stack[--_stackptr]
-        #define stack_push(v) if (_stackptr >= STACK_SIZE-1) { error("stack overflow!"); } _stack[_stackptr++] = v
-        #define stack_at(i)    _stack[(i > 0) ? i : _stackptr+i]
-        // #define stack_set(i, v) _stack[(i > 0) ? i : _stackptr+i] = v
         
         /*
         auto stack_push = [&](Value v) {
@@ -263,7 +271,7 @@ struct Interpreter {
                 }
                 handle(ALLOC_OBJECT) {
                     // TODO: put key/values from stack
-                    stack_push(alloc_object());
+                    stack_push(alloc_object(r1));
                 }
                 handle(LOAD_OBJECT)     {
                     auto obj = stack_pop();

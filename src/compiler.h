@@ -386,7 +386,16 @@ struct Compiler {
             }
             handle(ObjectLiteral) {
                 // TODO: push any key-values
-                emit(ALLOC_OBJECT, 0);
+                for (auto i = 0; i < node.children.size(); i++) {
+                    auto& ident = node.children[i].children[0].data_s;
+                    auto& exp = node.children[i].children[1];
+                    // push key
+                    program.strings.emplace_back(ident);
+                    emit(LOAD_STRING, program.strings.size() - 1);
+                    // push value
+                    compile_node(context, exp, program);
+                }
+                emit(ALLOC_OBJECT, node.children.size());
             }
             handle(ClockExp) { emit(CLOCK, 0); } // TODO: remove
             handle(RandomExp) { emit(RANDOM, 0); } // TODO: remove
