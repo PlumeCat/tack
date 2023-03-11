@@ -1,6 +1,6 @@
-let array_random = fn(M) {
+const array_random = fn(M) {
     let i = 0
-    let arr = []
+    const arr = []
     while i < M {
         i = i + 1
         arr << random()
@@ -8,18 +8,18 @@ let array_random = fn(M) {
     return arr
 }
 
-let join = fn(a, b) {
-    let c = []
+const join = fn(a, b) {
+    const c = []
 
     let i = 0
-    let na = #a
+    const na = #a
     while i < na {
         c << a[i]
         i = i + 1
     }
 
     let j = 0
-    let nb = #b
+    const nb = #b
     while j < nb {
         c << b[j]
         j = j + 1
@@ -27,39 +27,31 @@ let join = fn(a, b) {
 
     return c
 }
-let minmax = fn(arr) {
-    let n = #arr
 
-    if n == 0 { return [ 0, 0 ] }
-    if n == 1 { return [ arr[0], arr[0] ] }
+const quicksort = fn(arr, qs, join) {
+    const n = #arr
+    if n <= 1 { return arr }
+
+    " min and max "
 
     let min = arr[0]
     let max = arr[0]
     let i = 1
     while i < n {
-        if min > arr[i] { min = arr[i] }
-        if max < arr[i] { max = arr[i] }
+        let ai = arr[i]
+        if ai > max { max = ai }
+        if ai < min { min = ai }
         i = i + 1
     }
 
-    return [ min, max ]
-}
-let quicksort = fn(arr, qs, join, minmax) {
-    let n = #arr
-    if n <= 1 { return arr }
-    
-    let mm = minmax(arr)
-    let min = mm[0]
-    let max = mm[1]
-    
+    " midpoint "
     if min == max { return arr }
-    let mid = (min + max) / 2
+    const mid = (min + max) / 2
     let upper = []
     let lower = []
 
-    "print(mid)"
-
-    let i = 0
+    " pivot "
+    i = 0
     while i < n {
         let e = arr[i]
         if e < mid { lower << e }
@@ -67,21 +59,22 @@ let quicksort = fn(arr, qs, join, minmax) {
         i = i + 1
     }
 
-    return join(qs(lower, qs, join, minmax), qs(upper, qs, join, minmax))
+    " recurse "
+    return join(qs(lower, qs, join), qs(upper, qs, join))
 }
 
-let N = 1000
-let A = array_random(N)
-A = []
+const N = 1000
+"let A = array_random(N)"
+const A = []
 let i = 0
 while i < N {
     i = i + 1
     A << i
 }
 
-let before = clock()
-let B = quicksort(A, quicksort, join, minmax)
-let after = clock()
+const before = clock()
+const B = quicksort(A, quicksort, join)
+const after = clock()
 
 print("time taken: ")
 print(after - before)

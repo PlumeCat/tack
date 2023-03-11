@@ -14,6 +14,7 @@ make
 ### Features
 - [x] Objects
 - [ ] Closures
+- [ ] Const variables
 - [ ] calling C functions and vice versa
 - [ ] Garbage collector
 - [ ] Algebraics

@@ -14,7 +14,6 @@ struct Program {
     vector<Instruction> instructions;
     vector<Value> storage; // program constant storage goes at the bottom of the stack for now
     vector<string> strings; // string constants and literals storage - includes identifiers for objects
-    hash_map<uint32_t, string> addr_to_function;
 
     string to_string() {
         auto s = stringstream {};
@@ -50,6 +49,8 @@ struct Program {
 struct VariableContext {
     string name;
     uint32_t stackpos;
+    bool is_const = false; // if marked const, don't allow reassignment
+    bool is_reassigned = false; // if never reassigned, can be auto-consted
     bool is_captured = false; // if captured by a lower scope, allocate on heap
 };
 struct ScopeContext {
@@ -63,7 +64,7 @@ struct FunctionContext {
     uint32_t variable_count = 0;
     
     // variable -> stack index relative to current stack frame
-    int lookup_variable(const string& identifier) {
+    VariableContext& lookup_variable(const string& identifier) {
         // TODO: search in higher scopes starting from parent scope
         // if the variable is found in a parent scope, mark as is_captured
         // captured variables must be auto boxed and garbage collected/reference counted
@@ -71,22 +72,21 @@ struct FunctionContext {
         // then it can refer to captured variables via the stack)
         for (auto s = scopes.rbegin(); s != scopes.rend(); s++) {
             if (auto iter = (*s).variables.find(identifier); iter != (*s).variables.end()) {
-                // log(identifier, " -> ", iter->second.stackpos);
-                return iter->second.stackpos;
+                return iter->second;
             }
         }
-        return -1;
+        throw runtime_error("Variable not found");
     }
     
     // set stack position for new variable
     // don't bind if already exists in current scope
-    int bind_variable(const string& identifier) {
+    VariableContext& bind_variable(const string& identifier, bool is_const) {
         if (scopes.back().variables.find(identifier) != scopes.back().variables.end()) {
-            return -1;
+            throw runtime_error("Already exists in current scope");
         }
         auto stackpos = variable_count++;
-        scopes.back().variables[identifier] = VariableContext { identifier, stackpos, false };
-        return stackpos;
+        auto iter = scopes.back().variables.insert(identifier, { identifier, stackpos, is_const });
+        return iter->second;
     }
 
     void push_scope() {
@@ -149,10 +149,7 @@ struct Compiler {
         for(const auto& arg: context.func_node->children[0].children) {
             // bind arg as variable
             // it's at the top of the stack so it's mutable
-            auto stackpos = context.bind_variable(arg.data_s);
-            if (stackpos == -1) {
-                throw runtime_error("Compile error: duplicate argument: " + arg.data_s);
-            }
+            context.bind_variable(arg.data_s, false);
         }
         // compile body
         compile_node(context, context.func_node->children[1], program);
@@ -178,15 +175,17 @@ struct Compiler {
                 }
                 context.pop_scope();
             }
+            handle(ConstDeclStat) {
+                auto variable = context.bind_variable(node.children[0].data_s, true);
+                child(1);
+                emit(WRITE_VAR, variable.stackpos);
+            }
             handle(VarDeclStat) {
                 // make sure not already declared
                 // TODO: allow shadowing in lower scopes?
-                auto stackpos = context.bind_variable(node.children[0].data_s);
-                if (stackpos == -1) {
-                    throw runtime_error("Compile error: variable already exists: " + node.children[0].data_s);
-                }
+                auto variable = context.bind_variable(node.children[0].data_s, false);
                 child(1); // push result of expression
-                emit(WRITE_VAR, stackpos); // put the value at the top of the stack into the variable at stackpos
+                emit(WRITE_VAR, variable.stackpos); // put the value at the top of the stack into the variable at stackpos
             }
             handle(AssignStat) {
                 auto& lhs = node.children[0];
@@ -207,12 +206,13 @@ struct Compiler {
                     emit(STORE_ARRAY, 0);
                 } else if (lhs.type == AstType::Identifier) {
                     // make sure variable exists
-                    auto stackpos = context.lookup_variable(node.children[0].data_s);
-                    if (stackpos == -1) {
-                        throw runtime_error("Compile error: variable not found: " + node.children[0].data_s);
+                    auto& var = context.lookup_variable(node.children[0].data_s);
+                    if (var.is_const) {
+                        throw runtime_error("Compile error: Can't reassign to const");
                     }
+                    var.is_reassigned = true;
                     child(1);
-                    emit(WRITE_VAR, stackpos); // value at top of stack into variable at stackpos
+                    emit(WRITE_VAR, var.stackpos); // value at top of stack into variable at stackpos
                 } else {
                     throw runtime_error("Compile error: invalid LHS for assignment statement");
                 }
@@ -402,10 +402,7 @@ struct Compiler {
             handle(Identifier) {
                 // reading a variable (writing is not encountered by recursive compile)
                 // so the variable exists and points to a stackpos
-                auto stackpos = context.lookup_variable(node.data_s);
-                if (stackpos == -1) {
-                    throw runtime_error("Compile error: variable not found: " + node.data_s);
-                }
+                auto stackpos = context.lookup_variable(node.data_s).stackpos;
                 emit(READ_VAR, stackpos);
             }
         }

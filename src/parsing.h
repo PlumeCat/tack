@@ -7,6 +7,7 @@ using namespace std;
 #define ast_type() ast(Unknown)\
     ast(StatList)\
     \
+    ast(ConstDeclStat)\
     ast(VarDeclStat)\
     ast(AssignStat)\
     ast(PrintStat) \
@@ -434,6 +435,13 @@ DEFPARSER(ternary_exp, {
 
 DEFPARSER(exp, { TRY(ternary_exp) SUCCESS(ternary_exp); });
 
+DEFPARSER(const_decl_stat, {
+    EXPECT("const")
+    TRY(identifier) {
+        EXPECT('=')
+        TRY(exp) { SUCCESS(AstType::ConstDeclStat, identifier, exp) }
+    }
+})
 DEFPARSER(var_decl_stat, {
     EXPECT("let")
     TRY(identifier) {
@@ -508,6 +516,7 @@ DEFPARSER(stat_list, {
     while (true) {
         auto n = AstNode {};
         if (0
+            ||parse_const_decl_stat(code, n)
             ||parse_var_decl_stat(code, n)
             ||parse_assign_stat(code, n)
             ||parse_if_stat(code, n)
