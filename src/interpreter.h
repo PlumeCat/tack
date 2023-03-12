@@ -125,9 +125,12 @@ struct Interpreter {
 
 		while (instruction_pointer < program.instructions.size()) {
 			// decode
-			auto opcode = Opcode {};
-			auto r1 = uint16_t { 0 };
-			decode_instruction(program.instructions[instruction_pointer], opcode, r1);
+			auto& instruction = program.instructions[instruction_pointer];
+			auto opcode = instruction.opcode;
+			auto r1 = instruction.operands[0];
+			auto r2 = instruction.operands[1];
+			auto r3 = instruction.operands[2];
+			//decode_instruction(program.instructions[instruction_pointer], opcode, r1, r2, r3);
 
 #define check(val, type)  (value_get_type(val) == Type::type)
 #define handle(c)           break; case Opcode::c:

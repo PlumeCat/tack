@@ -6,6 +6,7 @@
 
 #include <jlib/hash_map.h>
 
+#include "parsing.h"
 #include "instructions.h"
 
 using namespace std;
@@ -22,9 +23,7 @@ struct Program {
         s << "   Bytecode:\n";
         auto i = 0;
         for (auto bc : instructions) {
-            auto op = (Opcode)uint16_t(bc >> 16);
-            auto r1 = uint16_t(bc & 0xffff);
-            s << "        " << i << ": " << ::to_string(op) << ", " << r1 << '\n'; //", " << r2 << ", " << r3 << '\n';
+            s << "        " << i << ": " << ::to_string(bc.opcode) << ' ' << bc.operands[0] << ' ' << bc.operands[1] << ' ' << bc.operands[2] << '\n'; //", " << r2 << ", " << r3 << '\n';
             i++;
         }
 
@@ -51,7 +50,8 @@ struct VariableContext {
     uint32_t stackpos;
     bool is_const = false; // if marked const, don't allow reassignment
     bool is_reassigned = false; // if never reassigned, can be auto-consted
-    bool is_captured = false; // if captured by a lower scope, allocate on heap
+    bool is_captured = false; // if captured by a lower scope
+    // if a variable is captured by a lower scope, AND is reassigned at some point, mark as const
 };
 struct ScopeContext {
     hash_map<string, VariableContext> variables;
@@ -62,6 +62,8 @@ struct FunctionContext {
     FunctionContext* parent_context; // so we can capture variables from lexical parent scopes
     uint32_t storage_location;
     uint32_t variable_count = 0;
+    vector<Value> storage;
+    vector<Value> strings;
     
     // variable -> stack index relative to current stack frame
     VariableContext& lookup_variable(const string& identifier) {
@@ -124,15 +126,21 @@ struct Compiler {
             if (func.storage_location != UINT32_MAX) {
                 auto start_address = program.instructions.size();
                 program.storage[func.storage_location] = value_from_function(start_address);
-                // program.addr_to_function[start_address] = program.strings[program.storage[func.storage_location +1].d];
             }
             compile_function(func, program);
         }
     }
 
-    #define encode(op, ...) encode_instruction(Opcode::op, __VA_ARGS__)
-    #define emit(op, ...) program.instructions.push_back(encode(op, __VA_ARGS__));
-    #define rewrite(instr, op, ...) program.instructions[instr] = encode(op, __VA_ARGS__);
+    void emit_instruction(vector<Instruction>& instructions, Opcode opcode, uint8_t r1 = 0, uint8_t r2 = 0, uint8_t r3 = 0) {
+        instructions.emplace_back(Instruction { opcode, r1, r2, r3 });
+    }
+    void rewrite_instruction(Instruction& where, Opcode opcode, uint8_t r1 = 0, uint8_t r2 = 0, uint8_t r3 = 0) {
+        where = Instruction { opcode, r1, r2, r3 };
+    }
+    
+    #define emit(op, ...)           emit_instruction(program.instructions, Opcode::op, __VA_ARGS__);
+    #define rewrite(instr, op, ...) rewrite_instruction(program.instructions[instr], Opcode::op, __VA_ARGS__);
+
     #define handle(type)                break; case AstType::type:
     #define handle_binexp(type, opcode) handle(type) { child(0); child(1); emit(opcode, 0); }
     #define child(n) compile_node(context, node.children[n], program);
@@ -270,19 +278,20 @@ struct Compiler {
             handle(AddExp) {
                 auto& c0 = node.children[0];
                 auto& c1 = node.children[1];
-                if (c1.type == AstType::NumLiteral && trunc(c1.data_d) == c1.data_d && abs(c0.data_d) <= INT16_MAX) {
-                    child(0);
-                    // ADDI right (commutative)
-                    int16_t _i[2] = { int16_t(c1.data_d), 0 };
-                    auto i = uint32_t(Opcode::ADDI) << 16 | *reinterpret_cast<uint32_t*>(_i);
-                    program.instructions.emplace_back(i);
+                //if (c1.type == AstType::NumLiteral && trunc(c1.data_d) == c1.data_d && abs(c0.data_d) <= INT16_MAX) {
+                //    child(0);
+                //    // ADDI right (commutative)
+                //    int16_t _i[2] = { int16_t(c1.data_d), 0 };
+                //    auto i = uint32_t(Opcode::ADDI) << 16 | *reinterpret_cast<uint32_t*>(_i);
+                //    // program.instructions.emplace_back(i);
+                //    emit(ADD, )
 
-                } else {
+                //} else {
                     // generic add
                     child(0);
                     child(1);
                     emit(ADD, 0);
-                }
+                // }
             }
             
             handle_binexp(SubExp, SUB)
@@ -412,8 +421,9 @@ struct Compiler {
         // TODO: mov folding
     }
     
-    #undef encode
+    //#undef encode
     #undef emit
+    #undef rewrite
     #undef handle
     #undef child
     #undef label

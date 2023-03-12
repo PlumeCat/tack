@@ -37,19 +37,15 @@ string to_string(Opcode opcode) {
 }
 #undef opcode
 
-using Instruction = uint32_t;
+struct Instruction {
+    Opcode opcode;
+    uint8_t operands[3];
 
-Instruction encode_instruction(Opcode opcode, uint32_t operand = 0) {
-    if (operand > UINT16_MAX) {
-        throw runtime_error("Out of range operand");
-    }
-    return Instruction(
-        uint32_t(opcode) << 16 |
-        uint32_t(operand)
-    );
+    Instruction() {}
+    Instruction(const Instruction&) = default;
+    Instruction(Instruction&&) = default;
+    Instruction& operator=(const Instruction&) = default;
+    Instruction& operator=(Instruction&&) = default;
+    Instruction(Opcode op, uint8_t r1 = 0, uint8_t r2 = 0, uint8_t r3 = 0)
+        : opcode(op), operands { r1, r2, r3 } {}
 };
-void decode_instruction(Instruction instruction, Opcode& out_opcode, uint16_t& out_operand) {
-    out_opcode = (Opcode)(uint16_t)(instruction >> 16);
-    out_operand = (uint16_t)(instruction & 0xffff);
-}
-

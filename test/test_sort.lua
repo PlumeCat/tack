@@ -12,7 +12,8 @@ end
 function table_random(N, M)
     local array = alloc_table()
     for i = 1, N do
-        array[#array+1] = math.random(1, M)
+        -- array[#array+1] = math.random(1, M)
+        array[#array+1] = i
     end
     return array
 end
