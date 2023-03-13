@@ -16,11 +16,13 @@ using namespace std;
     ast(ReturnStat)\
     \
     ast(TernaryExp)\
+    \
     ast(OrExp) ast(AndExp)\
     ast(BitOrExp) ast(BitAndExp) ast(BitXorExp)\
     ast(EqExp) ast(NotEqExp) ast(LessExp) ast(GreaterExp) ast(LessEqExp) ast(GreaterEqExp)\
     ast(ShiftLeftExp) ast(ShiftRightExp)\
     ast(AddExp) ast(SubExp) ast(MulExp) ast(DivExp) ast(ModExp) ast(PowExp)\
+    \
     ast(NegateExp) ast(NotExp) ast(BitNotExp) ast(LenExp)\
     \
     ast(CallExp) ast(ArgList)\

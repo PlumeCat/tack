@@ -1,18 +1,13 @@
-let foo = { a = 1, b = 2 }
-foo.x = 1
-foo.y = 2
+let a = 1
+let b = 2
+let c = a + b
 
-print("blah")
-print(foo)
-let bar = {}
-bar.foo = foo
+let d = (a + 1) * (c / 2) + (b * 32)
 
-let get_foo = fn (f) {
-    return f.foo
-}
+let e = d + 2
 
-let foo2 = get_foo(bar)
-
-print(foo2.x)
-print(foo2)
-
+print(a)
+print(b)
+print(c)
+print(d)
+print(e)

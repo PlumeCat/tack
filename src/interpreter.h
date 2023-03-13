@@ -20,7 +20,7 @@ TODO: keep a list of errors when encountered and attempt to continue compilation
 struct Interpreter {
 	Interpreter() {}
 
-	void execute(Program& program) {
+	void execute(const Program& program) {
 		// TODO: optimization, computed goto, direct threading, ...?
 
 		// program counter
@@ -219,22 +219,22 @@ struct Interpreter {
 						stack_push(value_null());
 					}
 				}
-				handle(READ_VAR)        {
-					auto var = stack_at(_stackbase + r1);
-					/*if (value_is_boxed(var)) {
-						var = *value_to_box(var);
-					}*/
-					stack_push(var);
-				}
-				handle(WRITE_VAR)       {
-					auto val = stack_pop();
-					// auto var = stack_at(_stackbase + r1);
-					//if (value_is_boxed(var)) {
-						//*value_to_box(var) = val;
-					//} else {
-					stack_at(_stackbase + r1) = val;
-					//}
-				}
+				// handle(READ_VAR)        {
+				// 	auto var = stack_at(_stackbase + r1);
+				// 	/*if (value_is_boxed(var)) {
+				// 		var = *value_to_box(var);
+				// 	}*/
+				// 	stack_push(var);
+				// }
+				// handle(WRITE_VAR)       {
+				// 	auto val = stack_pop();
+				// 	// auto var = stack_at(_stackbase + r1);
+				// 	//if (value_is_boxed(var)) {
+				// 		//*value_to_box(var) = val;
+				// 	//} else {
+				// 	stack_at(_stackbase + r1) = val;
+				// 	//}
+				// }
 				handle(LOAD_CONST)      { stack_push(program.storage[r1]); }
 				handle(LOAD_STRING)     { stack_push(value_from_string(&program.strings[r1])); /* TODO: allow more than 2**16 strings in the program */ }
 				handle(ALLOC_ARRAY)     {

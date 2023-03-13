@@ -10,13 +10,7 @@
     /* unary operation: apply inplace for value at top of stack*/\
     opcode(NEGATE) opcode(NOT) opcode(BITNOT) opcode(LEN) \
     \
-    /* stack and variable operations */\
-    opcode(READ_VAR) \
-    opcode(WRITE_VAR) \
-    \
-    opcode(LOAD_CONST) opcode(LOAD_STRING) \
-    opcode(LOAD_ARRAY) opcode(LOAD_OBJECT) opcode(STORE_ARRAY) opcode(STORE_OBJECT) \
-    opcode(GROW) \
+    opcode(LOAD_CONST) \
     \
     opcode(JUMPF) opcode(JUMPB) opcode(CONDJUMP)\
     opcode(ALLOC_OBJECT) opcode(ALLOC_ARRAY)\
@@ -39,7 +33,10 @@ string to_string(Opcode opcode) {
 
 struct Instruction {
     Opcode opcode;
-    uint8_t operands[3];
+    union {
+        uint8_t operands[3];
+        struct { uint8_t r0, r1, r2; };
+    };
 
     Instruction() {}
     Instruction(const Instruction&) = default;

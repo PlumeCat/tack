@@ -20,8 +20,11 @@ using namespace std::chrono;
 
 #include "parsing.h"
 #include "value.h"
-#include "compiler.h"
-#include "interpreter.h"
+// #include "compiler.h"
+// #include "interpreter.h"
+
+#include "compiler2.h"
+#include "interpreter2.h"
 
 
 int main(int argc, char* argv[]) {
@@ -48,16 +51,16 @@ int main(int argc, char* argv[]) {
             log("AST: ", out_ast.tostring());
         }
         
-        auto vm = Interpreter();
         auto program = Program {};
-        auto compiler = Compiler {};
+        auto compiler = Compiler2{};
+        auto vm = Interpreter2();
         compiler.compile(out_ast, program);
         //if (check_arg("-D")) {
             log(program.to_string());
         //}
 
         //auto before = steady_clock::now();
-        //vm.execute(program);
+        vm.execute(program);
         //auto after = steady_clock::now();
         //log("BC done in ", duration_cast<microseconds>(after - before).count() * 1e-6, "s");
     } catch (exception& e) {

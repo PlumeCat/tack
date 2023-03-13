@@ -158,7 +158,7 @@ Value value_from_pointer(void* ptr) {
 }
 Value value_from_function(uint32_t a)    { return { nan_bits | type_bits_function| a }; }
 Value value_from_boxed(BoxType* box)    { return { nan_bits | type_bits_boxed  | uint64_t(box) }; }
-Value value_from_string(StringType* str){ return { nan_bits | type_bits_string | uint64_t(str) }; }
+Value value_from_string(const StringType* str){ return { nan_bits | type_bits_string | uint64_t(str) }; }
 Value value_from_object(ObjectType* obj){ return { nan_bits | type_bits_object | uint64_t(obj) }; }
 Value value_from_array(ArrayType* arr)  { return { nan_bits | type_bits_array  | uint64_t(arr) }; }
 Value value_from_vec2(vec2* v2)  { return { nan_bits | type_bits_vec2   | uint64_t(v2) }; }

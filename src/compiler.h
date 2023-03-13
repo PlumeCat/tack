@@ -8,42 +8,9 @@
 
 #include "parsing.h"
 #include "instructions.h"
+#include "program.h"
 
 using namespace std;
-
-struct Program {
-    vector<Instruction> instructions;
-    vector<Value> storage; // program constant storage goes at the bottom of the stack for now
-    vector<string> strings; // string constants and literals storage - includes identifiers for objects
-
-    string to_string() {
-        auto s = stringstream {};
-
-        s << "Program:\n";
-        s << "   Bytecode:\n";
-        auto i = 0;
-        for (auto bc : instructions) {
-            s << "        " << i << ": " << ::to_string(bc.opcode) << ' ' << bc.operands[0] << ' ' << bc.operands[1] << ' ' << bc.operands[2] << '\n'; //", " << r2 << ", " << r3 << '\n';
-            i++;
-        }
-
-        s << "    Storage:\n";
-        i = 0;
-        for (auto& x : storage) {
-            s << "        " << i << ": " << x << '\n';
-            i++;
-        }
-
-        s << "    Strings:\n";
-        i = 0;
-        for (auto& _s: strings) {
-            s << "        " << i << ": " << _s << '\n';
-            i++;
-        }
-
-        return s.str();
-    }
-};
 
 struct VariableContext {
     string name;
@@ -161,7 +128,7 @@ struct Compiler {
         context.pop_scope();
         
         // return
-        emit(RET);
+        emit(RET, 0);
         
         // space for variables
         //auto num_variables = (int)context.variable_count;
@@ -387,8 +354,8 @@ struct Compiler {
             handle(Identifier) {
                 // reading a variable (writing is not encountered by recursive compile)
                 // so the variable exists and points to a stackpos
-                auto stackpos = context.lookup_variable(node.data_s).stackpos;
-                emit(READ_VAR, stackpos);
+                auto stackpos = context.lookup_variable(node.data_s).register_location;
+                // emit(READ_VAR, stackpos);
             }
         }
 
