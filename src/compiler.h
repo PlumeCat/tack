@@ -47,7 +47,7 @@ struct Program {
 
 struct VariableContext {
     string name;
-    uint32_t stackpos;
+    uint8_t register_location;
     bool is_const = false; // if marked const, don't allow reassignment
     bool is_reassigned = false; // if never reassigned, can be auto-consted
     bool is_captured = false; // if captured by a lower scope
@@ -61,9 +61,7 @@ struct FunctionContext {
     vector<ScopeContext> scopes;
     FunctionContext* parent_context; // so we can capture variables from lexical parent scopes
     uint32_t storage_location;
-    uint32_t variable_count = 0;
-    vector<Value> storage;
-    vector<Value> strings;
+    uint8_t free_register = 0;
     
     // variable -> stack index relative to current stack frame
     VariableContext& lookup_variable(const string& identifier) {
@@ -86,8 +84,8 @@ struct FunctionContext {
         if (scopes.back().variables.find(identifier) != scopes.back().variables.end()) {
             throw runtime_error("Already exists in current scope");
         }
-        auto stackpos = variable_count++;
-        auto iter = scopes.back().variables.insert(identifier, { identifier, stackpos, is_const });
+        auto register_location = free_register++;
+        auto iter = scopes.back().variables.insert(identifier, { identifier, register_location, is_const });
         return iter->second;
     }
 
@@ -138,19 +136,18 @@ struct Compiler {
         where = Instruction { opcode, r1, r2, r3 };
     }
     
-    #define emit(op, ...)           emit_instruction(program.instructions, Opcode::op, __VA_ARGS__);
-    #define rewrite(instr, op, ...) rewrite_instruction(program.instructions[instr], Opcode::op, __VA_ARGS__);
-
+    #define emit(op, ...)               emit_instruction(program.instructions, Opcode::op, __VA_ARGS__);
+    #define rewrite(instr, op, ...)     rewrite_instruction(program.instructions[instr], Opcode::op, __VA_ARGS__);
     #define handle(type)                break; case AstType::type:
     #define handle_binexp(type, opcode) handle(type) { child(0); child(1); emit(opcode, 0); }
-    #define child(n) compile_node(context, node.children[n], program);
-    #define label(name) auto name = program.instructions.size();
+    #define child(n)                    compile_node(context, node.children[n], program);
+    #define label(name)                 auto name = program.instructions.size();
     
     void compile_function(FunctionContext& context, Program& program) {
         auto num_args = (int)context.func_node->children[0].children.size();
         
         // grow stack to make space for variables (space required will be known later)
-        label(grow); emit(GROW, 0);
+        //label(grow); emit(GROW, 0);
         
         // handle arguments; bind as variables
         context.push_scope();
@@ -164,14 +161,13 @@ struct Compiler {
         context.pop_scope();
         
         // return
-        emit(RET, 0);
+        emit(RET);
         
         // space for variables
-        auto num_variables = (int)context.variable_count;
-        auto extra_stack = max(0, num_variables - num_args); // extra space for arguments not needed, CALL will handle, we just need to allow space for variable bindings
-        rewrite(grow, GROW, extra_stack);
+        //auto num_variables = (int)context.variable_count;
+        //auto extra_stack = max(0, num_variables - num_args); // extra space for arguments not needed, CALL will handle, we just need to allow space for variable bindings
+        //rewrite(grow, GROW, extra_stack);
     }
-
     void compile_node(FunctionContext& context, const AstNode& node, Program& program) {
         switch (node.type) {
             case AstType::Unknown: return;
@@ -184,35 +180,33 @@ struct Compiler {
                 context.pop_scope();
             }
             handle(ConstDeclStat) {
-                auto variable = context.bind_variable(node.children[0].data_s, true);
-                child(1);
-                emit(WRITE_VAR, variable.stackpos);
+                context.bind_variable(node.children[0].data_s, true);
+                child(1); // put result of expression into free register
             }
             handle(VarDeclStat) {
-                // make sure not already declared
-                // TODO: allow shadowing in lower scopes?
-                auto variable = context.bind_variable(node.children[0].data_s, false);
-                child(1); // push result of expression
-                emit(WRITE_VAR, variable.stackpos); // put the value at the top of the stack into the variable at stackpos
+                context.bind_variable(node.children[0].data_s, false);
+                child(1); // put result of expression into free register
             }
             handle(AssignStat) {
                 auto& lhs = node.children[0];
                 auto& rhs = node.children[1];
 
-                if (lhs.type == AstType::AccessExp) {
-                    // put array, value on stack
-                    // the identifier to use is in program strings, index is encoded in instruction
-                    compile_node(context, lhs.children[0], program); // object
-                    child(1); // value
-                    program.strings.emplace_back(lhs.children[1].data_s);
-                    emit(STORE_OBJECT, program.strings.size() - 1);
-                } else if (lhs.type == AstType::IndexExp) {
-                    // put array, index, value on the stack
-                    compile_node(context, lhs.children[0], program); // array
-                    compile_node(context, lhs.children[1], program); // index
-                    child(1); // value
-                    emit(STORE_ARRAY, 0);
-                } else if (lhs.type == AstType::Identifier) {
+                //if (lhs.type == AstType::AccessExp) {
+                //    // put array, value on stack
+                //    // the identifier to use is in program strings, index is encoded in instruction
+                //    compile_node(context, lhs.children[0], program); // object
+                //    child(1); // value
+                //    program.strings.emplace_back(lhs.children[1].data_s);
+                //    emit(STORE_OBJECT, program.strings.size() - 1);
+                //} else if (lhs.type == AstType::IndexExp) {
+                //    // put array, index, value on the stack
+                //    compile_node(context, lhs.children[0], program); // array
+                //    compile_node(context, lhs.children[1], program); // index
+                //    child(1); // value
+                //    emit(STORE_ARRAY, 0);
+                //}
+                //else
+                if (lhs.type == AstType::Identifier) {
                     // make sure variable exists
                     auto& var = context.lookup_variable(node.children[0].data_s);
                     if (var.is_const) {
@@ -220,8 +214,9 @@ struct Compiler {
                     }
                     var.is_reassigned = true;
                     child(1);
-                    emit(WRITE_VAR, var.stackpos); // value at top of stack into variable at stackpos
-                } else {
+                    // emit(WRITE_VAR, var.stackpos); // value at top of stack into variable at stackpos
+                }
+                else {
                     throw runtime_error("Compile error: invalid LHS for assignment statement");
                 }
                 
@@ -264,8 +259,8 @@ struct Compiler {
             handle(BitAndExp) {}
             handle(BitXorExp) {}
             
-            handle_binexp(ShiftLeftExp, SHL)
             handle(ShiftRightExp) {}
+            handle_binexp(ShiftLeftExp, SHL)
             
             handle_binexp(EqExp, EQUAL)
             handle_binexp(NotEqExp, NEQUAL)
@@ -273,27 +268,8 @@ struct Compiler {
             handle_binexp(GreaterExp, GREATER)
             handle_binexp(LessEqExp, LESSEQ)
             handle_binexp(GreaterEqExp, GREATEREQ)
-            
-            // handle_binexp(AddExp, ADD)
-            handle(AddExp) {
-                auto& c0 = node.children[0];
-                auto& c1 = node.children[1];
-                //if (c1.type == AstType::NumLiteral && trunc(c1.data_d) == c1.data_d && abs(c0.data_d) <= INT16_MAX) {
-                //    child(0);
-                //    // ADDI right (commutative)
-                //    int16_t _i[2] = { int16_t(c1.data_d), 0 };
-                //    auto i = uint32_t(Opcode::ADDI) << 16 | *reinterpret_cast<uint32_t*>(_i);
-                //    // program.instructions.emplace_back(i);
-                //    emit(ADD, )
 
-                //} else {
-                    // generic add
-                    child(0);
-                    child(1);
-                    emit(ADD, 0);
-                // }
-            }
-            
+            handle_binexp(AddExp, ADD)            
             handle_binexp(SubExp, SUB)
             handle_binexp(MulExp, MUL)
             handle_binexp(DivExp, DIV)
