@@ -86,9 +86,11 @@ struct FunctionContext {
         }
     }
 
-    #define handle(x) break; case AstType::x:
-    #define emit(type, r0, r1, r2) program.instructions.emplace_back(Opcode::type, r0, r1, r2)
-    #define emit2(...) program.instructions.emplace_back(__VA_ARGS__)
+    #define handle(x)                       break; case AstType::x:
+    #define emit(type, r0, r1, r2)          program.instructions.emplace_back(Opcode::type, r0, r1, r2)
+    #define rewrite(pos, type, r0, r1, r2)  program.instructions[pos] = { Opcode::type, r0, r1, r2 };
+    #define label(name)                     auto name = program.instructions.size();
+    #define emit2(...)                      program.instructions.emplace_back(__VA_ARGS__)
 
     #define should_allocate(n)
 
@@ -107,28 +109,28 @@ struct FunctionContext {
         switch (node.type) {
             case AstType::Unknown: {} break;
 
-            // handle(StatList)
+                // handle(StatList)
         
             // handle(ConstDeclStat)
-            // handle(VarDeclStat)
+                // handle(VarDeclStat)
             // handle(AssignStat)
-            // handle(PrintStat) 
+                // handle(PrintStat)
+            
             // handle(IfStat)
             // handle(WhileStat)
-            // handle(ReturnStat)
+                // handle(ReturnStat)
             
-            // handle(TernaryExp)
-            // handle(OrExp)
-            // handle(AndExp)
-            // handle(BitOrExp)
-            // handle(BitAndExp)
-            // handle(BitXorExp)
             // handle(EqExp)
             // handle(NotEqExp)
             // handle(LessExp)
             // handle(GreaterExp)
             // handle(LessEqExp)
             // handle(GreaterEqExp)
+            // handle(OrExp)
+            // handle(AndExp)
+            // handle(BitOrExp)
+            // handle(BitAndExp)
+            // handle(BitXorExp)
             // handle(ShiftLeftExp)
             // handle(ShiftRightExp)
             // handle(AddExp)
@@ -137,26 +139,28 @@ struct FunctionContext {
             // handle(DivExp)
             // handle(ModExp)
             // handle(PowExp)
+            
+            // handle(TernaryExp)
             // handle(NegateExp)
             // handle(NotExp)
             // handle(BitNotExp)
             // handle(LenExp)
             
-            // handle(CallExp)
-            // handle(ArgList)
+                // handle(CallExp)
+                // handle(ArgList)
             // handle(IndexExp)
             // handle(AccessExp)
             
             // handle(ClockExp)
             // handle(RandomExp)
             
-            // handle(FuncLiteral)
-            // handle(ParamDef)
+                // handle(FuncLiteral)
+                // handle(ParamDef)
             // handle(NumLiteral)
             // handle(StringLiteral)
             // handle(ArrayLiteral)
             // handle(ObjectLiteral)
-            // handle(Identifier)
+                // handle(Identifier)
 
             handle(StatList) { should_allocate(0);
                 for (auto& c: node.children) {
@@ -164,6 +168,54 @@ struct FunctionContext {
                     free_all_registers();
                 }
                 return 0xff;
+            }
+            handle(IfStat) {
+                // child 0 - expression
+                // child 1 - if body
+                // child 2 - else body ()
+                auto has_else = node.children.size() == 3;
+
+                // // compile the condition and emit a condjump
+                // auto cond_reg = compile(node.children[0], program);
+                // assert(cond_reg != 0xff);
+                // auto condjump = program.instructions.size();
+                // emit(CONDJUMP, cond_reg, 0, 0); // placeholder
+                // free_register(cond_reg);
+
+                // // compile the if body
+                // compile(node.children[1], program);
+                // auto endif = program.instructions.size();
+                
+                // // compile the else
+                // if (has_else) {
+                //     emit(JUMPF, 0, 0, 0); // end of if block - jump over the else body
+                //     compile(node.children[2], program);
+                //     auto endelse = program.instructions.size();
+                //     rewrite(endif, JUMPF, (uint8_t)(endelse - endif), 0, 0);
+                // }
+                // rewrite(condjump, CONDJUMP, cond_reg, (uint8_t)(endif - condjump), 0);
+                
+                auto cond_reg = compile(node.children[0], program); // evaluate the expression
+                label(condjump);
+                emit(CONDJUMP, 0, 0, 0); // PLACEHOLDER
+                
+                compile(node.children[1], program); // compile the if body
+                label(endif);
+                emit(JUMPF, 0, 0, 0); // PLACEHODLER TODO: not needed if there's no else-block
+
+                label(startelse);
+                if (has_else) {
+                    compile(node.children[2], program);
+                }
+                label(endelse);
+                // TODO: make more efficient
+                // can be more efficient for the case when there's no else (probably)
+                rewrite(condjump, CONDJUMP, cond_reg, uint8_t(startelse - condjump), 0);
+                rewrite(endif, JUMPF, uint8_t(endelse - endif), 0, 0);
+                return 0xff;
+            }
+            handle(WhileStat) {
+
             }
             handle(VarDeclStat) { should_allocate(1);
                 auto reg = compile(node.children[1], program);
@@ -205,12 +257,8 @@ struct FunctionContext {
                 
                 emit(CALL, func_reg, nargs, end_reg);
                 
-                // free function and argument registers
+                // free function register; arg regs were never 'allocated' so no need to free
                 free_register(func_reg);
-                for (auto i = 0; i < nargs; i++) {
-                    free_register(arg_regs[i]);
-                }
-
                 return end_reg - 2; // return value copied to end register
             }
             handle(ReturnStat) {
@@ -238,6 +286,15 @@ struct FunctionContext {
                 auto in2 = compile(node.children[1], program);
                 auto out = allocate_register();
                 emit(ADD, out, in1, in2);
+                free_register(in1);
+                free_register(in2);
+                return out;
+            }
+            handle(SubExp) {
+                auto in1 = compile(node.children[0], program);
+                auto in2 = compile(node.children[1], program);
+                auto out = allocate_register();
+                emit(SUB, out, in1, in2);
                 free_register(in1);
                 free_register(in2);
                 return out;
@@ -326,6 +383,9 @@ struct Interpreter2 {
                 handle(ADD) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) + value_to_number(REGISTER(i.r2)));
                 }
+                handle(SUB) {
+                    REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) - value_to_number(REGISTER(i.r2)));
+                }
                 handle(MUL) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) * value_to_number(REGISTER(i.r2)));
                 }
@@ -334,6 +394,14 @@ struct Interpreter2 {
                 }
                 handle(MOVE) {
                     REGISTER(i.r0) = REGISTER(i.r1);
+                }
+                handle(CONDJUMP) {
+                    if (!value_to_number(REGISTER(i.r0))) {
+                        _pc += i.r1 - 1;
+                    }
+                }
+                handle(JUMPF) {
+                    _pc += i.r0 - 1;
                 }
                 handle(CALL) {
                     auto func_start = value_to_function(REGISTER(i.r0));
@@ -350,6 +418,8 @@ struct Interpreter2 {
                     auto return_fptr = REGISTER(-1);
                     if (i.r0) {
                         REGISTER(-2) = REGISTER(i.r1);
+                    } else {
+                        REGISTER(-2) = value_null();
                     }
                     _pc = value_to_function(return_addr);
                     _stackbase = value_to_integer(return_fptr);

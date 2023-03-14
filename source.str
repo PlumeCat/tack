@@ -6,14 +6,25 @@ let d = (a + 1) * (c / 2) + (b * 32)
 
 print(d)
 
-let add = fn(a, b) {
-    print(888888)
-    print(a)
-    print(b)
-    print(a + b)
-    return a + b
+if d - d {
+    print(200)
+} else if a * 2 - b {
+    print(100)
+} else if 1 {
+    print(300)
+
+    if b - b {
+        print(2)
+    } else if a - a {
+        print(3)
+    } else {
+        print(4)
+    }
+
+    print(5)
+
+} else {
+    print(400)
 }
 
-let e = add(add(add(add(1, 2), 3), 4), 5)
-print(e)
-
+print(d)
