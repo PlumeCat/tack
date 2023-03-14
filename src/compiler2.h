@@ -6,7 +6,6 @@
 #include "value.h"
 
 
-
 bool is_integer(double d) {
     return trunc(d) == d;
 }
@@ -23,11 +22,9 @@ enum RegisterState {
     BOUND = 2
 };
 
-
 struct FunctionContext;
 struct Compiler2 {
     list<FunctionContext> funcs; // need to grow without invalidating pointers
-
     void add_function(Program& program, const AstNode* node);
     void compile(const AstNode& module, Program& program);
 };
@@ -70,6 +67,7 @@ struct FunctionContext {
 
     // set a register as bound by a variable
     void bind_register(const string& binding, uint8_t reg) {
+        log("Bind register: ", binding, reg);
         registers[reg] = BOUND;
         bindings[binding] = reg;
     }
@@ -92,9 +90,16 @@ struct FunctionContext {
     #define emit(type, r0, r1, r2) program.instructions.emplace_back(Opcode::type, r0, r1, r2)
     #define emit2(...) program.instructions.emplace_back(__VA_ARGS__)
 
+    #define should_allocate(n)
+
     uint8_t compile(Program& program) {
         // compile function literal
         // TODO: emit bindings for the N arguments
+        auto nargs = node->children[0].children.size(); // ParamDef
+        for (auto i = 0; i < nargs; i++) {
+            auto& param = node->children[0].children[i]; // Identifier
+            bind_register(param.data_s, i);
+        }
         auto reg = compile(node->children[1], program);
         emit(RET, 0, 0, 0);
     }
@@ -146,29 +151,29 @@ struct FunctionContext {
             // handle(RandomExp)
             
             // handle(FuncLiteral)
-                // handle(ParamDef)
-                // handle(NumLiteral)
-                // handle(StringLiteral)
-                // handle(ArrayLiteral)
-                // handle(ObjectLiteral)
-                // handle(Identifier)
+            // handle(ParamDef)
+            // handle(NumLiteral)
+            // handle(StringLiteral)
+            // handle(ArrayLiteral)
+            // handle(ObjectLiteral)
+            // handle(Identifier)
 
-            handle(StatList) {
+            handle(StatList) { should_allocate(0);
                 for (auto& c: node.children) {
                     compile(c, program);
                     free_all_registers();
                 }
                 return 0xff;
             }
-            handle(VarDeclStat) {
+            handle(VarDeclStat) { should_allocate(1);
                 auto reg = compile(node.children[1], program);
                 bind_register(node.children[0].data_s, reg);
                 return reg;
             }
-            handle(Identifier) { // read variable - returns the register used
+            handle(Identifier) { should_allocate(0);
                 return bindings[node.data_s];
             }
-            handle(NumLiteral) { // 1 out via LOAD_CONST
+            handle(NumLiteral) { should_allocate(1);
                 auto n = node.data_d;
                 auto out = allocate_register();
                 auto in1 = (uint8_t)program.storage.size();
@@ -176,23 +181,49 @@ struct FunctionContext {
                 emit(LOAD_CONST, out, in1, 0);
                 return out;
             }
-            handle(FuncLiteral) {
+            handle(FuncLiteral) { should_allocate(1);
                 compiler->add_function(program, &node);
                 auto out = allocate_register();
                 emit(LOAD_CONST, out, compiler->funcs.back().storage_index, 0);
                 return out;
             }
-            handle(CallExp) { // 1 out if 
+            handle(CallExp) { should_allocate(1);
+                auto nargs = node.children[1].children.size();
+                
+                // compile the arguments first and remember which registers they are in
+                auto arg_regs = vector<uint8_t>{};
+                for (auto i = 0; i < nargs; i++) {
+                    arg_regs.emplace_back(compile(node.children[1].children[i], program));
+                }
                 auto func_reg = compile(node.children[0], program); // LHS evaluates to function
-                auto nargs = node.children[0].children.size();
-                auto end_reg = get_end_register();
-                nargs = 0;// TODO: compile arguments into registers starting from end_reg+2
+
+                // copy arguments to top of stack in sequence
+                auto end_reg = get_end_register() + 2; // leave space for stack frame
+                for (auto i = 0; i < nargs; i++) {
+                    emit(MOVE, end_reg + i, arg_regs[i], 0);
+                }
+                
                 emit(CALL, func_reg, nargs, end_reg);
+                
+                // free function and argument registers
                 free_register(func_reg);
-                return 0xff;
+                for (auto i = 0; i < nargs; i++) {
+                    free_register(arg_regs[i]);
+                }
+
+                return end_reg - 2; // return value copied to end register
             }
             handle(ReturnStat) {
-                return 0xff;
+                if (node.children.size()) {
+                    auto return_register = compile(node.children[0], program);
+                    if (return_register == 0xff) {
+                        throw runtime_error("return value incorrect register");
+                        // emit(RET, 0, 0, 0);
+                    }
+                    emit(RET, 1, return_register, 0);
+                }
+                emit(RET, 0, 0, 0);
+                return 0xff; // it's irrelevant
             }
             handle(AddExp) { // 1 out
                 // TODO: experiment with the following:
@@ -301,21 +332,27 @@ struct Interpreter2 {
                 handle(DIV) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) / value_to_number(REGISTER(i.r2)));
                 }
-
+                handle(MOVE) {
+                    REGISTER(i.r0) = REGISTER(i.r1);
+                }
                 handle(CALL) {
                     auto func_start = value_to_function(REGISTER(i.r0));
                     auto nargs = i.r1;
-                    auto end_reg = i.r2;
+                    auto new_base = i.r2;
                     
-                    REGISTER(end_reg) = value_from_function(_pc); // push return addr
-                    REGISTER(end_reg+1) = value_from_integer(_stackbase); // push return frameptr
+                    REGISTER(new_base-2) = value_from_function(_pc); // push return addr
+                    REGISTER(new_base-1) = value_from_integer(_stackbase); // push return frameptr
                     _pc = func_start - 1; // jump to addr
-                    _stackbase = _stackbase + end_reg + 2; // new stack frame
-                    
+                    _stackbase = _stackbase + new_base; // new stack frame
                 }
                 handle(RET) {
-                    _pc = value_to_function(REGISTER(-2));
-                    _stackbase = value_to_integer(REGISTER(-1));
+                    auto return_addr = REGISTER(-2);
+                    auto return_fptr = REGISTER(-1);
+                    if (i.r0) {
+                        REGISTER(-2) = REGISTER(i.r1);
+                    }
+                    _pc = value_to_function(return_addr);
+                    _stackbase = value_to_integer(return_fptr);
                 }
                 handle(PRINT) {
                     log<false,false>(REGISTER(i.r0));

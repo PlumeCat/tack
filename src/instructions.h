@@ -12,6 +12,7 @@
     opcode(NEGATE) opcode(NOT) opcode(BITNOT) opcode(LEN) \
     \
     opcode(LOAD_CONST) \
+    opcode(MOVE)\
     \
     /* lua allows 200 local variables; safet*/\
     /* lua can jump 1<<24 instructions */\

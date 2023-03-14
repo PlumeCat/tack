@@ -4,31 +4,16 @@ let c = a + b
 
 let d = (a + 1) * (c / 2) + (b * 32)
 
-let e = d + 2
-
 print(d)
 
-let f = fn() {
-    let a = 32
-    let b = 64
+let add = fn(a, b) {
+    print(888888)
+    print(a)
+    print(b)
     print(a + b)
-
-    let g = fn() {
-        print(200)
-
-        let h = fn() {
-            print(300)
-        }
-
-        h()
-
-        print(200)
-    }
-
-    g()
-    g()
+    return a + b
 }
 
-f()
+let e = add(add(add(add(1, 2), 3), 4), 5)
+print(e)
 
-print(105)
