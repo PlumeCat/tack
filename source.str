@@ -6,8 +6,29 @@ let d = (a + 1) * (c / 2) + (b * 32)
 
 let e = d + 2
 
-print(a)
-print(b)
-print(c)
 print(d)
-print(e)
+
+let f = fn() {
+    let a = 32
+    let b = 64
+    print(a + b)
+
+    let g = fn() {
+        print(200)
+
+        let h = fn() {
+            print(300)
+        }
+
+        h()
+
+        print(200)
+    }
+
+    g()
+    g()
+}
+
+f()
+
+print(105)

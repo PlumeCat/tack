@@ -70,7 +70,6 @@ Grammar:
 		literal-object
 		literal-array
 		literal-function
-			
 
 Types:
 	null:		null
@@ -90,6 +89,28 @@ Types:
 	object		{ a = 1, b = 2, ... }
 	function	fn (x, y, z) {} // closures are passed by-ref as well
 	// boxed
+
+Instructions:
+	from abusive testing, lua allows only 200 local variables
+	if you then try and call a function and pass them all, it will complain
+	on the 55th argument
+
+	seeing as all arguments must be on the stack, safe to assume the function
+	only has 256 "registers" to play with
+
+	however should not need that many; 200 local variables is perverse
+
+	it is known to use 32bit instructions, so safe to assume
+	there are 8bits for opcode then 3x 8bit operands
+
+	from also abusive testing, lua can jump over 1<<24 instructions
+	so presumably using all 3 operands for jumps (the )
+
+	lua only has JMP, not CONDJUMP, instead the EQ type instructions
+	are used to implement condjumps; EQ conditionally jumps the next
+	instruction, so you can schedule an unconditional jump straight after
+	to implement condjump
+	
 
 Notes:
 	objects will need some kind of 'prototype' or 'index' field to implement classes

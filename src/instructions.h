@@ -4,19 +4,22 @@
     opcode(UNKNOWN)\
     /* binary operations:*/\
     opcode(EQUAL) opcode(NEQUAL) opcode(GREATER) opcode(LESS) opcode(GREATEREQ) opcode(LESSEQ)\
+    opcode(EQUAL0) opcode(EQUALI) opcode(NEQUALI) opcode(GREATERI) opcode(LESSI) opcode(GREATEREQI) opcode(LESSEQI)\
     opcode(ADD) opcode(SUB) opcode(DIV) opcode(MUL) opcode(MOD) opcode(POW)\
-    opcode(ADDI) \
+    opcode(ADDI) opcode(SUBI) opcode(DIVI) opcode(MULI) opcode(MODI) opcode(POWI)\
     opcode(SHL) opcode(SHR) opcode(BITAND) opcode(BITOR) opcode(BITXOR) opcode(AND) opcode(OR)\
-    /* unary operation: apply inplace for value at top of stack*/\
+    \
     opcode(NEGATE) opcode(NOT) opcode(BITNOT) opcode(LEN) \
     \
     opcode(LOAD_CONST) \
     \
+    /* lua allows 200 local variables; safet*/\
+    /* lua can jump 1<<24 instructions */\
     opcode(JUMPF) opcode(JUMPB) opcode(CONDJUMP)\
     opcode(ALLOC_OBJECT) opcode(ALLOC_ARRAY)\
     opcode(PRECALL) opcode(CALL) opcode(RET)/**/\
     opcode(PRINT) opcode(CLOCK) opcode(RANDOM) \
-    opcode(DUMP) /* dump stack */\
+    \
     opcode(OPCODE_MAX)
     
 
