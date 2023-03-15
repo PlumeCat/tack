@@ -67,9 +67,15 @@ struct FunctionContext {
 
     // set a register as bound by a variable
     void bind_register(const string& binding, uint8_t reg) {
-        log("Bind register: ", binding, reg);
         registers[reg] = BOUND;
         bindings[binding] = reg;
+    }
+
+    // change a binding
+    void rebind_register(const string& binding, uint8_t new_reg) {
+        auto old_reg = bindings[binding];
+        registers[old_reg] = FREE;
+        bind_register(binding, new_reg);
     }
     
     // free a register if it's not bound
@@ -105,7 +111,7 @@ struct FunctionContext {
         auto reg = compile(node->children[1], program);
         emit(RET, 0, 0, 0);
     }
-    uint8_t compile(const AstNode& node, Program& program) {
+    uint8_t compile(const AstNode& node, Program& program, uint8_t target_register = 0xff) {
         switch (node.type) {
             case AstType::Unknown: {} break;
 
@@ -170,56 +176,55 @@ struct FunctionContext {
                 return 0xff;
             }
             handle(IfStat) {
-                // child 0 - expression
-                // child 1 - if body
-                // child 2 - else body ()
                 auto has_else = node.children.size() == 3;
-
-                // // compile the condition and emit a condjump
-                // auto cond_reg = compile(node.children[0], program);
-                // assert(cond_reg != 0xff);
-                // auto condjump = program.instructions.size();
-                // emit(CONDJUMP, cond_reg, 0, 0); // placeholder
-                // free_register(cond_reg);
-
-                // // compile the if body
-                // compile(node.children[1], program);
-                // auto endif = program.instructions.size();
-                
-                // // compile the else
-                // if (has_else) {
-                //     emit(JUMPF, 0, 0, 0); // end of if block - jump over the else body
-                //     compile(node.children[2], program);
-                //     auto endelse = program.instructions.size();
-                //     rewrite(endif, JUMPF, (uint8_t)(endelse - endif), 0, 0);
-                // }
-                // rewrite(condjump, CONDJUMP, cond_reg, (uint8_t)(endif - condjump), 0);
-                
                 auto cond_reg = compile(node.children[0], program); // evaluate the expression
                 label(condjump);
-                emit(CONDJUMP, 0, 0, 0); // PLACEHOLDER
-                
+                emit(CONDJUMP, cond_reg, 0, 0); // PLACEHOLDER
+                free_register(cond_reg); // can be reused
                 compile(node.children[1], program); // compile the if body
                 label(endif);
-                emit(JUMPF, 0, 0, 0); // PLACEHODLER TODO: not needed if there's no else-block
-
-                label(startelse);
+                
                 if (has_else) {
+                    emit(JUMPF, 0, 0, 0); // PLACEHODLER
+                    label(startelse);
                     compile(node.children[2], program);
+                    label(endelse);
+                    // TODO: can be more efficient for the case when there's no else (probably)
+                    rewrite(endif, JUMPF, uint8_t(endelse - endif), 0, 0);
+                    rewrite(condjump, CONDJUMP, cond_reg, uint8_t(startelse - condjump), 0);
+                } else {
+                    rewrite(condjump, CONDJUMP, cond_reg, uint8_t(endif - condjump), 0);
                 }
-                label(endelse);
-                // TODO: make more efficient
-                // can be more efficient for the case when there's no else (probably)
-                rewrite(condjump, CONDJUMP, cond_reg, uint8_t(startelse - condjump), 0);
-                rewrite(endif, JUMPF, uint8_t(endelse - endif), 0, 0);
                 return 0xff;
             }
             handle(WhileStat) {
-
+                label(condeval);
+                auto cond_reg = compile(node.children[0], program);
+                label(condjump);
+                emit(CONDJUMP, cond_reg, 0, 0);
+                free_register(cond_reg);
+                compile(node.children[1], program);
+                label(jumpback);
+                emit(JUMPB, jumpback - condeval, 0, 0);
+                label(endwhile);
+                rewrite(condjump, CONDJUMP, cond_reg, uint8_t(endwhile - condjump), 0);
+                return 0xff;
             }
             handle(VarDeclStat) { should_allocate(1);
                 auto reg = compile(node.children[1], program);
                 bind_register(node.children[0].data_s, reg);
+                return reg;
+            }
+            handle(AssignStat) { should_allocate(0);
+                auto reg = compile(node.children[1], program);
+                // TODO: try and elide this MOVE
+                // see if we can force the 
+                // failing that, a generic MOVE-elision pass hopefully will work
+                emit(MOVE, bindings[node.children[0].data_s], reg, 0);
+                // rebind_register(node.children[0].data_s, reg);
+                // return reg;
+                // getting creative:    relabel the register instead of MOVEing to the old one
+                free_register(reg);
                 return reg;
             }
             handle(Identifier) { should_allocate(0);
@@ -295,6 +300,15 @@ struct FunctionContext {
                 auto in2 = compile(node.children[1], program);
                 auto out = allocate_register();
                 emit(SUB, out, in1, in2);
+                free_register(in1);
+                free_register(in2);
+                return out;
+            }
+            handle(LessExp) {
+                auto in1 = compile(node.children[0], program);
+                auto in2 = compile(node.children[1], program);
+                auto out = allocate_register();
+                emit(LESS, out, in1, in2);
                 free_register(in1);
                 free_register(in2);
                 return out;
@@ -392,16 +406,30 @@ struct Interpreter2 {
                 handle(DIV) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) / value_to_number(REGISTER(i.r2)));
                 }
+                handle(LESS) {
+                    REGISTER(i.r0) = value_from_boolean(
+                        value_to_number(REGISTER(i.r1)) <
+                        value_to_number(REGISTER(i.r2))
+                    );
+                }
                 handle(MOVE) {
                     REGISTER(i.r0) = REGISTER(i.r1);
                 }
                 handle(CONDJUMP) {
-                    if (!value_to_number(REGISTER(i.r0))) {
+                    auto val = REGISTER(i.r0);
+                    if (!(
+                        (value_get_type(val) == Type::Boolean && value_to_boolean(val)) ||
+                        (value_get_type(val) == Type::Integer && value_to_integer(val)) ||
+                        (value_get_type(val) == Type::Number && value_to_number(val))
+                    )) {
                         _pc += i.r1 - 1;
                     }
                 }
                 handle(JUMPF) {
                     _pc += i.r0 - 1;
+                }
+                handle(JUMPB) {
+                    _pc -= i.r0 + 1;
                 }
                 handle(CALL) {
                     auto func_start = value_to_function(REGISTER(i.r0));
