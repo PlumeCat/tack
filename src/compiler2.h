@@ -481,7 +481,8 @@ struct Interpreter2 {
         auto _stackbase = 0u;
         auto _pc = 0u;
         auto _pe = program.instructions.size();
-        auto _arrays = vector<ArrayType>(4096);
+        auto _arrays = list<ArrayType>{};
+        // auto arrays = vector<ArrayType>(4096);
         auto error = [&](auto err) { throw runtime_error(err); return value_null(); };
 
         REGISTER(0) = value_from_function(program.instructions.size()); // pseudo function that jumps to end
