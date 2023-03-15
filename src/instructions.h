@@ -17,7 +17,8 @@
     /* lua allows 200 local variables; safet*/\
     /* lua can jump 1<<24 instructions */\
     opcode(JUMPF) opcode(JUMPB) opcode(CONDJUMP)\
-    opcode(ALLOC_OBJECT) opcode(ALLOC_ARRAY)\
+    opcode(ALLOC_OBJECT)\
+    opcode(ALLOC_ARRAY) opcode(LOAD_ARRAY) \
     opcode(PRECALL) opcode(CALL) opcode(RET)/**/\
     opcode(PRINT) opcode(CLOCK) opcode(RANDOM) \
     \

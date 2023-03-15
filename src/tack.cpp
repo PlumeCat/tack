@@ -55,9 +55,9 @@ int main(int argc, char* argv[]) {
         auto compiler = Compiler2{};
         auto vm = Interpreter2();
         compiler.compile(out_ast, program);
-        //if (check_arg("-D")) {
+        if (check_arg("-D")) {
             log(program.to_string());
-        //}
+        }
 
         //auto before = steady_clock::now();
         vm.execute(program);

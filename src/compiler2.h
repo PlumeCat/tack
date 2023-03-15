@@ -190,9 +190,18 @@ struct FunctionContext {
                     compile(node.children[2], program);
                     label(endelse);
                     // TODO: can be more efficient for the case when there's no else (probably)
+                    if (endelse - endif > 0xff) {
+                        throw runtime_error("jump too much");
+                    }
                     rewrite(endif, JUMPF, uint8_t(endelse - endif), 0, 0);
+                    if (startelse - condjump > 0xff) {
+                        throw runtime_error("jump too much");
+                    }
                     rewrite(condjump, CONDJUMP, cond_reg, uint8_t(startelse - condjump), 0);
                 } else {
+                    if (endif - condjump > 0xff) {
+                        throw runtime_error("jump too much");
+                    }
                     rewrite(condjump, CONDJUMP, cond_reg, uint8_t(endif - condjump), 0);
                 }
                 return 0xff;
@@ -205,12 +214,23 @@ struct FunctionContext {
                 free_register(cond_reg);
                 compile(node.children[1], program);
                 label(jumpback);
-                emit(JUMPB, jumpback - condeval, 0, 0);
+                if (jumpback - condeval > 0xff) {
+                    throw runtime_error("jump too much");
+                }
+                emit(JUMPB, uint8_t(jumpback - condeval), 0, 0);
                 label(endwhile);
+                if (endwhile - condjump > 0xff) {
+                    throw runtime_error("jump too much");
+                }
                 rewrite(condjump, CONDJUMP, cond_reg, uint8_t(endwhile - condjump), 0);
                 return 0xff;
             }
             handle(VarDeclStat) { should_allocate(1);
+                auto reg = compile(node.children[1], program);
+                bind_register(node.children[0].data_s, reg);
+                return reg;
+            }
+            handle(ConstDeclStat) { should_allocate(1);
                 auto reg = compile(node.children[1], program);
                 bind_register(node.children[0].data_s, reg);
                 return reg;
@@ -235,6 +255,16 @@ struct FunctionContext {
                 auto out = allocate_register();
                 auto in1 = (uint8_t)program.storage.size();
                 program.storage.emplace_back(value_from_number(n));
+                emit(LOAD_CONST, out, in1, 0);
+                return out;
+            }
+            handle(StringLiteral) { should_allocate(1);
+                auto out = allocate_register();
+                auto in1 = (uint8_t)program.storage.size();
+                program.strings.emplace_back(node.data_s);
+                program.storage.emplace_back(value_from_string(
+                    &program.strings.back()
+                ));
                 emit(LOAD_CONST, out, in1, 0);
                 return out;
             }
@@ -266,6 +296,16 @@ struct FunctionContext {
                 free_register(func_reg);
                 return end_reg - 2; // return value copied to end register
             }
+            handle(ClockExp) {
+                auto reg = allocate_register();
+                emit(CLOCK, reg, 0, 0);
+                return reg;
+            }
+            handle(RandomExp) {
+                auto reg = allocate_register();
+                emit(RANDOM, reg, 0, 0);
+                return reg;
+            }
             handle(ReturnStat) {
                 if (node.children.size()) {
                     auto return_register = compile(node.children[0], program);
@@ -277,6 +317,13 @@ struct FunctionContext {
                 }
                 emit(RET, 0, 0, 0);
                 return 0xff; // it's irrelevant
+            }
+            handle(LenExp) {
+                auto in = compile(node.children[0], program);
+                auto out = allocate_register();
+                emit(LEN, out, in, 0);
+                free_register(in);
+                return out;
             }
             handle(AddExp) { // 1 out
                 // TODO: experiment with the following:
@@ -313,6 +360,33 @@ struct FunctionContext {
                 free_register(in2);
                 return out;
             }
+            handle(LessEqExp) {
+                auto in1 = compile(node.children[0], program);
+                auto in2 = compile(node.children[1], program);
+                auto out = allocate_register();
+                emit(LESSEQ, out, in1, in2);
+                free_register(in1);
+                free_register(in2);
+                return out;
+            }
+            handle(EqExp) {
+                auto in1 = compile(node.children[0], program);
+                auto in2 = compile(node.children[1], program);
+                auto out = allocate_register();
+                emit(EQUAL, out, in1, in2);
+                free_register(in1);
+                free_register(in2);
+                return out;
+            }
+            handle(GreaterExp) {
+                auto in1 = compile(node.children[0], program);
+                auto in2 = compile(node.children[1], program);
+                auto out = allocate_register();
+                emit(GREATER, out, in1, in2);
+                free_register(in1);
+                free_register(in2);
+                return out;
+            }
             handle(MulExp) { // 1 out
                 auto in1 = compile(node.children[0], program);
                 auto in2 = compile(node.children[1], program);
@@ -331,14 +405,35 @@ struct FunctionContext {
                 free_register(in2);
                 return out;
             }
+            handle(ArrayLiteral) {
+                // TODO: child elements
+                auto reg = allocate_register();
+                emit(ALLOC_ARRAY, reg, 0, 0);
+                return reg;
+            }
+            handle(ShiftLeftExp) {
+                auto arr = compile(node.children[0], program);
+                auto value = compile(node.children[1], program);
+                emit(SHL, arr, value, 0);
+                return 0xff;
+            }
             handle(PrintStat) { // no output
                 auto in1 = compile(node.children[0], program);
                 emit(PRINT, in1, 0, 0);
                 free_register(in1);
                 return 0xff;
             }
+            handle(IndexExp) {
+                auto arr = compile(node.children[0], program);
+                auto ind = compile(node.children[1], program);
+                auto out = allocate_register();
+                emit(LOAD_ARRAY, out, arr, ind);
+                free_register(arr);
+                free_register(ind);
+                return out;
+            }
 
-            default: { throw runtime_error("unknown ast; "); } break;
+            default: { throw runtime_error("unknown ast: " + to_string(node.type)); } break;
         }
 
         throw runtime_error("forgot to return a register");
@@ -353,6 +448,10 @@ void Compiler2::compile(const AstNode& module, Program& program) {
     if (module.type != AstType::StatList) {
         throw runtime_error("expected statlist");
     }
+
+    // TODO: improve this
+    program.strings.reserve(100);
+
     auto node = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef, {}), module);
     add_function(program, &node);
 
@@ -382,6 +481,8 @@ struct Interpreter2 {
         auto _stackbase = 0u;
         auto _pc = 0u;
         auto _pe = program.instructions.size();
+        auto _arrays = vector<ArrayType>(4096);
+        auto error = [&](auto err) { throw runtime_error(err); return value_null(); };
 
         REGISTER(0) = value_from_function(program.instructions.size()); // pseudo function that jumps to end
         REGISTER(1) = value_from_integer(0); // reset stack base to 0
@@ -406,9 +507,31 @@ struct Interpreter2 {
                 handle(DIV) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) / value_to_number(REGISTER(i.r2)));
                 }
+                handle(SHL) {
+                    auto* arr = value_to_array(REGISTER(i.r0));
+                    arr->emplace_back(REGISTER(i.r1));
+                }
                 handle(LESS) {
                     REGISTER(i.r0) = value_from_boolean(
                         value_to_number(REGISTER(i.r1)) <
+                        value_to_number(REGISTER(i.r2))
+                    );
+                }
+                handle(EQUAL) {
+                    REGISTER(i.r0) = value_from_boolean(
+                        value_to_number(REGISTER(i.r1)) ==
+                        value_to_number(REGISTER(i.r2))
+                    );
+                }
+                handle(LESSEQ) {
+                    REGISTER(i.r0) = value_from_boolean(
+                        value_to_number(REGISTER(i.r1)) <=
+                        value_to_number(REGISTER(i.r2))
+                    );
+                }
+                handle(GREATER) {
+                    REGISTER(i.r0) = value_from_boolean(
+                        value_to_number(REGISTER(i.r1)) >
                         value_to_number(REGISTER(i.r2))
                     );
                 }
@@ -421,15 +544,29 @@ struct Interpreter2 {
                         (value_get_type(val) == Type::Boolean && value_to_boolean(val)) ||
                         (value_get_type(val) == Type::Integer && value_to_integer(val)) ||
                         (value_get_type(val) == Type::Number && value_to_number(val))
-                    )) {
-                        _pc += i.r1 - 1;
-                    }
+                    )) { _pc += i.r1 - 1; }
                 }
-                handle(JUMPF) {
-                    _pc += i.r0 - 1;
+                handle(JUMPF) { _pc += i.r0 - 1; }
+                handle(JUMPB) { _pc -= i.r0 + 1; }
+                handle(LEN) {
+                    auto* arr = value_to_array(REGISTER(i.r1));
+                    REGISTER(i.r0) = value_from_number(arr->size());
                 }
-                handle(JUMPB) {
-                    _pc -= i.r0 + 1;
+                handle(ALLOC_ARRAY) {
+                    _arrays.emplace_back(ArrayType{});
+                    REGISTER(i.r0) = value_from_array(&_arrays.back());
+                }
+                handle(LOAD_ARRAY) {
+                    auto arr_val = REGISTER(i.r1);
+                    auto ind_val = REGISTER(i.r2);
+                    auto* arr = value_to_array(arr_val);
+                    auto ind_type = value_get_type(ind_val);
+                    auto ind = (ind_type == Type::Integer)
+                        ? value_to_integer(ind_val) 
+                        : (ind_type == Type::Number) 
+                            ? (int)value_to_number(ind_val)
+                            : error("expected number")._i;
+                    REGISTER(i.r0) = (*arr)[ind];
                 }
                 handle(CALL) {
                     auto func_start = value_to_function(REGISTER(i.r0));
@@ -440,6 +577,12 @@ struct Interpreter2 {
                     REGISTER(new_base-1) = value_from_integer(_stackbase); // push return frameptr
                     _pc = func_start - 1; // jump to addr
                     _stackbase = _stackbase + new_base; // new stack frame
+                }
+                handle(RANDOM) {
+                    REGISTER(i.r0) = value_from_number(rand() % 10000);
+                }
+                handle(CLOCK) {
+                    REGISTER(i.r0) = value_from_number(duration_cast<microseconds>(steady_clock::now().time_since_epoch()).count() / 1e6);
                 }
                 handle(RET) {
                     auto return_addr = REGISTER(-2);
@@ -453,7 +596,7 @@ struct Interpreter2 {
                     _stackbase = value_to_integer(return_fptr);
                 }
                 handle(PRINT) {
-                    log<false,false>(REGISTER(i.r0));
+                    log<true,false>(REGISTER(i.r0));
                 }
                 break; default: throw runtime_error("unknown instruction: " + to_string(i.opcode));
             }
