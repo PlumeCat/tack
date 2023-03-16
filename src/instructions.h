@@ -12,7 +12,8 @@
     opcode(NEGATE) opcode(NOT) opcode(BITNOT) opcode(LEN) \
     \
     opcode(LOAD_CONST) \
-    opcode(MOVE)\
+    opcode(LOAD_I) \
+    opcode(MOVE) \
     \
     /* lua allows 200 local variables; safet*/\
     /* lua can jump 1<<24 instructions */\
@@ -37,10 +38,10 @@ string to_string(Opcode opcode) {
 #undef opcode
 
 struct Instruction {
-    Opcode opcode;
     union {
-        uint8_t operands[3];
-        struct { uint8_t r0, r1, r2; };
+        struct { Opcode opcode; uint8_t r0, r1, r2; };
+        // uint8_t operands[4];
+        struct { int16_t s0; int16_t s1; };
     };
 
     Instruction() {}
@@ -48,6 +49,6 @@ struct Instruction {
     Instruction(Instruction&&) = default;
     Instruction& operator=(const Instruction&) = default;
     Instruction& operator=(Instruction&&) = default;
-    Instruction(Opcode op, uint8_t r1 = 0, uint8_t r2 = 0, uint8_t r3 = 0)
-        : opcode(op), operands { r1, r2, r3 } {}
+    Instruction(Opcode op, uint8_t r0 = 0, uint8_t r1 = 0, uint8_t r2 = 0)
+        : opcode(op), r0(r0), r1(r1), r2(r2) {}
 };

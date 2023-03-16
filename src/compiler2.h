@@ -12,8 +12,8 @@ bool is_integer(double d) {
 
 bool is_small_integer(double d) {
     return is_integer(d) && 
-        d <= std::numeric_limits<int8_t>::max() &&
-        d >= std::numeric_limits<int8_t>::min();
+        d <= std::numeric_limits<int16_t>::max() &&
+        d >= std::numeric_limits<int16_t>::min();
 }
 
 enum RegisterState {
@@ -240,10 +240,11 @@ struct FunctionContext {
                 // TODO: try and elide this MOVE
                 // see if we can force the 
                 // failing that, a generic MOVE-elision pass hopefully will work
-                emit(MOVE, bindings[node.children[0].data_s], reg, 0);
-                // rebind_register(node.children[0].data_s, reg);
-                // return reg;
-                // getting creative:    relabel the register instead of MOVEing to the old one
+                auto target = bindings.find(node.children[0].data_s);
+                if (target == bindings.end()) {
+                    throw runtime_error("unknown variable: " + node.children[0].data_s);
+                }
+                emit(MOVE, target->second, reg, 0);
                 free_register(reg);
                 return reg;
             }
@@ -253,9 +254,17 @@ struct FunctionContext {
             handle(NumLiteral) { should_allocate(1);
                 auto n = node.data_d;
                 auto out = allocate_register();
-                auto in1 = (uint8_t)program.storage.size();
-                program.storage.emplace_back(value_from_number(n));
-                emit(LOAD_CONST, out, in1, 0);
+                
+                // if (is_small_integer(n)) {
+                //     auto ins = Instruction(Opcode::LOAD_I, out);
+                //     ins.s1 = int16_t(n);
+                //     emit2(ins);
+                // } else {
+                    auto in1 = (uint8_t)program.storage.size();
+                    program.storage.emplace_back(value_from_number(n));
+                    emit(LOAD_CONST, out, in1, 0);
+                // }
+                
                 return out;
             }
             handle(StringLiteral) { should_allocate(1);
@@ -489,119 +498,140 @@ struct Interpreter2 {
         REGISTER(1) = value_from_integer(0); // reset stack base to 0
         _stackbase = 2;
 
-        while (_pc < _pe) {
-            auto i = program.instructions[_pc];
-            switch (i.opcode) {
-                case Opcode::UNKNOWN: break;
-                handle(LOAD_CONST) {
-                    REGISTER(i.r0) = program.storage[i.r1];
-                }
-                handle(ADD) {
-                    REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) + value_to_number(REGISTER(i.r2)));
-                }
-                handle(SUB) {
-                    REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) - value_to_number(REGISTER(i.r2)));
-                }
-                handle(MUL) {
-                    REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) * value_to_number(REGISTER(i.r2)));
-                }
-                handle(DIV) {
-                    REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) / value_to_number(REGISTER(i.r2)));
-                }
-                handle(SHL) {
-                    auto* arr = value_to_array(REGISTER(i.r0));
-                    arr->emplace_back(REGISTER(i.r1));
-                }
-                handle(LESS) {
-                    REGISTER(i.r0) = value_from_boolean(
-                        value_to_number(REGISTER(i.r1)) <
-                        value_to_number(REGISTER(i.r2))
-                    );
-                }
-                handle(EQUAL) {
-                    REGISTER(i.r0) = value_from_boolean(
-                        value_to_number(REGISTER(i.r1)) ==
-                        value_to_number(REGISTER(i.r2))
-                    );
-                }
-                handle(LESSEQ) {
-                    REGISTER(i.r0) = value_from_boolean(
-                        value_to_number(REGISTER(i.r1)) <=
-                        value_to_number(REGISTER(i.r2))
-                    );
-                }
-                handle(GREATER) {
-                    REGISTER(i.r0) = value_from_boolean(
-                        value_to_number(REGISTER(i.r1)) >
-                        value_to_number(REGISTER(i.r2))
-                    );
-                }
-                handle(MOVE) {
-                    REGISTER(i.r0) = REGISTER(i.r1);
-                }
-                handle(CONDJUMP) {
-                    auto val = REGISTER(i.r0);
-                    if (!(
-                        (value_get_type(val) == Type::Boolean && value_to_boolean(val)) ||
-                        (value_get_type(val) == Type::Integer && value_to_integer(val)) ||
-                        (value_get_type(val) == Type::Number && value_to_number(val))
-                    )) { _pc += i.r1 - 1; }
-                }
-                handle(JUMPF) { _pc += i.r0 - 1; }
-                handle(JUMPB) { _pc -= i.r0 + 1; }
-                handle(LEN) {
-                    auto* arr = value_to_array(REGISTER(i.r1));
-                    REGISTER(i.r0) = value_from_number(arr->size());
-                }
-                handle(ALLOC_ARRAY) {
-                    _arrays.emplace_back(ArrayType{});
-                    REGISTER(i.r0) = value_from_array(&_arrays.back());
-                }
-                handle(LOAD_ARRAY) {
-                    auto arr_val = REGISTER(i.r1);
-                    auto ind_val = REGISTER(i.r2);
-                    auto* arr = value_to_array(arr_val);
-                    auto ind_type = value_get_type(ind_val);
-                    auto ind = (ind_type == Type::Integer)
-                        ? value_to_integer(ind_val) 
-                        : (ind_type == Type::Number) 
-                            ? (int)value_to_number(ind_val)
-                            : error("expected number")._i;
-                    REGISTER(i.r0) = (*arr)[ind];
-                }
-                handle(CALL) {
-                    auto func_start = value_to_function(REGISTER(i.r0));
-                    auto nargs = i.r1;
-                    auto new_base = i.r2;
-                    
-                    REGISTER(new_base-2) = value_from_function(_pc); // push return addr
-                    REGISTER(new_base-1) = value_from_integer(_stackbase); // push return frameptr
-                    _pc = func_start - 1; // jump to addr
-                    _stackbase = _stackbase + new_base; // new stack frame
-                }
-                handle(RANDOM) {
-                    REGISTER(i.r0) = value_from_number(rand() % 10000);
-                }
-                handle(CLOCK) {
-                    REGISTER(i.r0) = value_from_number(duration_cast<microseconds>(steady_clock::now().time_since_epoch()).count() / 1e6);
-                }
-                handle(RET) {
-                    auto return_addr = REGISTER(-2);
-                    auto return_fptr = REGISTER(-1);
-                    if (i.r0) {
-                        REGISTER(-2) = REGISTER(i.r1);
-                    } else {
-                        REGISTER(-2) = value_null();
+        try {
+            while (_pc < _pe) {
+                auto i = program.instructions[_pc];
+                switch (i.opcode) {
+                    case Opcode::UNKNOWN: break;
+                    handle(LOAD_I) {
+                        REGISTER(i.r0) = value_from_integer(i.s1);
                     }
-                    _pc = value_to_function(return_addr);
-                    _stackbase = value_to_integer(return_fptr);
+                    handle(LOAD_CONST) {
+                        REGISTER(i.r0) = program.storage[i.r1];
+                    }
+                    handle(ADD) {
+                        REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) + value_to_number(REGISTER(i.r2)));
+                    }
+                    handle(SUB) {
+                        REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) - value_to_number(REGISTER(i.r2)));
+                    }
+                    handle(MUL) {
+                        REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) * value_to_number(REGISTER(i.r2)));
+                    }
+                    handle(DIV) {
+                        REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) / value_to_number(REGISTER(i.r2)));
+                    }
+                    handle(SHL) {
+                        auto* arr = value_to_array(REGISTER(i.r0));
+                        arr->emplace_back(REGISTER(i.r1));
+                    }
+                    handle(LESS) {
+                        REGISTER(i.r0) = value_from_boolean(
+                            value_to_number(REGISTER(i.r1)) <
+                            value_to_number(REGISTER(i.r2))
+                        );
+                    }
+                    handle(EQUAL) {
+                        REGISTER(i.r0) = value_from_boolean(
+                            value_to_number(REGISTER(i.r1)) ==
+                            value_to_number(REGISTER(i.r2))
+                        );
+                    }
+                    handle(LESSEQ) {
+                        REGISTER(i.r0) = value_from_boolean(
+                            value_to_number(REGISTER(i.r1)) <=
+                            value_to_number(REGISTER(i.r2))
+                        );
+                    }
+                    handle(GREATER) {
+                        REGISTER(i.r0) = value_from_boolean(
+                            value_to_number(REGISTER(i.r1)) >
+                            value_to_number(REGISTER(i.r2))
+                        );
+                    }
+                    handle(MOVE) {
+                        REGISTER(i.r0) = REGISTER(i.r1);
+                    }
+                    handle(CONDJUMP) {
+                        auto val = REGISTER(i.r0);
+                        if (!(
+                            (value_get_type(val) == Type::Boolean && value_to_boolean(val)) ||
+                            (value_get_type(val) == Type::Integer && value_to_integer(val)) ||
+                            (value_get_type(val) == Type::Number && value_to_number(val))
+                        )) { _pc += i.r1 - 1; }
+                    }
+                    handle(JUMPF) { _pc += i.r0 - 1; }
+                    handle(JUMPB) { _pc -= i.r0 + 1; }
+                    handle(LEN) {
+                        auto* arr = value_to_array(REGISTER(i.r1));
+                        REGISTER(i.r0) = value_from_number(arr->size());
+                    }
+                    handle(ALLOC_ARRAY) {
+                        _arrays.emplace_back(ArrayType{});
+                        REGISTER(i.r0) = value_from_array(&_arrays.back());
+                    }
+                    handle(LOAD_ARRAY) {
+                        auto arr_val = REGISTER(i.r1);
+                        auto ind_val = REGISTER(i.r2); 
+                        auto* arr = value_to_array(arr_val);
+                        auto ind_type = value_get_type(ind_val);
+                        auto ind = (ind_type == Type::Integer)
+                            ? value_to_integer(ind_val) 
+                            : (ind_type == Type::Number) 
+                                ? (int)value_to_number(ind_val)
+                                : error("expected number")._i;
+
+                        if (ind >= arr->size()) {
+                            throw runtime_error("outof range index");
+                        }
+                        REGISTER(i.r0) = (*arr)[ind];
+                    }
+                    handle(CALL) {
+                        auto func_start = value_to_function(REGISTER(i.r0));
+                        auto nargs = i.r1;
+                        auto new_base = i.r2;
+                        
+                        REGISTER(new_base-2) = value_from_function(_pc); // push return addr
+                        REGISTER(new_base-1) = value_from_integer(_stackbase); // push return frameptr
+                        _pc = func_start - 1; // jump to addr
+                        _stackbase = _stackbase + new_base; // new stack frame
+                    }
+                    handle(RANDOM) {
+                        REGISTER(i.r0) = value_from_number(rand() % 10000);
+                    }
+                    handle(CLOCK) {
+                        REGISTER(i.r0) = value_from_number(duration_cast<microseconds>(steady_clock::now().time_since_epoch()).count() / 1e6);
+                    }
+                    handle(RET) {
+                        auto return_addr = REGISTER(-2);
+                        auto return_fptr = REGISTER(-1);
+                        if (i.r0) {
+                            REGISTER(-2) = REGISTER(i.r1);
+                        } else {
+                            REGISTER(-2) = value_null();
+                        }
+                        _pc = value_to_function(return_addr);
+                        _stackbase = value_to_integer(return_fptr);
+                    }
+                    handle(PRINT) {
+                        log<true,false>(REGISTER(i.r0));
+                    }
+                    break; default: throw runtime_error("unknown instruction: " + to_string(i.opcode));
                 }
-                handle(PRINT) {
-                    log<true,false>(REGISTER(i.r0));
-                }
-                break; default: throw runtime_error("unknown instruction: " + to_string(i.opcode));
+                _pc++;
             }
-            _pc++;
+        }
+        catch (exception& e) {
+            // stack unwind
+            auto fp = _stackbase;
+            while (true) {
+                auto return_addr = value_to_function(_stack[fp - 2]);
+                fp = value_to_integer(_stack[fp - 1]);
+                log("return addr: ", return_addr, fp);
+                if (return_addr == program.instructions.size()) {
+                    break;
+                }
+            }
         }
     }
 };

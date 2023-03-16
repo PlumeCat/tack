@@ -1,4 +1,4 @@
-const array_random = fn(M) {
+fn array_random(M) {
     let i = 0
     const arr = []
     while i < M {
@@ -8,7 +8,7 @@ const array_random = fn(M) {
     return arr
 }
 
-const join = fn(a, b) {
+fn join(a, b) {
     const c = []
 
     let i = 0
@@ -28,7 +28,7 @@ const join = fn(a, b) {
     return c
 }
 
-const quicksort = fn(arr, qs, join) {
+fn quicksort(arr, qs, join) {
     const n = #arr
     if n <= 1 { return arr }
 
@@ -73,7 +73,7 @@ while i < N {
 }
 
 const before = clock()
-const B = quicksort(A, quicksort, join)
+const B = quicksort(A, quicksort, foo)
 const after = clock()
 
 print("time taken: ")

@@ -57,12 +57,16 @@ struct AstNode {
     vector<AstNode> children = {};
     string data_s = ""s; // string literal, identifier
     double data_d = 0.f; // num literal
+    uint32_t line_number = 0;
 
     AstNode() = default;
     AstNode(const AstNode& node) = default;
-    template<typename... Children> AstNode(AstType type, Children... ch) : type(type), children({ ch... }) {} // TODO: check forwarding
-    AstNode(AstType type, const string& data_s): type(type), data_s(data_s) {}
-    AstNode(double d): type(AstType::NumLiteral), data_d(d) {}
+    template<typename... Children> AstNode(AstType type, Children... ch)
+        : type(type), children({ ch... }) {} // TODO: check forwarding
+    AstNode(AstType type, const string& data_s)
+        : type(type), data_s(data_s) {}
+    AstNode(double d)
+        : type(AstType::NumLiteral), data_d(d) {}
 
     string tostring(const string& indent = "") const {
         auto s = indent + to_string(type) + (type == AstType::Identifier ? " " + data_s : ""s) + (type == AstType::NumLiteral ? " "s + to_string(data_d) : "");
@@ -75,86 +79,34 @@ struct AstNode {
 
 // parsing utils
 
-bool is_identifier_char(char c) {
-    return isalnum(c) || c == '_';
-}
-bool is_identifier_start_char(char c) {
-    return isalpha(c) || c == '_';
-}
-void skip_whitespace(string_view& code) {
-    auto n = 0;
-    for (; n < code.size(); n++) {
-        if (!isspace(code[n])) {
-            break;
-        }
-    }
-    code.remove_prefix(n);
-}
+struct ParseContext : private string_view {
+    uint32_t line_number = 0;
+    ParseContext(const string& s): string_view(s) {}
 
-bool parse_raw_number(string_view& code, double& out) {
-    auto end = (char*)nullptr;
-    auto result = strtod(code.data(), &end);
-    auto dist = end - code.data();
-    if (dist != 0) {
-        code.remove_prefix(dist);
-        out = result;
-        return true;
-    }
-    return false;
-}
-bool parse_raw_string_literal(string_view& code, string& out) {
-    skip_whitespace(code);
-    if (code.size() && code[0] == '"') {
-        for (auto n = 1; n < code.size(); n++) {
-            if (code[n] == '"') {
-                out = code.substr(1, n - 1);
-                code.remove_prefix(n + 1);
-                return true;
+    void remove_prefix(string_view::size_type s) noexcept {
+        for (auto i = 0; i < s; i++) {
+            if ((*this)[i] == '\n') {
+                line_number += 1;
             }
         }
-        throw runtime_error("Expected closing quote '\"'");
+        string_view::remove_prefix(s);
     }
-    return false;
-}
-bool parse_raw_identifier(string_view& code, string& out) {
-    skip_whitespace(code);
-    if (code.size() && is_identifier_start_char(code[0])) {
-        for (auto n = 1; n < code.size(); n++) {
-            if (!is_identifier_char(code[n])) {
-                out = code.substr(0, n);
-                code.remove_prefix(n);
-                return true;
-            }
-        }
-    }
-    return false;
-}
-bool parse_raw_string(string_view& code, char c) {
-    skip_whitespace(code);
-    if (code.size() && code[0] == c) {
-        code.remove_prefix(1);
-        return true;
-    }
-    return false;
-}
-bool parse_raw_string(string_view& code, const string& c) {
-    skip_whitespace(code);
-    if (code.size() >= c.size() && code.substr(0, c.size()) == c) {
-        code.remove_prefix(c.size());
-        return true;
-    }
-    return false;
-}
 
+    using string_view::operator[];
+    using string_view::size;
+    using string_view::data;
+    using string_view::substr;
+};
 
-
-#define SUCCESS(...) { out = AstNode(__VA_ARGS__); return true; }
+#define SUCCESS(...) { out = AstNode(__VA_ARGS__); out.line_number = _c.line_number; return true; }
 #define FAIL(); { code = _c; return false; }
+#define ERROR(msg) throw runtime_error("parsing error: " msg " | line: " + to_string(code.line_number))
+#define EXPECT(s) if (!parse_raw_string(code, s)) { FAIL(); }
 
 #define paste(a, b) a##b
-#define DECLPARSER(name) bool paste(parse_, name)(string_view& code, AstNode& out)
+#define DECLPARSER(name) bool paste(parse_, name)(ParseContext& code, AstNode& out)
 #define DEFPARSER(name, body) DECLPARSER(name) { auto _c = code; body; FAIL(); }
-#define SUBPARSER(name, body) auto paste(parse_, name) = [&](string_view& code, AstNode& out) -> bool { auto _c = code; body; FAIL(); };
+#define SUBPARSER(name, body) auto paste(parse_, name) = [&](ParseContext& code, AstNode& out) -> bool { auto _c = code; body; FAIL(); };
 
 #define TRY4(n1,n2,n3,n4)\
     auto n1 = AstNode {}; auto n2 = AstNode {}; auto n3 = AstNode {}; auto n4 = AstNode {};\
@@ -172,7 +124,79 @@ bool parse_raw_string(string_view& code, const string& c) {
     if (parse_raw_string(code, s))
 
 
-#define EXPECT(s) if (!parse_raw_string(code, s)) { FAIL(); }
+
+
+bool is_identifier_char(char c) {
+    return isalnum(c) || c == '_';
+}
+bool is_identifier_start_char(char c) {
+    return isalpha(c) || c == '_';
+}
+void skip_whitespace(ParseContext& code) {
+    auto n = 0;
+    for (; n < code.size(); n++) {
+        if (!isspace(code[n])) {
+            break;
+        }
+    }
+    code.remove_prefix(n);
+}
+
+bool parse_raw_number(ParseContext& code, double& out) {
+    auto end = (char*)nullptr;
+    auto result = strtod(code.data(), &end);
+    auto dist = end - code.data();
+    if (dist != 0) {
+        code.remove_prefix(dist);
+        out = result;
+        return true;
+    }
+    return false;
+}
+bool parse_raw_string_literal(ParseContext& code, string& out) {
+    skip_whitespace(code);
+    if (code.size() && code[0] == '"') {
+        for (auto n = 1; n < code.size(); n++) {
+            if (code[n] == '"') {
+                out = code.substr(1, n - 1);
+                code.remove_prefix(n + 1);
+                return true;
+            }
+        }
+        ERROR("expected closing quote '\"'");
+    }
+    return false;
+}
+bool parse_raw_identifier(ParseContext& code, string& out) {
+    skip_whitespace(code);
+    if (code.size() && is_identifier_start_char(code[0])) {
+        for (auto n = 1; n < code.size(); n++) {
+            if (!is_identifier_char(code[n])) {
+                out = code.substr(0, n);
+                code.remove_prefix(n);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+bool parse_raw_string(ParseContext& code, char c) {
+    skip_whitespace(code);
+    if (code.size() && code[0] == c) {
+        code.remove_prefix(1);
+        return true;
+    }
+    return false;
+}
+bool parse_raw_string(ParseContext& code, const string& c) {
+    skip_whitespace(code);
+    if (code.size() >= c.size() && code.substr(0, c.size()) == c) {
+        code.remove_prefix(c.size());
+        return true;
+    }
+    return false;
+}
+
 
 // left recursive binary operation
 // eg SubExpr = SubExpr '-' MulExpr
@@ -185,7 +209,7 @@ bool parse_raw_string(string_view& code, const string& c) {
                 TRYs(op) {\
                     TRY(precedent) {\
                         res = AstNode(AstType::ty, res, precedent);\
-                    } else throw runtime_error("foo bar baz");\
+                    } else ERROR("expected RHS for binary op '" op "'");\
                 } else break;\
             }\
             SUCCESS(res);\
@@ -259,7 +283,7 @@ DEFPARSER(literal, {
                 TRY(exp) {
                     res.children.emplace_back(exp);
                     TRYs(',') {} else break;
-                } else break; // throw runtime_error("unexpected symbol in array literal");
+                } else break;
             }
 
             EXPECT(']');
@@ -278,13 +302,28 @@ DEFPARSER(literal, {
             SUCCESS(p);
         })
         EXPECT("fn")
-        TRY(identifier) {} // TODO: named vs anon functions (a named function is a VarDeclStat, so can't be an expression?)
-        TRYs('(') {} else throw runtime_error("expected parameter definition after 'fn'");
+        TRY(identifier) {}
+        TRYs('(') {} else ERROR("expected parameter definition after 'fn'");
         TRY(param_def) {
-            TRYs(')') {} else throw runtime_error("expected ')' after parameter definition");
+            TRYs(')') {} else ERROR("expected ')' after parameter definition");
             TRY(block) {
-                SUCCESS(AstType::FuncLiteral, param_def, block, identifier)
-            } else throw runtime_error("expected block after parameter definition");
+                // SUCCESS(AstType::FuncLiteral, param_def, block, identifier)
+                if (identifier.type == AstType::Identifier) {
+                    // emit a const decl
+                    SUCCESS(AstType::ConstDeclStat, identifier,
+                        AstNode(AstType::FuncLiteral, param_def, block)
+                    );
+                    // TODO: this allows you to do 'let x = fn y() {... }'
+                    // which currently works as x and y end up
+                    // bound to the same register.
+                    // not sure if this is a good thing - may stop working suddenly
+                    // will break if user reassigns 'x'
+                } else {
+                    // emit func literal expression
+                    SUCCESS(AstType::FuncLiteral, param_def, block);
+                }
+                // 
+            } else ERROR("expected block after parameter definition");
         }
     });
     TRY(string_literal) SUCCESS(string_literal);
@@ -309,7 +348,7 @@ DEFPARSER(primary_exp, {
     TRY(identifier) SUCCESS(identifier)
     TRYs('(') {
         TRY(exp) {
-            TRYs(')') {} else throw runtime_error("expected closing ')'");
+            TRYs(')') {} else ERROR("expected closing ')'");
             SUCCESS(exp)
         }
     }
@@ -320,7 +359,7 @@ DEFPARSER(postfix_exp, {
         TRYs('.') {
             TRY(identifier) {
                 SUCCESS(identifier)
-            } else throw runtime_error("expected identifier after '.'");
+            } else ERROR("expected identifier after '.'");
         }
     });
     SUBPARSER(index_postfix, {
@@ -329,8 +368,8 @@ DEFPARSER(postfix_exp, {
             TRY(exp) {
                 TRYs(']') {
                     SUCCESS(exp)
-                } //else throw runtime_error("expected ']'");
-            } //else throw runtime_error("expected expression in square brackets");
+                }
+            }
         }
     });
     SUBPARSER(call_postfix, {
@@ -345,7 +384,7 @@ DEFPARSER(postfix_exp, {
                 TRYs(',') {
                     TRY(exp) {
                         res.children.emplace_back(exp);
-                    } else throw runtime_error("unexpected symbol in argument list");
+                    } else ERROR("unexpected symbol in argument list");
                 } else break;
             }
             SUCCESS(res)
@@ -354,8 +393,8 @@ DEFPARSER(postfix_exp, {
             TRY(arg_list) {
                 TRYs(')') {
                     SUCCESS(arg_list)
-                } else throw runtime_error("expected ')' after argument list");
-            } else throw runtime_error("expected ')' or argument list after '('");
+                } else ERROR("expected ')' after argument list");
+            } else ERROR("expected ')' or argument list after '('");
         }
     });
     TRY(primary_exp) {
@@ -394,11 +433,11 @@ DEFPARSER(unary_exp, {
 });
 
 BINOP(pow_exp, PowExp, unary_exp, "**");
-BINOP(mod_exp, ModExp, pow_exp, '%');
-BINOP(div_exp, DivExp, mod_exp, '/');
-BINOP(mul_exp, MulExp, div_exp, '*');
-BINOP(sub_exp, SubExp, mul_exp, '-');
-BINOP(add_exp, AddExp, sub_exp, '+');
+BINOP(mod_exp, ModExp, pow_exp, "%");
+BINOP(div_exp, DivExp, mod_exp, "/");
+BINOP(mul_exp, MulExp, div_exp, "*");
+BINOP(sub_exp, SubExp, mul_exp, "-");
+BINOP(add_exp, AddExp, sub_exp, "+");
 BINOP(shr_exp, ShiftRightExp, add_exp, ">>");
 BINOP(shl_exp, ShiftLeftExp, shr_exp, "<<");
 
@@ -415,9 +454,9 @@ DEFPARSER(cmp_exp, {
     }
 })
 
-BINOP(bit_and_exp, BitAndExp, cmp_exp, '&');
-BINOP(bit_xor_exp, BitXorExp, bit_and_exp, '^');
-BINOP(bit_or_exp, BitOrExp, bit_xor_exp, '|');
+BINOP(bit_and_exp, BitAndExp, cmp_exp, "&");
+BINOP(bit_xor_exp, BitXorExp, bit_and_exp, "^");
+BINOP(bit_or_exp, BitOrExp, bit_xor_exp, "|");
 BINOP(and_exp, AndExp, bit_or_exp, "&&");
 BINOP(or_exp, OrExp, and_exp, "||");
 
@@ -544,7 +583,7 @@ DEFPARSER(module, {
 
 
 bool parse(const string& code, AstNode& out_ast) {
-    auto s_code = string_view { code };
+    auto s_code = ParseContext(code);
     out_ast = AstNode { AstType::Unknown };
     auto res = parse_module(s_code, out_ast);
     if (!res) {
