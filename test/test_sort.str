@@ -49,6 +49,7 @@ fn quicksort(arr, qs, join) {
     const mid = (min + max) / 2
     let upper = []
     let lower = []
+    print(mid)
 
     " pivot "
     i = 0
@@ -58,23 +59,29 @@ fn quicksort(arr, qs, join) {
         else { upper << e }
         i = i + 1
     }
+    
+    print(lower)
+    lower = qs(lower, qs, join)
+    print(lower)
+    
+    print(upper)
+    upper = qs(upper, qs, join)
+    print(upper)
 
-    " recurse "
-    return join(qs(lower, qs, join), qs(upper, qs, join))
+    return join(lower, upper)
 }
 
-const N = 1000
+const N = 5
 "let A = array_random(N)"
 const A = []
 let i = 0
 while i < N {
     i = i + 1
-    A << i
+    A << random()
 }
 
+print(A)
 const before = clock()
 const B = quicksort(A, quicksort, join)
 const after = clock()
-
-print("time taken: ")
-print(after - before)
+print(B)

@@ -210,20 +210,21 @@ ostream& operator<<(ostream& o, const Value& v) {
         return o << value_to_number(v);
     }
     switch (v._i & type_bits) {
-        case (uint64_t)Type::Null:        return o << "null";
-        case (uint64_t)Type::Boolean:     return o << (value_to_boolean(v) ? "true" : "false");
-        case (uint64_t)Type::Integer:     return o << value_to_integer(v);
-        case (uint64_t)Type::String:      return o << *value_to_string(v);
-        case (uint64_t)Type::Pointer:     return o << value_to_pointer(v);
-        case (uint64_t)Type::Object:      return o << "object {" << *value_to_object(v) << "}"; //*value_to_object(v);
-        case (uint64_t)Type::Array:       return o << "array [" << *value_to_array(v) << "]"; //*value_to_array(v);
-        case (uint64_t)Type::Function:    return o << "fn @ " << value_to_function(v);
-        case (uint64_t)Type::Mat4:        return o << *value_to_mat4(v);
-        case (uint64_t)Type::Vec2:        return o << *value_to_vec2(v);
-        case (uint64_t)Type::Vec3:        return o << *value_to_vec3(v);
-        case (uint64_t)Type::Vec4:        return o << *value_to_vec4(v);
-        case type_bits_boxed:   return o << *value_to_box(v);
-        default:                return o << "(unknown)" << hex << v._i << dec;
+        case (uint64_t)Type::Null:      return o << "null";
+        case (uint64_t)Type::Boolean:   return o << (value_to_boolean(v) ? "true" : "false");
+        case (uint64_t)Type::Integer:   return o << value_to_integer(v);
+        case (uint64_t)Type::String:    return o << *value_to_string(v);
+        case (uint64_t)Type::Pointer:   return o << value_to_pointer(v);
+        case (uint64_t)Type::Object:    return o << "object {" << *value_to_object(v) << "}"; //*value_to_object(v);
+        case (uint64_t)Type::Array:     return o << "array [" << *value_to_array(v) << "]"; //*value_to_array(v);
+        case (uint64_t)Type::Function:  return o << "fn @ " << value_to_function(v);
+        case (uint64_t)Type::Mat4:      return o << *value_to_mat4(v);
+        case (uint64_t)Type::Vec2:      return o << *value_to_vec2(v);
+        case (uint64_t)Type::Vec3:      return o << *value_to_vec3(v);
+        case (uint64_t)Type::Vec4:      return o << *value_to_vec4(v);
+        case type_bits_boxed:           return o << *value_to_box(v);
+        default:                        return o << "(unknown)" << hex << v._i << dec;
+        // default: return o << value_to_number(v);
     }
 }
 ostream& operator<<(ostream& o, const ArrayType& arr) {

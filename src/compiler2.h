@@ -35,9 +35,15 @@ struct Compiler2 {
 static const uint32_t MAX_REGISTERS = 256;
 struct VariableContext {
     uint8_t reg;
+
     bool is_const = false;
     bool is_reassigned = false;
     bool is_captured = false;
+    
+    uint32_t first_read = 0;
+    uint32_t last_read = 0;
+    uint32_t first_write = 0;
+    uint32_t last_write = 0;
 };
 struct ScopeContext {
     hash_map<string, VariableContext> bindings; // variables
@@ -180,7 +186,7 @@ struct FunctionContext {
                 // handle(CallExp)
                 // handle(ArgList)
                 // handle(IndexExp)
-            // handle(AccessExp)
+                // handle(AccessExp)
             
                 // handle(ClockExp)
                 // handle(RandomExp)
@@ -190,7 +196,7 @@ struct FunctionContext {
                 // handle(NumLiteral)
                 // handle(StringLiteral)
                 // handle(ArrayLiteral)
-            // handle(ObjectLiteral)
+                // handle(ObjectLiteral)
                 // handle(Identifier)
 
             handle(StatList) { should_allocate(0);
@@ -216,7 +222,6 @@ struct FunctionContext {
                     label(startelse);
                     compile(node.children[2], program);
                     label(endelse);
-                    // TODO: can be more efficient for the case when there's no else (probably)
                     if (endelse - endif > 0xff) {
                         throw runtime_error("jump too much");
                     }
@@ -339,25 +344,26 @@ struct FunctionContext {
             }
             handle(CallExp) { should_allocate(1);
                 auto nargs = node.children[1].children.size();
-                
+                // log("call", nargs);
                 // compile the arguments first and remember which registers they are in
                 auto arg_regs = vector<uint8_t>{};
                 for (auto i = 0; i < nargs; i++) {
                     arg_regs.emplace_back(compile(node.children[1].children[i], program));
+                    // log("arg reg: ", i, arg_regs.back());
                 }
                 auto func_reg = compile(node.children[0], program); // LHS evaluates to function
 
                 // copy arguments to top of stack in sequence
-                auto end_reg = get_end_register() + 2; // leave space for stack frame
+                auto end_reg = get_end_register();
                 for (auto i = 0; i < nargs; i++) {
-                    emit(MOVE, end_reg + i, arg_regs[i], 0);
+                    emit(MOVE, end_reg + i + 2, arg_regs[i], 0);
                 }
                 
                 emit(CALL, func_reg, nargs, end_reg);
                 
-                // free function register; arg regs were never 'allocated' so no need to free
-                free_register(func_reg);
-                return end_reg - 2; // return value copied to end register
+                // return value goes in end-reg so mark it as used
+                registers[end_reg] = BUSY;
+                return end_reg; // return value copied to end register
             }
             handle(ClockExp) {
                 auto reg = allocate_register();
@@ -383,8 +389,9 @@ struct FunctionContext {
                         // emit(RET, 0, 0, 0);
                     }
                     emit(RET, 1, return_register, 0);
+                } else {
+                    emit(RET, 0, 0, 0);
                 }
-                emit(RET, 0, 0, 0);
                 return 0xff; // it's irrelevant
             }
             handle(LenExp) {
@@ -576,7 +583,7 @@ void Compiler2::compile(const AstNode& module, Program& program) {
 }
 uint8_t Compiler2::add_function(Program& program, FunctionContext* parent_context, const AstNode* node) {
     auto storage_index = program.storage.size();
-    program.storage.emplace_back(value_from_function(0));
+    program.storage.emplace_back(value_null());
     funcs.emplace_back(FunctionContext { this, parent_context, node, (uint8_t)storage_index });
     return storage_index;
 }
@@ -585,21 +592,32 @@ uint8_t Compiler2::add_function(Program& program, FunctionContext* parent_contex
 struct Interpreter2 {
     // Lua only allows 256 registers, we should do the same
 
-    #define handle(opcode) break; case Opcode::opcode:
     void execute(const Program& program) {
-
+        #define handle(opcode) break; case Opcode::opcode:
         #define REGISTER(n) _stack[_stackbase+n]
+
         auto _stack = array<Value, 4096> {};
+        _stack.fill(value_null());
         auto _stackbase = 0u;
         auto _pc = 0u;
         auto _pe = program.instructions.size();
         auto _arrays = list<ArrayType>{};
         auto _objects = list<ObjectType>{};
+        auto _boxes = list<Value>{};
         auto error = [&](auto err) { throw runtime_error(err); return value_null(); };
 
-        REGISTER(0) = value_from_function(program.instructions.size()); // pseudo function that jumps to end
-        REGISTER(1) = value_from_integer(0); // reset stack base to 0
+        REGISTER(0)._i = program.instructions.size(); // pseudo function that jumps to end
+        REGISTER(1)._i = 0; // reset stack base to 0
         _stackbase = 2;
+
+        auto dumpstack = [&] {
+            log<true, false>(" ---- Stack ---- ");
+            for (auto i = 0; i < 20 && value_get_type(REGISTER(i)) != Type::Null; i++) {
+                log<true, false>(i, ": ", REGISTER(i));
+            }
+            log<true, false>(" --------------- ");
+
+        };
 
         try {
             while (_pc < _pe) {
@@ -667,6 +685,7 @@ struct Interpreter2 {
                     }
                     handle(MOVE) {
                         REGISTER(i.r0) = REGISTER(i.r1);
+                        // log<true, false>("MOVE: ", (int)i.r0, ": ", REGISTER(i.r0), " <- ", (int)i.r1, ": ", REGISTER(i.r1));
                     }
                     handle(CONDJUMP) {
                         auto val = REGISTER(i.r0);
@@ -702,7 +721,7 @@ struct Interpreter2 {
                                 : error("expected number")._i;
 
                         if (ind >= arr->size()) {
-                            throw runtime_error("outof range index");
+                            error("outof range index");
                         }
                         REGISTER(i.r0) = (*arr)[ind];
                     }
@@ -718,7 +737,7 @@ struct Interpreter2 {
                                 : error("expected number")._i;
                         
                         if (ind > arr->size()) {
-                            throw runtime_error("outof range index");
+                            error("outof range index");
                         }
                         (*arr)[ind] = REGISTER(i.r0);
                     }
@@ -727,11 +746,11 @@ struct Interpreter2 {
                         auto key_val = REGISTER(i.r2);
                         auto* obj = value_to_object(obj_val);
                         if (value_get_type(key_val) != Type::String) {
-                            throw runtime_error("expected string key");
+                            error("expected string key");
                         }
                         auto iter = obj->find(*value_to_string(key_val));
                         if (iter == obj->end()) {
-                            throw runtime_error("key not found");
+                            error("key not found");
                         }
                         REGISTER(i.r0) = iter->second;
                     }
@@ -740,19 +759,22 @@ struct Interpreter2 {
                         auto key_val = REGISTER(i.r2);
                         auto* obj = value_to_object(obj_val);
                         if (value_get_type(key_val) != Type::String) {
-                            throw runtime_error("expected string key");
+                            error("expected string key");
                         }
                         (*obj)[*value_to_string(key_val)] = REGISTER(i.r0);
                     }
                     handle(CALL) {
-                        auto func_start = value_to_function(REGISTER(i.r0));
+                        auto func_start = REGISTER(i.r0)._i;
                         auto nargs = i.r1;
                         auto new_base = i.r2;
                         
-                        REGISTER(new_base-2) = value_from_function(_pc); // push return addr
-                        REGISTER(new_base-1) = value_from_integer(_stackbase); // push return frameptr
+                        REGISTER(new_base)._i = _pc; // push return addr
+                        REGISTER(new_base+1)._i = _stackbase; // push return frameptr
+                        
+                        // dumpstack();
+                        
                         _pc = func_start - 1; // jump to addr
-                        _stackbase = _stackbase + new_base; // new stack frame
+                        _stackbase = _stackbase + new_base + 2; // new stack frame
                     }
                     handle(RANDOM) {
                         REGISTER(i.r0) = value_from_number(rand() % 10000);
@@ -763,18 +785,23 @@ struct Interpreter2 {
                     handle(RET) {
                         auto return_addr = REGISTER(-2);
                         auto return_fptr = REGISTER(-1);
+                        REGISTER(-1) = value_null();
                         if (i.r0) {
                             REGISTER(-2) = REGISTER(i.r1);
+                            // log("return value: ", REGISTER(i.r1));
                         } else {
                             REGISTER(-2) = value_null();
                         }
-                        _pc = value_to_function(return_addr);
-                        _stackbase = value_to_integer(return_fptr);
+                        _pc = return_addr._i;
+                        _stackbase = return_fptr._i;
+
+                        // dumpstack();
                     }
                     handle(PRINT) {
+                        // dumpstack();
                         log<true,false>(REGISTER(i.r0));
                     }
-                    break; default: throw runtime_error("unknown instruction: " + to_string(i.opcode));
+                    break; default: error("unknown instruction: " + to_string(i.opcode));
                 }
                 _pc++;
             }
