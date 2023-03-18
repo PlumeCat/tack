@@ -260,7 +260,20 @@ struct FunctionContext {
                     free_register(index_reg);
                     free_register(array_reg);
                 } else if (lhs.type == AstType::AccessExp) {
+                    auto obj_reg = compile(lhs.children[0], program);
 
+                    // save identifier as string and load it
+                    auto key_reg = allocate_register();
+                    auto in1 = (uint8_t)program.storage.size();
+                    program.strings.emplace_back(lhs.children[1].data_s);
+                    program.storage.emplace_back(value_from_string(
+                        &program.strings.back()
+                    ));
+                    emit(LOAD_CONST, key_reg, in1, 0);
+                    
+                    emit(STORE_OBJECT, reg, obj_reg, key_reg);
+                    free_register(obj_reg);
+                    free_register(key_reg);
                 }
                 free_register(reg);
                 return reg;
@@ -335,6 +348,12 @@ struct FunctionContext {
                 auto reg = allocate_register();
                 emit(RANDOM, reg, 0, 0);
                 return reg;
+            }
+            handle(PrintStat) { // no output
+                auto in1 = compile(node.children[0], program);
+                emit(PRINT, in1, 0, 0);
+                free_register(in1);
+                return 0xff;
             }
             handle(ReturnStat) {
                 if (node.children.size()) {
@@ -464,16 +483,15 @@ struct FunctionContext {
                 emit(ALLOC_ARRAY, reg, 0, 0);
                 return reg;
             }
+            handle(ObjectLiteral) {
+                auto reg = allocate_register();
+                emit(ALLOC_OBJECT, reg, 0, 0);
+                return reg;
+            }
             handle(ShiftLeftExp) {
                 auto arr = compile(node.children[0], program);
                 auto value = compile(node.children[1], program);
                 emit(SHL, arr, value, 0);
-                return 0xff;
-            }
-            handle(PrintStat) { // no output
-                auto in1 = compile(node.children[0], program);
-                emit(PRINT, in1, 0, 0);
-                free_register(in1);
                 return 0xff;
             }
             handle(IndexExp) {
@@ -483,6 +501,26 @@ struct FunctionContext {
                 emit(LOAD_ARRAY, out, arr, ind);
                 free_register(arr);
                 free_register(ind);
+                return out;
+            }
+            handle(AccessExp) {
+                // TODO: object read
+                auto obj = compile(node.children[0], program);
+                
+                // save identifier as string and load it
+                auto key = allocate_register();
+                auto in1 = (uint8_t)program.storage.size();
+                program.strings.emplace_back(node.children[1].data_s);
+                program.storage.emplace_back(value_from_string(
+                    &program.strings.back()
+                ));
+                emit(LOAD_CONST, key, in1, 0);
+                
+                // load from object
+                auto out = allocate_register();
+                emit(LOAD_OBJECT, out, obj, key);
+                free_register(obj);
+                free_register(key);
                 return out;
             }
 
@@ -535,7 +573,7 @@ struct Interpreter2 {
         auto _pc = 0u;
         auto _pe = program.instructions.size();
         auto _arrays = list<ArrayType>{};
-        // auto arrays = vector<ArrayType>(4096);
+        auto _objects = list<ObjectType>{};
         auto error = [&](auto err) { throw runtime_error(err); return value_null(); };
 
         REGISTER(0) = value_from_function(program.instructions.size()); // pseudo function that jumps to end
@@ -627,6 +665,10 @@ struct Interpreter2 {
                         _arrays.emplace_back(ArrayType{});
                         REGISTER(i.r0) = value_from_array(&_arrays.back());
                     }
+                    handle(ALLOC_OBJECT) {
+                        _objects.emplace_back(ObjectType{});
+                        REGISTER(i.r0) = value_from_object(&_objects.back());
+                    }
                     handle(LOAD_ARRAY) {
                         auto arr_val = REGISTER(i.r1);
                         auto ind_val = REGISTER(i.r2); 
@@ -658,6 +700,28 @@ struct Interpreter2 {
                             throw runtime_error("outof range index");
                         }
                         (*arr)[ind] = REGISTER(i.r0);
+                    }
+                    handle(LOAD_OBJECT) {
+                        auto obj_val = REGISTER(i.r1);
+                        auto key_val = REGISTER(i.r2);
+                        auto* obj = value_to_object(obj_val);
+                        if (value_get_type(key_val) != Type::String) {
+                            throw runtime_error("expected string key");
+                        }
+                        auto iter = obj->find(*value_to_string(key_val));
+                        if (iter == obj->end()) {
+                            throw runtime_error("key not found");
+                        }
+                        REGISTER(i.r0) = iter->second;
+                    }
+                    handle(STORE_OBJECT) {
+                        auto obj_val = REGISTER(i.r1);
+                        auto key_val = REGISTER(i.r2);
+                        auto* obj = value_to_object(obj_val);
+                        if (value_get_type(key_val) != Type::String) {
+                            throw runtime_error("expected string key");
+                        }
+                        (*obj)[*value_to_string(key_val)] = REGISTER(i.r0);
                     }
                     handle(CALL) {
                         auto func_start = value_to_function(REGISTER(i.r0));

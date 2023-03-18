@@ -17,3 +17,25 @@ while i < 10 {
 }
 
 print(x)
+
+
+fn vec2(x, y) {
+    let v = {}
+    v.x = x
+    v.y = y
+    return v
+}
+
+
+let v = vec2(1, 2)
+
+print(v)
+
+v.x = 42
+v.y = 34
+print(v)
+
+v.x = "hello"
+v.y = "world"
+
+print(v)
