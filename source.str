@@ -1,22 +1,19 @@
-let a = 1
-let b = 2
-let c = a + b
+let x = []
+print(x)
 
-let d = (a + 1) * (c / 2) + (b * 32)
-
-let get_zero = fn() {
-    return 2 - 4 / 2
-}
-
-let i = get_zero()
-while i < 10 {
+let i = 0
+while i < 10{ 
     i = i + 1
-    print(i)
+    x << i
 }
 
-let arr = []
-arr << 1
-arr << 2
-arr << 3
+print(x)
 
-print(arr[2])
+
+i = 0
+while i < 10 {
+    x[i] = x[i] * x[i] 
+    i = i + 1
+}
+
+print(x)

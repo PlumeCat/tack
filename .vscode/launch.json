@@ -5,7 +5,7 @@
             "request": "launch",
             "name": "Launch Debug",
             "program": "${workspaceFolder}/build/Debug/tack",
-            "args": [ "test/test_sort.str", "-A", "-D" ],
+            "args": [ "source.str", "-A", "-D" ],
             "preLaunchTask": "Build - Debug",
             "cwd": "${workspaceFolder}"
         }, {

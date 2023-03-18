@@ -69,7 +69,10 @@ struct AstNode {
         : type(AstType::NumLiteral), data_d(d) {}
 
     string tostring(const string& indent = "") const {
-        auto s = indent + to_string(type) + (type == AstType::Identifier ? " " + data_s : ""s) + (type == AstType::NumLiteral ? " "s + to_string(data_d) : "");
+        auto s = indent + to_string(type) + 
+            (type == AstType::Identifier ? " " + data_s : ""s) + 
+            (type == AstType::NumLiteral ? " "s + to_string(data_d) : "") +
+            ' ' + to_string(line_number);
         for (const auto& c : children) {
             s += "\n" + indent + c.tostring(indent + "  ");
         }
@@ -80,7 +83,7 @@ struct AstNode {
 // parsing utils
 
 struct ParseContext : private string_view {
-    uint32_t line_number = 0;
+    uint32_t line_number = 1;
     ParseContext(const string& s): string_view(s) {}
 
     void remove_prefix(string_view::size_type s) noexcept {
@@ -100,7 +103,7 @@ struct ParseContext : private string_view {
 
 #define SUCCESS(...) { out = AstNode(__VA_ARGS__); out.line_number = _c.line_number; return true; }
 #define FAIL(); { code = _c; return false; }
-#define ERROR(msg) throw runtime_error("parsing error: " msg " | line: " + to_string(code.line_number))
+#define ERROR(msg) throw runtime_error("parsing error: " msg " | line: " + to_string(code.line_number) + "\n'" + string(code.substr(0, 32))  + "... '")
 #define EXPECT(s) if (!parse_raw_string(code, s)) { FAIL(); }
 
 #define paste(a, b) a##b
@@ -307,22 +310,11 @@ DEFPARSER(literal, {
         TRY(param_def) {
             TRYs(')') {} else ERROR("expected ')' after parameter definition");
             TRY(block) {
-                // SUCCESS(AstType::FuncLiteral, param_def, block, identifier)
                 if (identifier.type == AstType::Identifier) {
-                    // emit a const decl
-                    SUCCESS(AstType::ConstDeclStat, identifier,
-                        AstNode(AstType::FuncLiteral, param_def, block)
-                    );
-                    // TODO: this allows you to do 'let x = fn y() {... }'
-                    // which currently works as x and y end up
-                    // bound to the same register.
-                    // not sure if this is a good thing - may stop working suddenly
-                    // will break if user reassigns 'x'
+                    SUCCESS(AstType::FuncLiteral, param_def, block, identifier);
                 } else {
-                    // emit func literal expression
                     SUCCESS(AstType::FuncLiteral, param_def, block);
                 }
-                // 
             } else ERROR("expected block after parameter definition");
         }
     });
@@ -554,6 +546,7 @@ DEFPARSER(while_stat, {
 })
 DEFPARSER(stat_list, {
     out.type = AstType::StatList;
+    out.line_number = _c.line_number;
     while (true) {
         auto n = AstNode {};
         if (0

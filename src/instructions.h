@@ -19,7 +19,7 @@
     /* lua can jump 1<<24 instructions */\
     opcode(JUMPF) opcode(JUMPB) opcode(CONDJUMP)\
     opcode(ALLOC_OBJECT)\
-    opcode(ALLOC_ARRAY) opcode(LOAD_ARRAY) \
+    opcode(ALLOC_ARRAY) opcode(LOAD_ARRAY) opcode(STORE_ARRAY) \
     opcode(PRECALL) opcode(CALL) opcode(RET)/**/\
     opcode(PRINT) opcode(CLOCK) opcode(RANDOM) \
     \

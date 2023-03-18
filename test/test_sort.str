@@ -73,7 +73,7 @@ while i < N {
 }
 
 const before = clock()
-const B = quicksort(A, quicksort, foo)
+const B = quicksort(A, quicksort, join)
 const after = clock()
 
 print("time taken: ")

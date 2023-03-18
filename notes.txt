@@ -110,15 +110,12 @@ Instructions:
 	are used to implement condjumps; EQ conditionally jumps the next
 	instruction, so you can schedule an unconditional jump straight after
 	to implement condjump
-	
 
-Notes:
+Objects, arrays, closures
 	objects will need some kind of 'prototype' or 'index' field to implement classes
 
 	arrays are true arrays, not just object in disguise
 
-	function value could implement with pointer-to-code and pointer-to-closure
-	for a class function we could use the "self" object as the closure
 	for a free function the closure is the containing scope
 	captured scopes will need to capture parent scopes as well (up to module or function boundary)
 	so will need a linked list or something
@@ -130,19 +127,7 @@ Notes:
 	this is assumed to be running as part of a game engine
 	so make sure the garbage collector can be done in parallel slices multi threaded and deterministic time limits
 
-Notes:
-	bits of double: 1 sign 11 exp 52 frac
-	nan: exp==1, frac!=0
-		we will set the top 16 bits to 1
-		and use the bottom 48 for whatever
-	inf: exp==1, frac==0
-	zero:exp==0, frac==0
-	nan happens when exp is all 1, frac is non-zero (sign bit ignored)
-	quick and safe to set first 16 bits to 1, and use the remaining 48 bits for whatever
-
-Notes:
-	Exceptions / error handling
-
+Exceptions / error handling
 	The interpreter loop is stackless - maintains its own stack
 	This means we don't need exceptions, longjmp, goto or anything
 	too problematic for error handling. Instead we can just jump out of the interpreter loop
@@ -169,8 +154,7 @@ Notes:
 	make sure that if an instruction errors and we choose to continue, the stack is preserved, ie the expected
 	pops/pushes have occurred
 
-
-Notes:
+Types
 	Type analysis might be useful for optimization
 	eg.
 		let c = a + b
@@ -276,6 +260,26 @@ Notes:
 	We can use escape analysis to figure out whether the inner function escapes the outer function, and
 	therefore whether it is a quasi-closure or not.
 
-	Any named recursive function needs to capture itself so it can call itself.
-	However what we are really doing is 
+	Another special case for closures is a recursive non-anonymous function
+	The code emitted is something like this
+		fn foo() {
+			...
+			foo(...)
+			..
+		}
+		->
+		const foo = fn() {
+			...
+			foo(...)
+		}
+	so foo has to capture itself from the enclosing scope.
+	might be worth optimising this case
+	lua appears to set the function as an upvalue
+	(for a recursive non-named function we need acrobatics like the y-combinator
+	iiuc Y() is doing something equivalent where the function itself uses
+	a 'recurse' variable which is then contorted to point to itself)
+		on further reading, x => y => y(x) is capturing x from a higher scope
+
+	we could do something like always put a function in its own registers
+	eg at position 0
 	

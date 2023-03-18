@@ -30,6 +30,12 @@ struct Compiler2 {
 };
 
 static const uint32_t MAX_REGISTERS = 256;
+struct VariableContext {
+    uint8_t reg;
+    bool is_const = false;
+    bool is_reassigned = false;
+    bool is_captured = false;
+};
 struct ScopeContext {
     hash_map<string, uint8_t> bindings; // variables
 };
@@ -37,9 +43,10 @@ struct FunctionContext {
     Compiler2* compiler;
     const AstNode* node;
     uint8_t storage_index;
+    string name;
 
     // vector<ScopeContext> scopes;
-    hash_map<string, uint8_t> bindings;
+    hash_map<string, VariableContext> bindings;
     array<RegisterState, MAX_REGISTERS> registers;
 
     // get a free register
@@ -66,16 +73,17 @@ struct FunctionContext {
     }
 
     // set a register as bound by a variable
-    void bind_register(const string& binding, uint8_t reg) {
+    void bind_register(const string& binding, uint8_t reg, bool is_const = false) {
         registers[reg] = BOUND;
-        bindings[binding] = reg;
+        bindings[binding] = { reg, is_const };
     }
 
-    // change a binding
-    void rebind_register(const string& binding, uint8_t new_reg) {
-        auto old_reg = bindings[binding];
-        registers[old_reg] = FREE;
-        bind_register(binding, new_reg);
+    // find an existing variable
+    VariableContext& lookup(const string& name) {
+        if (auto iter = bindings.find(name); iter != bindings.end()) {
+            return iter->second;
+        }
+        throw runtime_error("can't find variable: " + name);
     }
     
     // free a register if it's not bound
@@ -97,7 +105,6 @@ struct FunctionContext {
     #define rewrite(pos, type, r0, r1, r2)  program.instructions[pos] = { Opcode::type, r0, r1, r2 };
     #define label(name)                     auto name = program.instructions.size();
     #define emit2(...)                      program.instructions.emplace_back(__VA_ARGS__)
-
     #define should_allocate(n)
 
     uint8_t compile(Program& program) {
@@ -106,7 +113,7 @@ struct FunctionContext {
         auto nargs = node->children[0].children.size(); // ParamDef
         for (auto i = 0; i < nargs; i++) {
             auto& param = node->children[0].children[i]; // Identifier
-            bind_register(param.data_s, i);
+            bind_register(param.data_s, i, false); // TODO: could choose to make arguments const?
         }
         auto reg = compile(node->children[1], program);
         emit(RET, 0, 0, 0);
@@ -117,32 +124,32 @@ struct FunctionContext {
 
                 // handle(StatList)
         
-            // handle(ConstDeclStat)
+                // handle(ConstDeclStat)
                 // handle(VarDeclStat)
-            // handle(AssignStat)
+                // handle(AssignStat)
                 // handle(PrintStat)
             
-            // handle(IfStat)
-            // handle(WhileStat)
+                // handle(IfStat)
+                // handle(WhileStat)
                 // handle(ReturnStat)
             
-            // handle(EqExp)
-            // handle(NotEqExp)
-            // handle(LessExp)
-            // handle(GreaterExp)
-            // handle(LessEqExp)
-            // handle(GreaterEqExp)
+                // handle(EqExp)
+                // handle(NotEqExp)
+                // handle(LessExp)
+                // handle(GreaterExp)
+                // handle(LessEqExp)
+                // handle(GreaterEqExp)
             // handle(OrExp)
             // handle(AndExp)
             // handle(BitOrExp)
             // handle(BitAndExp)
             // handle(BitXorExp)
-            // handle(ShiftLeftExp)
+                // handle(ShiftLeftExp)
             // handle(ShiftRightExp)
-            // handle(AddExp)
-            // handle(SubExp)
-            // handle(MulExp)
-            // handle(DivExp)
+                // handle(AddExp)
+                // handle(SubExp)
+                // handle(MulExp)
+                // handle(DivExp)
             // handle(ModExp)
             // handle(PowExp)
             
@@ -150,21 +157,21 @@ struct FunctionContext {
             // handle(NegateExp)
             // handle(NotExp)
             // handle(BitNotExp)
-            // handle(LenExp)
+                // handle(LenExp)
             
                 // handle(CallExp)
                 // handle(ArgList)
-            // handle(IndexExp)
+                // handle(IndexExp)
             // handle(AccessExp)
             
-            // handle(ClockExp)
-            // handle(RandomExp)
+                // handle(ClockExp)
+                // handle(RandomExp)
             
                 // handle(FuncLiteral)
                 // handle(ParamDef)
-            // handle(NumLiteral)
-            // handle(StringLiteral)
-            // handle(ArrayLiteral)
+                // handle(NumLiteral)
+                // handle(StringLiteral)
+                // handle(ArrayLiteral)
             // handle(ObjectLiteral)
                 // handle(Identifier)
 
@@ -232,24 +239,35 @@ struct FunctionContext {
             }
             handle(ConstDeclStat) { should_allocate(1);
                 auto reg = compile(node.children[1], program);
-                bind_register(node.children[0].data_s, reg);
+                bind_register(node.children[0].data_s, reg, true);
                 return reg;
             }
             handle(AssignStat) { should_allocate(0);
                 auto reg = compile(node.children[1], program);
-                // TODO: try and elide this MOVE
-                // see if we can force the 
-                // failing that, a generic MOVE-elision pass hopefully will work
-                auto target = bindings.find(node.children[0].data_s);
-                if (target == bindings.end()) {
-                    throw runtime_error("unknown variable: " + node.children[0].data_s);
+                auto& lhs = node.children[0];
+                if (lhs.type == AstType::Identifier) {
+                    // TODO: try and elide this MOVE with 'target' register
+                    auto& var = lookup(node.children[0].data_s);
+                    if (var.is_const) {
+                        throw runtime_error("can't reassign const");
+                    }
+                    var.is_reassigned = true;
+                    emit(MOVE, var.reg, reg, 0);
+                } else if (lhs.type == AstType::IndexExp) {
+                    auto array_reg = compile(lhs.children[0], program);
+                    auto index_reg = compile(lhs.children[1], program);
+                    emit(STORE_ARRAY, reg, array_reg, index_reg);
+                    free_register(index_reg);
+                    free_register(array_reg);
+                } else if (lhs.type == AstType::AccessExp) {
+
                 }
-                emit(MOVE, target->second, reg, 0);
                 free_register(reg);
                 return reg;
             }
             handle(Identifier) { should_allocate(0);
-                return bindings[node.data_s];
+                // return bindings[node.data_s];
+                return lookup(node.data_s).reg;
             }
             handle(NumLiteral) { should_allocate(1);
                 auto n = node.data_d;
@@ -281,6 +299,9 @@ struct FunctionContext {
                 compiler->add_function(program, &node);
                 auto out = allocate_register();
                 emit(LOAD_CONST, out, compiler->funcs.back().storage_index, 0);
+                if (node.children.size() == 3) {
+                    bind_register(node.children[2].data_s, out);
+                }
                 return out;
             }
             handle(CallExp) { should_allocate(1);
@@ -387,11 +408,29 @@ struct FunctionContext {
                 free_register(in2);
                 return out;
             }
+            handle(NotEqExp) {
+                auto in1 = compile(node.children[0], program);
+                auto in2 = compile(node.children[1], program);
+                auto out = allocate_register();
+                emit(NEQUAL, out, in1, in2);
+                free_register(in1);
+                free_register(in2);
+                return out;
+            }
             handle(GreaterExp) {
                 auto in1 = compile(node.children[0], program);
                 auto in2 = compile(node.children[1], program);
                 auto out = allocate_register();
                 emit(GREATER, out, in1, in2);
+                free_register(in1);
+                free_register(in2);
+                return out;
+            }
+            handle(GreaterEqExp) {
+                auto in1 = compile(node.children[0], program);
+                auto in2 = compile(node.children[1], program);
+                auto out = allocate_register();
+                emit(GREATEREQ, out, in1, in2);
                 free_register(in1);
                 free_register(in2);
                 return out;
@@ -415,8 +454,13 @@ struct FunctionContext {
                 return out;
             }
             handle(ArrayLiteral) {
-                // TODO: child elements
                 auto reg = allocate_register();
+                // auto end_reg = get_end_register();
+                // auto n = node.children.size();
+                // for (auto i = 0; i < n; i++) {
+
+                // }
+                // TODO: child elements
                 emit(ALLOC_ARRAY, reg, 0, 0);
                 return reg;
             }
@@ -521,6 +565,7 @@ struct Interpreter2 {
                     handle(DIV) {
                         REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) / value_to_number(REGISTER(i.r2)));
                     }
+                    // TODO: Bin ops need type checking
                     handle(SHL) {
                         auto* arr = value_to_array(REGISTER(i.r0));
                         arr->emplace_back(REGISTER(i.r1));
@@ -537,6 +582,12 @@ struct Interpreter2 {
                             value_to_number(REGISTER(i.r2))
                         );
                     }
+                    handle(NEQUAL) {
+                        REGISTER(i.r0) = value_from_boolean(
+                            value_to_number(REGISTER(i.r1)) !=
+                            value_to_number(REGISTER(i.r2))
+                        );
+                    }
                     handle(LESSEQ) {
                         REGISTER(i.r0) = value_from_boolean(
                             value_to_number(REGISTER(i.r1)) <=
@@ -546,6 +597,12 @@ struct Interpreter2 {
                     handle(GREATER) {
                         REGISTER(i.r0) = value_from_boolean(
                             value_to_number(REGISTER(i.r1)) >
+                            value_to_number(REGISTER(i.r2))
+                        );
+                    }
+                    handle(GREATEREQ) {
+                        REGISTER(i.r0) = value_from_boolean(
+                            value_to_number(REGISTER(i.r1)) >=
                             value_to_number(REGISTER(i.r2))
                         );
                     }
@@ -586,6 +643,22 @@ struct Interpreter2 {
                         }
                         REGISTER(i.r0) = (*arr)[ind];
                     }
+                    handle(STORE_ARRAY) {
+                        auto arr_val = REGISTER(i.r1);
+                        auto ind_val = REGISTER(i.r2); 
+                        auto* arr = value_to_array(arr_val);
+                        auto ind_type = value_get_type(ind_val);
+                        auto ind = (ind_type == Type::Integer)
+                            ? value_to_integer(ind_val) 
+                            : (ind_type == Type::Number) 
+                                ? (int)value_to_number(ind_val)
+                                : error("expected number")._i;
+                        
+                        if (ind > arr->size()) {
+                            throw runtime_error("outof range index");
+                        }
+                        (*arr)[ind] = REGISTER(i.r0);
+                    }
                     handle(CALL) {
                         auto func_start = value_to_function(REGISTER(i.r0));
                         auto nargs = i.r1;
@@ -623,6 +696,7 @@ struct Interpreter2 {
         }
         catch (exception& e) {
             // stack unwind
+            log("runtime error: "s + e.what());
             auto fp = _stackbase;
             while (true) {
                 auto return_addr = value_to_function(_stack[fp - 2]);
