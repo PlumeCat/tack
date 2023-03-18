@@ -13,9 +13,12 @@ make
 ### Features
 - [ ] Proper for loops
 - [x] Arrays
-- [ ] Objects
+- [x] Objects
 - [ ] Closures
 - [x] Const variables
 - [ ] Calling C functions and vice versa
 - [ ] Garbage collector
 - [ ] Algebraics
+- [ ] Compile as library
+- [ ] QOL improvements
+- [ ] Language standard library

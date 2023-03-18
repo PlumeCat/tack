@@ -25,7 +25,10 @@ enum RegisterState {
 struct FunctionContext;
 struct Compiler2 {
     list<FunctionContext> funcs; // need to grow without invalidating pointers
-    void add_function(Program& program, const AstNode* node);
+    
+    // returns the storage index of the start address
+    uint8_t add_function(Program& program, FunctionContext* parent_context, const AstNode* node);
+    
     void compile(const AstNode& module, Program& program);
 };
 
@@ -37,16 +40,16 @@ struct VariableContext {
     bool is_captured = false;
 };
 struct ScopeContext {
-    hash_map<string, uint8_t> bindings; // variables
+    hash_map<string, VariableContext> bindings; // variables
 };
 struct FunctionContext {
     Compiler2* compiler;
+    FunctionContext* parent_context;
     const AstNode* node;
     uint8_t storage_index;
     string name;
 
-    // vector<ScopeContext> scopes;
-    hash_map<string, VariableContext> bindings;
+    vector<ScopeContext> scopes;
     array<RegisterState, MAX_REGISTERS> registers;
 
     // get a free register
@@ -75,13 +78,26 @@ struct FunctionContext {
     // set a register as bound by a variable
     void bind_register(const string& binding, uint8_t reg, bool is_const = false) {
         registers[reg] = BOUND;
-        bindings[binding] = { reg, is_const };
+        scopes.back().bindings[binding] = { reg, is_const };
+    }
+
+    void push_scope() {
+        scopes.emplace_back();
+    }
+    void pop_scope() {
+        // unbind all bound registers
+        for (auto& b: scopes.back().bindings) {
+            registers[b.second.reg] = FREE;
+        }
+        scopes.pop_back();
     }
 
     // find an existing variable
     VariableContext& lookup(const string& name) {
-        if (auto iter = bindings.find(name); iter != bindings.end()) {
-            return iter->second;
+        for (auto& s: scopes) {
+            if (auto iter = s.bindings.find(name); iter != s.bindings.end()) {
+                return iter->second;
+            }
         }
         throw runtime_error("can't find variable: " + name);
     }
@@ -110,6 +126,7 @@ struct FunctionContext {
     uint8_t compile(Program& program) {
         // compile function literal
         // TODO: emit bindings for the N arguments
+        push_scope();
         auto nargs = node->children[0].children.size(); // ParamDef
         for (auto i = 0; i < nargs; i++) {
             auto& param = node->children[0].children[i]; // Identifier
@@ -117,6 +134,7 @@ struct FunctionContext {
         }
         auto reg = compile(node->children[1], program);
         emit(RET, 0, 0, 0);
+        pop_scope();
     }
     uint8_t compile(const AstNode& node, Program& program, uint8_t target_register = 0xff) {
         switch (node.type) {
@@ -176,10 +194,12 @@ struct FunctionContext {
                 // handle(Identifier)
 
             handle(StatList) { should_allocate(0);
+                push_scope();
                 for (auto& c: node.children) {
                     compile(c, program);
                     free_all_registers();
                 }
+                pop_scope();
                 return 0xff;
             }
             handle(IfStat) {
@@ -309,7 +329,7 @@ struct FunctionContext {
                 return out;
             }
             handle(FuncLiteral) { should_allocate(1);
-                compiler->add_function(program, &node);
+                compiler->add_function(program, this, &node);
                 auto out = allocate_register();
                 emit(LOAD_CONST, out, compiler->funcs.back().storage_index, 0);
                 if (node.children.size() == 3) {
@@ -544,7 +564,7 @@ void Compiler2::compile(const AstNode& module, Program& program) {
     program.strings.reserve(100);
 
     auto node = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef, {}), module);
-    add_function(program, &node);
+    add_function(program, nullptr, &node);
 
     // compile all function literals and append to main bytecode
     // TODO: interesting, can this be parallelized?
@@ -554,10 +574,11 @@ void Compiler2::compile(const AstNode& module, Program& program) {
         f->compile(program);
     }
 }
-void Compiler2::add_function(Program& program, const AstNode* node) {
+uint8_t Compiler2::add_function(Program& program, FunctionContext* parent_context, const AstNode* node) {
     auto storage_index = program.storage.size();
     program.storage.emplace_back(value_from_function(0));
-    funcs.emplace_back(FunctionContext { this, node, (uint8_t)storage_index });
+    funcs.emplace_back(FunctionContext { this, parent_context, node, (uint8_t)storage_index });
+    return storage_index;
 }
 
 

@@ -1,41 +1,9 @@
-let x = []
-print(x)
-
-let i = 0
-while i < 10{ 
-    i = i + 1
-    x << i
+let x = 1
+if x {
+    let y = 2
+    print(y)
+} else {
+    print(x)
 }
 
 print(x)
-
-
-i = 0
-while i < 10 {
-    x[i] = x[i] * x[i] 
-    i = i + 1
-}
-
-print(x)
-
-
-fn vec2(x, y) {
-    let v = {}
-    v.x = x
-    v.y = y
-    return v
-}
-
-
-let v = vec2(1, 2)
-
-print(v)
-
-v.x = 42
-v.y = 34
-print(v)
-
-v.x = "hello"
-v.y = "world"
-
-print(v)
