@@ -93,7 +93,7 @@ using NullType = nullptr_t;
 using StringType = string;
 using ObjectType = hash_map<string, Value>;
 using ArrayType = vector<Value>;
-struct FunctionType {
+using FunctionType = struct {
     vector<Value> captures;
     uint32_t code;
 };

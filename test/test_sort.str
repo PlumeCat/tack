@@ -47,33 +47,27 @@ fn quicksort(arr, qs, join) {
     " midpoint "
     if min == max { return arr }
     const mid = (min + max) / 2
-    let upper = []
-    let lower = []
-    print(mid)
+    const upper = []
+    const lower = []
 
     " pivot "
     i = 0
     while i < n {
-        let e = arr[i]
+        const e = arr[i]
+
         if e < mid { lower << e }
         else { upper << e }
         i = i + 1
     }
-    
-    print(lower)
-    lower = qs(lower, qs, join)
-    print(lower)
-    
-    print(upper)
-    upper = qs(upper, qs, join)
-    print(upper)
 
-    return join(lower, upper)
+    return join(qs(lower, qs, join), qs(upper, qs, join))
 }
 
-const N = 5
+const N = 500
+
 "let A = array_random(N)"
 const A = []
+
 let i = 0
 while i < N {
     i = i + 1
@@ -85,3 +79,8 @@ const before = clock()
 const B = quicksort(A, quicksort, join)
 const after = clock()
 print(B)
+
+
+if #A != #B {
+    print("not same size!")
+}

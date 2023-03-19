@@ -46,7 +46,7 @@ struct VariableContext {
     uint32_t last_write = 0;
 };
 struct ScopeContext {
-    hash_map<string, VariableContext> bindings; // variables
+    hash_map<string, VariableContext> bindings = hash_map<string, VariableContext>(1, 1); // variables
 };
 struct FunctionContext {
     Compiler2* compiler;
@@ -75,16 +75,31 @@ struct FunctionContext {
     // get the register immediately after the highest non-free register
     uint8_t get_end_register() {
         for (auto i = 255; i > 0; i--) {
-            if (registers[i] != FREE) {
-                return i + 1;
+            if (registers[i-1] != FREE) {
+                return i;
             }
         }
+        return 0;
     }
 
     // set a register as bound by a variable
     void bind_register(const string& binding, uint8_t reg, bool is_const = false) {
         registers[reg] = BOUND;
-        scopes.back().bindings[binding] = { reg, is_const };
+        scopes.back().bindings.insert(binding, { reg, is_const });
+    }
+    
+    // free a register if it's not bound
+    void free_register(uint8_t reg) {
+        if (registers[reg] != BOUND) {
+            registers[reg] = FREE;
+        }
+    }
+
+    // free all unbound registers
+    void free_all_registers() {
+        for (auto i = 0; i < MAX_REGISTERS; i++) {
+            free_register(i);
+        }
     }
 
     void push_scope() {
@@ -105,22 +120,17 @@ struct FunctionContext {
                 return iter->second;
             }
         }
+
+        if (parent_context) {
+            auto& res = parent_context->lookup(name);
+            log("captured", name, "from parent scope");
+            res.is_captured = true;
+            return res;
+        }
+
         throw runtime_error("can't find variable: " + name);
     }
     
-    // free a register if it's not bound
-    void free_register(uint8_t reg) {
-        if (registers[reg] != BOUND) {
-            registers[reg] = FREE;
-        }
-    }
-
-    // free all unbound registers
-    void free_all_registers() {
-        for (auto i = 0; i < MAX_REGISTERS; i++) {
-            free_register(i);
-        }
-    }
 
     #define handle(x)                       break; case AstType::x:
     #define emit(type, r0, r1, r2)          program.instructions.emplace_back(Opcode::type, r0, r1, r2)
@@ -338,7 +348,7 @@ struct FunctionContext {
                 auto out = allocate_register();
                 emit(LOAD_CONST, out, compiler->funcs.back().storage_index, 0);
                 if (node.children.size() == 3) {
-                    bind_register(node.children[2].data_s, out);
+                    bind_register(node.children[2].data_s, out, true);
                 }
                 return out;
             }
@@ -501,11 +511,6 @@ struct FunctionContext {
             }
             handle(ArrayLiteral) {
                 auto reg = allocate_register();
-                // auto end_reg = get_end_register();
-                // auto n = node.children.size();
-                // for (auto i = 0; i < n; i++) {
-
-                // }
                 // TODO: child elements
                 emit(ALLOC_ARRAY, reg, 0, 0);
                 return reg;
@@ -580,6 +585,8 @@ void Compiler2::compile(const AstNode& module, Program& program) {
         program.storage[f->storage_index] = value_from_function(program.instructions.size());
         f->compile(program);
     }
+
+    // for each function, box captured variables
 }
 uint8_t Compiler2::add_function(Program& program, FunctionContext* parent_context, const AstNode* node) {
     auto storage_index = program.storage.size();
