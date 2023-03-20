@@ -42,6 +42,7 @@ struct Instruction {
         struct { Opcode opcode; uint8_t r0, r1, r2; };
         // uint8_t operands[4];
         struct { int16_t s0; int16_t s1; };
+        struct { uint16_t u0; uint16_t u1; };
     };
 
     Instruction() {}

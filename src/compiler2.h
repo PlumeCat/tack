@@ -22,12 +22,13 @@ enum RegisterState {
     BOUND = 2
 };
 
+using StorageIndex = uint16_t;
 struct FunctionContext;
 struct Compiler2 {
     list<FunctionContext> funcs; // need to grow without invalidating pointers
     
     // returns the storage index of the start address
-    uint8_t add_function(Program& program, FunctionContext* parent_context, const AstNode* node);
+    StorageIndex add_function(Program& program, FunctionContext* parent_context, const AstNode* node);
     
     void compile(const AstNode& module, Program& program);
 };
@@ -52,7 +53,7 @@ struct FunctionContext {
     Compiler2* compiler;
     FunctionContext* parent_context;
     const AstNode* node;
-    uint8_t storage_index;
+    StorageIndex storage_index;
     string name;
 
     vector<ScopeContext> scopes;
@@ -136,7 +137,7 @@ struct FunctionContext {
     #define emit(type, r0, r1, r2)          program.instructions.emplace_back(Opcode::type, r0, r1, r2)
     #define rewrite(pos, type, r0, r1, r2)  program.instructions[pos] = { Opcode::type, r0, r1, r2 };
     #define label(name)                     auto name = program.instructions.size();
-    #define emit2(...)                      program.instructions.emplace_back(__VA_ARGS__)
+    #define emit_loadconst(r, c)          auto ins = Instruction{}; ins.opcode = Opcode::LOAD_CONST; ins.r0 = r; ins.u1 = c; program.instructions.emplace_back(ins);
     #define should_allocate(n)
 
     uint8_t compile(Program& program) {
@@ -147,6 +148,11 @@ struct FunctionContext {
         for (auto i = 0; i < nargs; i++) {
             auto& param = node->children[0].children[i]; // Identifier
             bind_register(param.data_s, i, false); // TODO: could choose to make arguments const?
+        }
+        if (node->children.size() == 3) {
+            name = node->children[2].data_s;
+        } else {
+            name = "(anonymous)";
         }
         auto reg = compile(node->children[1], program);
         emit(RET, 0, 0, 0);
@@ -299,12 +305,13 @@ struct FunctionContext {
 
                     // save identifier as string and load it
                     auto key_reg = allocate_register();
-                    auto in1 = (uint8_t)program.storage.size();
+                    auto in1 = program.storage.size();
                     program.strings.emplace_back(lhs.children[1].data_s);
                     program.storage.emplace_back(value_from_string(
                         &program.strings.back()
                     ));
-                    emit(LOAD_CONST, key_reg, in1, 0);
+                    // emit(LOAD_CONST, key_reg, in1, 0);
+                    emit_loadconst(key_reg, in1);
                     
                     emit(STORE_OBJECT, reg, obj_reg, key_reg);
                     free_register(obj_reg);
@@ -326,9 +333,9 @@ struct FunctionContext {
                 //     ins.s1 = int16_t(n);
                 //     emit2(ins);
                 // } else {
-                    auto in1 = (uint8_t)program.storage.size();
+                    auto in1 = program.storage.size();
                     program.storage.emplace_back(value_from_number(n));
-                    emit(LOAD_CONST, out, in1, 0);
+                    emit_loadconst(out, in1);
                 // }
                 
                 return out;
@@ -344,9 +351,11 @@ struct FunctionContext {
                 return out;
             }
             handle(FuncLiteral) { should_allocate(1);
-                compiler->add_function(program, this, &node);
+                auto storage_index = compiler->add_function(program, this, &node);
                 auto out = allocate_register();
-                emit(LOAD_CONST, out, compiler->funcs.back().storage_index, 0);
+
+                emit_loadconst(out, storage_index);
+                
                 if (node.children.size() == 3) {
                     bind_register(node.children[2].data_s, out, true);
                 }
@@ -588,10 +597,10 @@ void Compiler2::compile(const AstNode& module, Program& program) {
 
     // for each function, box captured variables
 }
-uint8_t Compiler2::add_function(Program& program, FunctionContext* parent_context, const AstNode* node) {
+StorageIndex Compiler2::add_function(Program& program, FunctionContext* parent_context, const AstNode* node) {
     auto storage_index = program.storage.size();
     program.storage.emplace_back(value_null());
-    funcs.emplace_back(FunctionContext { this, parent_context, node, (uint8_t)storage_index });
+    funcs.emplace_back(FunctionContext { this, parent_context, node, (StorageIndex)storage_index });
     return storage_index;
 }
 
@@ -734,8 +743,12 @@ struct Interpreter2 {
                     }
                     handle(STORE_ARRAY) {
                         auto arr_val = REGISTER(i.r1);
-                        auto ind_val = REGISTER(i.r2); 
+                        if (value_get_type(arr_val) != Type::Array) {
+                            error("expected array");
+                        }
                         auto* arr = value_to_array(arr_val);
+                        
+                        auto ind_val = REGISTER(i.r2); 
                         auto ind_type = value_get_type(ind_val);
                         auto ind = (ind_type == Type::Integer)
                             ? value_to_integer(ind_val) 
@@ -818,7 +831,7 @@ struct Interpreter2 {
             log("runtime error: "s + e.what());
             auto fp = _stackbase;
             while (true) {
-                auto return_addr = value_to_function(_stack[fp - 2]);
+                auto return_addr = _stack[fp - 2]._i;
                 fp = value_to_integer(_stack[fp - 1]);
                 log("return addr: ", return_addr, fp);
                 if (return_addr == program.instructions.size()) {

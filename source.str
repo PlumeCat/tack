@@ -15,3 +15,8 @@ let d = counter()
 print(c)
 print(c())
 print(c())
+
+let x = {}
+x.x = 4
+x.y = 2
+print(x)
