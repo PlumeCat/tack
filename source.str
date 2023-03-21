@@ -2,7 +2,6 @@ fn counter() {
     let i = 0
     
     return fn() {
-        let i = 0
         i = i + 1
         return i
     }

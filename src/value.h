@@ -156,7 +156,7 @@ Value value_from_pointer(void* ptr) {
     // should also be valid for 32 bit pointers
     return { nan_bits | type_bits_pointer | u_ptr };
 }
-Value value_from_function(uint32_t a)    { return { nan_bits | type_bits_function| a }; }
+Value value_from_function(FunctionType* func)    { return { nan_bits | type_bits_function| uint64_t(func) }; }
 Value value_from_boxed(BoxType* box)    { return { nan_bits | type_bits_boxed  | uint64_t(box) }; }
 Value value_from_string(const StringType* str){ return { nan_bits | type_bits_string | uint64_t(str) }; }
 Value value_from_object(ObjectType* obj){ return { nan_bits | type_bits_object | uint64_t(obj) }; }
@@ -187,7 +187,7 @@ StringType* value_to_string(Value v){ return (StringType*)(v._i & pointer_bits);
 ArrayType* value_to_array(Value v)  { return (ArrayType*)(v._i & pointer_bits); }
 ObjectType* value_to_object(Value v){ return (ObjectType*)(v._i & pointer_bits); }
 BoxType* value_to_box(Value v)      { return (BoxType*)(v._i & pointer_bits); }
-uint32_t value_to_function(Value v) { return (uint32_t)(v._i & integer_bits); }
+FunctionType* value_to_function(Value v) { return (FunctionType*)(v._i & pointer_bits); }
 vec2* value_to_vec2(Value v)        { return (vec2*)(v._i & pointer_bits); }
 vec3* value_to_vec3(Value v)        { return (vec3*)(v._i & pointer_bits); }
 vec4* value_to_vec4(Value v)        { return (vec4*)(v._i & pointer_bits); }

@@ -13,6 +13,7 @@ struct Program {
     vector<Instruction> instructions;
     vector<Value> storage; // program constant storage goes at the bottom of the stack for now
     vector<string> strings; // string constants and literals storage - includes identifiers for objects
+    vector<FunctionType> functions;
 
     string to_string() {
         auto s = stringstream {};
