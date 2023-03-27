@@ -29,7 +29,7 @@ struct Compiler2 {
     list<FunctionContext> funcs; // need to grow without invalidating pointers
     
     // returns the storage index of the start address
-    StorageIndex add_function(Program& program, ScopeContext* parent_scope, const AstNode* node);
+    FunctionContext& add_function(Program& program, ScopeContext* parent_scope, const AstNode* node);
     
     void compile(const AstNode& module, Program& program);
 };
@@ -47,34 +47,15 @@ struct VariableContext {
     uint32_t first_write = 0;
     uint32_t last_write = 0;
 };
+struct CaptureContext {
+    uint8_t reg;
+    uint32_t frame_removal; // how many parent frames
+};
 struct ScopeContext {
+    FunctionContext* function;
     ScopeContext* parent_scope = nullptr; // a reverse linked-list backed by the scopes vector
     bool is_top_level_scope = false;
     hash_map<string, VariableContext> bindings = hash_map<string, VariableContext>(1, 1); // variables
-
-    VariableContext& lookup(const string& name) {
-        log("Lookup:", name);
-        log("    Bindings:");
-        for (auto& [k, v]: bindings) {
-            log("     - ", k, (int)v.reg);
-        }
-        if (auto iter = bindings.find(name); iter != bindings.end()) {
-            log("Found binding:", iter->first);
-            return iter->second;
-        }
-
-        if (parent_scope) {
-            log("Trying parent scope");
-            auto& res = parent_scope->lookup(name);
-            if (is_top_level_scope) {
-                log("Captured", name, "from parent scope");
-                res.is_captured = true;
-            }
-            return res;
-        }
-
-        throw runtime_error("can't find variable: " + name);
-    }
 };
 struct FunctionContext {
     Compiler2* compiler;
@@ -82,11 +63,56 @@ struct FunctionContext {
     ScopeContext* parent_scope = nullptr; // enclosing scope - might belong to parent function
     StorageIndex storage_index;
     string name;
-    bool is_closure; // capture something from higher scope
 
     list<ScopeContext> scopes;
     ScopeContext* current_scope;
+    hash_map<string, CaptureContext> captures;
     array<RegisterState, MAX_REGISTERS> registers;
+
+    VariableContext& lookup(const string& name) {
+        // VariableContext& ScopeContext::lookup(const string& name) {
+        log("Lookup:", name);
+
+        for (auto s = current_scope; s->parent_scope && !s->is_top_level_scope; s = s->parent_scope) {
+            if (auto iter = s->bindings.find(name); iter != s->bindings.end()) {
+                return iter->second;
+            }
+        }
+
+        // for (auto& [k, v]: bindings) {
+        //     log("     - ", k, (int)v.reg);
+        // }
+        // if (auto iter = bindings.find(name); iter != bindings.end()) {
+        //     log("Found binding:", iter->first);
+        //     return iter->second;
+        // }
+
+        // // if (is_top_level_scope) {
+        //     // top level scope should examine captures before checking parent scope
+        //     // if (auto iter = function->captures.find(name); iter != function->captures.end(); iter++) {
+        //     //     log("Found capture: ", iter->first);
+        //     //     return iter->second;
+        //     // }
+        // // }
+
+        // // if (parent_scope) {
+        // //     log("Trying parent scope");
+        // //     auto& res = parent_scope->lookup(name);
+        // //     if (is_top_level_scope) {
+        // //         log("Captured", name, "from parent scope");
+        // //         res.is_captured = true;
+        // //         // function->captures[name] = &res;
+        // //         auto& capture = function->captures.insert(name, {})->second;
+        // //         capture.is_captured = true;
+        // //         capture.reg = function->captures.size() - 1;
+        // //         // safe to take pointer because parent scope will always have completely compiled
+        // //         return capture;
+        // //     }
+        // //     return res;
+        // // }
+
+        // throw runtime_error("can't find variable: " + name);
+    }
 
     // get a free register
     uint8_t allocate_register() {
@@ -132,7 +158,7 @@ struct FunctionContext {
     }
 
     void push_scope(bool is_top_level = false) {
-        scopes.emplace_back(ScopeContext { current_scope, is_top_level });
+        scopes.emplace_back(ScopeContext { this, current_scope, is_top_level });
         current_scope = &scopes.back();
     }
     void pop_scope() {
@@ -145,12 +171,18 @@ struct FunctionContext {
     }
     
 
-    #define handle(x)                       break; case AstType::x:
-    #define emit(type, r0, r1, r2)          program.instructions.emplace_back(Opcode::type, r0, r1, r2)
+    
+    // emit an instruction with 3 8 bit operands
+    #define emit(op, r0, r1, r2)          program.instructions.emplace_back(Opcode::op, r0, r1, r2)
+
+    // emit an instruction with 1 8-bit operand (r) and 1 16-bit operand (u)
+    #define emit_u(op, r, u)                auto ins = Instruction{}; ins.opcode = Opcode::op; ins.r0 = r; ins.u1 = u; program.instructions.emplace_back(ins);
+
+    // rewrite an instruction with 3 8-bit operands
     #define rewrite(pos, type, r0, r1, r2)  program.instructions[pos] = { Opcode::type, r0, r1, r2 };
     #define label(name)                     auto name = program.instructions.size();
-    #define emit_loadconst(r, c)          auto ins = Instruction{}; ins.opcode = Opcode::LOAD_CONST; ins.r0 = r; ins.u1 = c; program.instructions.emplace_back(ins);
     #define should_allocate(n)
+    #define handle(x)                       break; case AstType::x:
 
     uint8_t compile(Program& program) {
         // compile function literal
@@ -301,7 +333,7 @@ struct FunctionContext {
                 auto& lhs = node.children[0];
                 if (lhs.type == AstType::Identifier) {
                     // TODO: try and elide this MOVE with 'target' register
-                    auto& var = current_scope->lookup(node.children[0].data_s);
+                    auto& var = lookup(node.children[0].data_s);
                     if (var.is_const) {
                         throw runtime_error("can't reassign const");
                     }
@@ -323,8 +355,7 @@ struct FunctionContext {
                     program.storage.emplace_back(value_from_string(
                         &program.strings.back()
                     ));
-                    // emit(LOAD_CONST, key_reg, in1, 0);
-                    emit_loadconst(key_reg, in1);
+                    emit_u(LOAD_CONST, key_reg, in1);
                     
                     emit(STORE_OBJECT, reg, obj_reg, key_reg);
                     free_register(obj_reg);
@@ -335,14 +366,14 @@ struct FunctionContext {
             }
             handle(Identifier) { should_allocate(0);
                 // return bindings[node.data_s];
-                return current_scope->lookup(node.data_s).reg;
+                return lookup(node.data_s).reg;
             }
             handle(NumLiteral) { should_allocate(1);
                 auto n = node.data_d;
                 auto out = allocate_register();
                 auto in1 = program.storage.size();
                 program.storage.emplace_back(value_from_number(n));
-                emit_loadconst(out, in1);                
+                emit_u(LOAD_CONST, out, in1);                
                 return out;
             }
             handle(StringLiteral) { should_allocate(1);
@@ -356,13 +387,16 @@ struct FunctionContext {
                 return out;
             }
             handle(FuncLiteral) { should_allocate(1);
-                auto storage_index = compiler->add_function(program, current_scope, &node);
+                auto& func = compiler->add_function(program, current_scope, &node);
                 auto out = allocate_register();
 
-                emit_loadconst(out, storage_index);
+                emit_u(ALLOC_FUNC, out, func.storage_index);
+                for (auto& [ k, v ]: func.captures) {
+                    // emit(CAPTURE, out, v.reg);
+                    // need to grab V from the stack
+                    // need absolute position for v
+                }
 
-                // TODO: 
-                
                 if (node.children.size() == 3) {
                     bind_register(node.children[2].data_s, out, true);
                 }
@@ -579,6 +613,10 @@ struct FunctionContext {
     }
 
     #undef handle
+    #undef should_allocate
+    #undef label
+    #undef rewrite
+    #undef emit_u
     #undef emit
 };
 
@@ -586,9 +624,6 @@ void Compiler2::compile(const AstNode& module, Program& program) {
     if (module.type != AstType::StatList) {
         throw runtime_error("expected statlist");
     }
-
-    // TODO: improve this
-    program.strings.reserve(100);
 
     auto node = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef, {}), module);
     add_function(program, nullptr, &node);
@@ -598,20 +633,20 @@ void Compiler2::compile(const AstNode& module, Program& program) {
     for (auto f = funcs.begin(); f != funcs.end(); f++) {
         // can't use range-based for because compiler.functions size changes
         auto start_addr = program.instructions.size();
-        program.functions.emplace_back(FunctionType { {}, (uint32_t)start_addr });
+        program.functions.emplace_back(FunctionType { (uint32_t)start_addr });
         program.storage[f->storage_index] = value_from_function(&program.functions.back());
+        //value_from_integer(program.functions.size() - 1);
         
         f->compile(program);
     }
 
     // for each function, box captured variables
 }
-StorageIndex Compiler2::add_function(Program& program, ScopeContext* parent_scope, const AstNode* node) {
+FunctionContext& Compiler2::add_function(Program& program, ScopeContext* parent_scope, const AstNode* node) {
     auto storage_index = program.storage.size();
     program.storage.emplace_back(value_null());
     funcs.emplace_back(FunctionContext{ this, node, parent_scope, (StorageIndex)storage_index });
-
-    return storage_index;
+    return funcs.back();
 }
 
 
@@ -624,18 +659,16 @@ struct Interpreter2 {
 
         auto _stack = array<Value, 4096> {};
         _stack.fill(value_null());
-        auto _stackbase = 0u;
+        _stack[0]._i = program.instructions.size(); // pseudo return address
+        _stack[1]._i = 0; // reset stack base to 0
+        auto _stackbase = 2u;
         auto _pc = 0u;
         auto _pe = program.instructions.size();
         auto _arrays = list<ArrayType>{};
         auto _objects = list<ObjectType>{};
-        auto _func = list<FunctionType>{};
+        auto _closures = list<FunctionType>{};
         auto _boxes = list<Value>{};
         auto error = [&](auto err) { throw runtime_error(err); return value_null(); };
-
-        REGISTER(0)._i = program.instructions.size(); // pseudo function that jumps to end
-        REGISTER(1)._i = 0; // reset stack base to 0
-        _stackbase = 2;
 
         auto dumpstack = [&] {
             log<true, false>(" ---- Stack ---- ");
@@ -710,10 +743,7 @@ struct Interpreter2 {
                             value_to_number(REGISTER(i.r2))
                         );
                     }
-                    handle(MOVE) {
-                        REGISTER(i.r0) = REGISTER(i.r1);
-                        // log<true, false>("MOVE: ", (int)i.r0, ": ", REGISTER(i.r0), " <- ", (int)i.r1, ": ", REGISTER(i.r1));
-                    }
+                    handle(MOVE) { REGISTER(i.r0) = REGISTER(i.r1); }
                     handle(CONDJUMP) {
                         auto val = REGISTER(i.r0);
                         if (!(
@@ -727,6 +757,12 @@ struct Interpreter2 {
                     handle(LEN) {
                         auto* arr = value_to_array(REGISTER(i.r1));
                         REGISTER(i.r0) = value_from_number(arr->size());
+                    }
+                    handle(ALLOC_FUNC) {
+                        REGISTER(i.r0) = program.storage[i.u1];
+                        // auto func = value_to_function(program.storage[i.u1]);
+                        // _closures.emplace_back(func);
+                        // REGISTER(i.r0) = value_from_function(&_closures.back());
                     }
                     handle(ALLOC_ARRAY) {
                         _arrays.emplace_back(ArrayType{});
@@ -795,7 +831,7 @@ struct Interpreter2 {
                         (*obj)[*value_to_string(key_val)] = REGISTER(i.r0);
                     }
                     handle(CALL) {
-                        auto func_start = REGISTER(i.r0)._i;
+                        auto func_start = value_to_function(REGISTER(i.r0))->code;
                         auto nargs = i.r1;
                         auto new_base = i.r2;
                         REGISTER(new_base)._i = _pc; // push return addr

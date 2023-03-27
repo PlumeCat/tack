@@ -12,8 +12,8 @@ using std::string, std::vector, std::stringstream;
 struct Program {
     vector<Instruction> instructions;
     vector<Value> storage; // program constant storage goes at the bottom of the stack for now
-    vector<string> strings; // string constants and literals storage - includes identifiers for objects
-    vector<FunctionType> functions;
+    list<string> strings; // string constants and literals storage - includes identifiers for objects
+    list<FunctionType> functions;
 
     string to_string() {
         auto s = stringstream {};
@@ -54,8 +54,5 @@ struct Program {
 
     Value get_storage(uint32_t index) {
         return storage[index];
-    }
-    const string& get_string(uint32_t index) {
-        return strings[index];
     }
 };

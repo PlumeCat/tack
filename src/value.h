@@ -94,7 +94,6 @@ using StringType = string;
 using ObjectType = hash_map<string, Value>;
 using ArrayType = vector<Value>;
 using FunctionType = struct {
-    vector<Value> captures;
     uint32_t code;
 };
 struct vec2 { float x, y; };
@@ -156,7 +155,7 @@ Value value_from_pointer(void* ptr) {
     // should also be valid for 32 bit pointers
     return { nan_bits | type_bits_pointer | u_ptr };
 }
-Value value_from_function(FunctionType* func)    { return { nan_bits | type_bits_function| uint64_t(func) }; }
+Value value_from_function(FunctionType* func)    { return { nan_bits | type_bits_function | uint64_t(func) }; }
 Value value_from_boxed(BoxType* box)    { return { nan_bits | type_bits_boxed  | uint64_t(box) }; }
 Value value_from_string(const StringType* str){ return { nan_bits | type_bits_string | uint64_t(str) }; }
 Value value_from_object(ObjectType* obj){ return { nan_bits | type_bits_object | uint64_t(obj) }; }
@@ -183,20 +182,20 @@ bool value_is_vec3(Value v)    { return (v._i & type_bits) == type_bits_vec3; }
 bool value_is_vec4(Value v)    { return (v._i & type_bits) == type_bits_vec4; }
 bool value_is_mat4(Value v)    { return (v._i & type_bits) == type_bits_mat4; }
 
-StringType* value_to_string(Value v){ return (StringType*)(v._i & pointer_bits); }
-ArrayType* value_to_array(Value v)  { return (ArrayType*)(v._i & pointer_bits); }
-ObjectType* value_to_object(Value v){ return (ObjectType*)(v._i & pointer_bits); }
-BoxType* value_to_box(Value v)      { return (BoxType*)(v._i & pointer_bits); }
-FunctionType* value_to_function(Value v) { return (FunctionType*)(v._i & pointer_bits); }
-vec2* value_to_vec2(Value v)        { return (vec2*)(v._i & pointer_bits); }
-vec3* value_to_vec3(Value v)        { return (vec3*)(v._i & pointer_bits); }
-vec4* value_to_vec4(Value v)        { return (vec4*)(v._i & pointer_bits); }
-mat4* value_to_mat4(Value v)        { return (mat4*)(v._i & pointer_bits); }
-uint64_t value_to_null(Value v)     { return v._i; } // ???
-bool value_to_boolean(Value v)      { return (bool)(v._i & boolean_bits); }
-int32_t value_to_integer(Value v)   { return (int32_t)(v._i & integer_bits); }
-double value_to_number(Value v)     { return v._d; } // ???
-void* value_to_pointer(Value v)     { return (void*)(v._i & pointer_bits); }
+StringType* value_to_string(Value v)        { return (StringType*)(v._i & pointer_bits); }
+ArrayType* value_to_array(Value v)          { return (ArrayType*)(v._i & pointer_bits); }
+ObjectType* value_to_object(Value v)        { return (ObjectType*)(v._i & pointer_bits); }
+BoxType* value_to_box(Value v)              { return (BoxType*)(v._i & pointer_bits); }
+FunctionType* value_to_function(Value v)    { return (FunctionType*)(v._i & pointer_bits); }
+vec2* value_to_vec2(Value v)                { return (vec2*)(v._i & pointer_bits); }
+vec3* value_to_vec3(Value v)                { return (vec3*)(v._i & pointer_bits); }
+vec4* value_to_vec4(Value v)                { return (vec4*)(v._i & pointer_bits); }
+mat4* value_to_mat4(Value v)                { return (mat4*)(v._i & pointer_bits); }
+uint64_t value_to_null(Value v)             { return v._i; } // ???
+bool value_to_boolean(Value v)              { return (bool)(v._i & boolean_bits); }
+int32_t value_to_integer(Value v)           { return (int32_t)(v._i & integer_bits); }
+double value_to_number(Value v)             { return v._d; } // ???
+void* value_to_pointer(Value v)             { return (void*)(v._i & pointer_bits); }
 
 ostream& operator<<(ostream& o, const mat4& v) { return o << "mat4 { ... }"; }
 ostream& operator<<(ostream& o, const vec2& v) { return o << "vec2 { " << v.x << ", " << v.y << " }"; }
@@ -217,7 +216,7 @@ ostream& operator<<(ostream& o, const Value& v) {
         case (uint64_t)Type::Pointer:   return o << value_to_pointer(v);
         case (uint64_t)Type::Object:    return o << "object {" << *value_to_object(v) << "}"; //*value_to_object(v);
         case (uint64_t)Type::Array:     return o << "array [" << *value_to_array(v) << "]"; //*value_to_array(v);
-        case (uint64_t)Type::Function:  return o << "fn @ " << value_to_function(v);
+        case (uint64_t)Type::Function:  return o << "fn @ " << value_to_function(v)->code;
         case (uint64_t)Type::Mat4:      return o << *value_to_mat4(v);
         case (uint64_t)Type::Vec2:      return o << *value_to_vec2(v);
         case (uint64_t)Type::Vec3:      return o << *value_to_vec3(v);
