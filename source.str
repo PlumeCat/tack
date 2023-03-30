@@ -1,21 +1,41 @@
-fn counter() {
+fn madness() {
+
     let i = 0
-    
-    return fn() {
-        "let i = 0"
+
+    let f1 = fn(callback) {
+        "
+        registers:
+            0: fn @ ?       callback
+            1: 2            j
+            2: 3            k
+        captures:
+            0: box@         i
+        "
+        let i = 0
+        let j = 2
+        let k = 3
+        print(i)
         i = i + 1
-        return i
+        callback()
+        i = i + 1
+        print(i)
     }
+
+    let f2 = fn() {
+        let i = 0
+        i = i + 1
+        print(i)
+    }
+
+    let res = []
+    res << f1
+    res << f2
+    return res
 }
 
 
-let c = counter()
+let m = madness()
+let f1 = m[0]
+let f2 = m[1]
 
-print(c)
-print(c())
-print(c())
-
-let x = {}
-x.x = 4
-x.y = 2
-print(x)
+f1(f2)

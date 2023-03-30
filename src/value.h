@@ -45,7 +45,7 @@ declare_type_bits(array,  0b1010) // 0xa
 
 // Unused
 declare_type_bits(function,0b1100)// 0xc
-declare_type_bits(______3,0b1101) // 0xd
+declare_type_bits(closure, 0b1101)// 0xd
 declare_type_bits(______4,0b1110) // 0xe
 
 #undef declare_type_bits
@@ -95,6 +95,10 @@ using ObjectType = hash_map<string, Value>;
 using ArrayType = vector<Value>;
 using FunctionType = struct {
     uint32_t code;
+};
+using ClosureType = struct {
+    FunctionType* func;
+    vector<Value> captures; // contains boxes
 };
 struct vec2 { float x, y; };
 struct vec3 { float x, y, z; };
@@ -156,6 +160,7 @@ Value value_from_pointer(void* ptr) {
     return { nan_bits | type_bits_pointer | u_ptr };
 }
 Value value_from_function(FunctionType* func)    { return { nan_bits | type_bits_function | uint64_t(func) }; }
+Value value_from_closure(ClosureType* closure)  { return { nan_bits | type_bits_closure | uint64_t(closure) }; }
 Value value_from_boxed(BoxType* box)    { return { nan_bits | type_bits_boxed  | uint64_t(box) }; }
 Value value_from_string(const StringType* str){ return { nan_bits | type_bits_string | uint64_t(str) }; }
 Value value_from_object(ObjectType* obj){ return { nan_bits | type_bits_object | uint64_t(obj) }; }
@@ -174,6 +179,7 @@ bool value_is_number(Value v)  { return !isnan(v._d); }
 bool value_is_pointer(Value v) { return (v._i & type_bits) == type_bits_pointer; }
 bool value_is_boxed(Value v)   { return isnan(v._d) && (v._i & type_bits) == type_bits_boxed;   }
 bool value_is_function(Value v){ return (v._i & type_bits) == type_bits_function; }
+bool value_is_closure(Value v) { return (v._i & type_bits) == type_bits_closure; }
 bool value_is_string(Value v)  { return (v._i & type_bits) == type_bits_string;  }
 bool value_is_object(Value v)  { return (v._i & type_bits) == type_bits_object;  }
 bool value_is_array(Value v)   { return (v._i & type_bits) == type_bits_array;   }
@@ -187,6 +193,7 @@ ArrayType* value_to_array(Value v)          { return (ArrayType*)(v._i & pointer
 ObjectType* value_to_object(Value v)        { return (ObjectType*)(v._i & pointer_bits); }
 BoxType* value_to_box(Value v)              { return (BoxType*)(v._i & pointer_bits); }
 FunctionType* value_to_function(Value v)    { return (FunctionType*)(v._i & pointer_bits); }
+ClosureType* value_to_closure(Value v)      { return (ClosureType*)(v._i & pointer_bits); }
 vec2* value_to_vec2(Value v)                { return (vec2*)(v._i & pointer_bits); }
 vec3* value_to_vec3(Value v)                { return (vec3*)(v._i & pointer_bits); }
 vec4* value_to_vec4(Value v)                { return (vec4*)(v._i & pointer_bits); }

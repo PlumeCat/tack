@@ -37,13 +37,10 @@ struct Compiler2 {
 static const uint32_t MAX_REGISTERS = 256;
 struct VariableContext {
     uint8_t reg;
-
+    uint8_t capture;
     bool is_const = false;
     bool is_reassigned = false;
-    bool is_capture_source = false;
-    bool is_capture_dest = false;
-
-    VariableContext* capture_source;
+    bool is_captured = true;
 };
 struct ScopeContext {
     FunctionContext* function;
@@ -78,26 +75,16 @@ struct FunctionContext {
         return nullptr;
     }
 
-    VariableContext* lookup(const string& name) {
-        // log("Lookup:", name);
-
-        // check for local variable within this function
-        if (auto v = lookup_local(name)) {
-            return v;
+    VariableContext* lookup_capture(const string& name) {
+        if (parent_scope) {
+            for (auto s = parent_scope; s->parent_scope != nullptr; s = s->parent_scope) {
+                if (auto iter = s->bindings.find(name); iter != s->bindings.end()) {
+                    // found capture
+                    return &iter->second;
+                }
+            }
         }
-
-        // check for capture in enclosing scopes
-        // if (parent_scope) {
-        //     for (auto s = parent_scope; s->parent_scope != nullptr; s = s->parent_scope) {
-        //         if (auto iter = s->bindings.find(name); iter != s->bindings.end()) {
-        //             log("Found capture: ", iter->second.reg);
-        //             // iter->second.is_captured = true;
-        //             // return iter->second;
-        //         }
-        //     }
-        // }
-
-        throw runtime_error("can't find variable: " + name);
+        return nullptr;
     }
 
     // get a free register
@@ -167,6 +154,7 @@ struct FunctionContext {
     #define label(name)                     auto name = program.instructions.size();
     #define should_allocate(n)
     #define handle(x)                       break; case AstType::x:
+   
 
     uint8_t compile(Program& program) {
         // compile function literal
@@ -185,6 +173,7 @@ struct FunctionContext {
         auto reg = compile(node->children[1], program);
         emit(RET, 0, 0, 0);
         pop_scope();
+        return 0;
     }
     uint8_t compile(const AstNode& node, Program& program, uint8_t target_register = 0xff) {
         switch (node.type) {
@@ -258,20 +247,34 @@ struct FunctionContext {
                 return reg;
             }
             handle(AssignStat) { should_allocate(0);
-                auto reg = compile(node.children[1], program);
+                auto source_reg = compile(node.children[1], program);
                 auto& lhs = node.children[0];
                 if (lhs.type == AstType::Identifier) {
-                    // TODO: try and elide this MOVE with 'target' register
-                    auto* var = lookup(node.children[0].data_s);
-                    if (var->is_const) {
-                        throw runtime_error("can't reassign const");
+                    if (auto var = lookup_local(node.children[0].data_s)) {
+                        if (var->is_const) {
+                            throw runtime_error("can't reassign const variable");
+                        }
+                        var->is_reassigned = true;
+
+                        // TODO: try and elide this MOVE
+                        // if the moved-from register is "busy" but not "bound", then the value is not used again
+                        // only need MOVE if assigning directly from another variable
+                        // in which case MOVE is more like COPY
+                        //if (registers[reg] == BOUND) {
+                            emit(MOVE, var->reg, source_reg, 0);
+                        //} else {
+                        //  program.instructions[most_recent_write_instruction(source_reg)].output_register = var->reg;
+                        //}
+                    } else if (auto capture = lookup_capture(node.children[0].data_s)) {
+                        if (capture->is_const) {
+                            throw runtime_error("can't reassign const capture");
+                        }
+                        capture->is_reassigned = true;
                     }
-                    var->is_reassigned = true;
-                    emit(MOVE, var->reg, reg, 0);
                 } else if (lhs.type == AstType::IndexExp) {
                     auto array_reg = compile(lhs.children[0], program);
                     auto index_reg = compile(lhs.children[1], program);
-                    emit(STORE_ARRAY, reg, array_reg, index_reg);
+                    emit(STORE_ARRAY, source_reg, array_reg, index_reg);
                     free_register(index_reg);
                     free_register(array_reg);
                 } else if (lhs.type == AstType::AccessExp) {
@@ -286,16 +289,25 @@ struct FunctionContext {
                     ));
                     emit_u(LOAD_CONST, key_reg, in1);
                     
-                    emit(STORE_OBJECT, reg, obj_reg, key_reg);
+                    emit(STORE_OBJECT, source_reg, obj_reg, key_reg);
                     free_register(obj_reg);
                     free_register(key_reg);
                 }
-                free_register(reg);
-                return reg;
+                free_register(source_reg);
+                return source_reg;
             }
             handle(Identifier) { should_allocate(0);
                 // return bindings[node.data_s];
-                return lookup(node.data_s)->reg;
+                if (auto v = lookup_local(node.data_s)) {
+                    return v->reg;
+                } else if (auto c = lookup_capture(node.data_s)) {
+                    /*if (c->reg != 0xff) {
+                        emit(BOX_READ, c->reg, c->capture_index);
+                    }*/
+                    return c->reg;
+                }
+
+                throw runtime_error("can't find variable: "s + node.data_s);
             }
             handle(NumLiteral) { should_allocate(1);
                 auto n = node.data_d;
@@ -595,7 +607,7 @@ struct Interpreter2 {
         auto _pe = program.instructions.size();
         auto _arrays = list<ArrayType>{};
         auto _objects = list<ObjectType>{};
-        auto _closures = list<FunctionType>{};
+        auto _closures = list<ClosureType>{};
         auto _boxes = list<Value>{};
         auto error = [&](auto err) { throw runtime_error(err); return value_null(); };
 
@@ -688,8 +700,10 @@ struct Interpreter2 {
                         REGISTER(i.r0) = value_from_number(arr->size());
                     }
                     handle(ALLOC_FUNC) {
-                        REGISTER(i.r0) = program.storage[i.u1];
-                        // auto func = value_to_function(program.storage[i.u1]);
+                        // REGISTER(i.r0) = program.storage[i.u1];
+                        auto func = value_to_function(program.storage[i.u1]);
+                        _closures.emplace_back(ClosureType { func, {} });
+                        REGISTER(i.r0) = value_from_closure(&_closures.back());
                         // _closures.emplace_back(func);
                         // REGISTER(i.r0) = value_from_function(&_closures.back());
                     }
@@ -760,7 +774,8 @@ struct Interpreter2 {
                         (*obj)[*value_to_string(key_val)] = REGISTER(i.r0);
                     }
                     handle(CALL) {
-                        auto func_start = value_to_function(REGISTER(i.r0))->code;
+                        // auto func_start = value_to_function(REGISTER(i.r0))->code;
+                        auto func_start = value_to_closure(REGISTER(i.r0))->func->code;
                         auto nargs = i.r1;
                         auto new_base = i.r2;
                         REGISTER(new_base)._i = _pc; // push return addr
