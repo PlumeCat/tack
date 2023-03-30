@@ -40,22 +40,17 @@ struct VariableContext {
 
     bool is_const = false;
     bool is_reassigned = false;
-    bool is_captured = false;
-    
-    uint32_t first_read = 0;
-    uint32_t last_read = 0;
-    uint32_t first_write = 0;
-    uint32_t last_write = 0;
-};
-struct CaptureContext {
-    uint8_t reg;
-    uint32_t frame_removal; // how many parent frames
+    bool is_capture_source = false;
+    bool is_capture_dest = false;
+
+    VariableContext* capture_source;
 };
 struct ScopeContext {
     FunctionContext* function;
-    ScopeContext* parent_scope = nullptr; // a reverse linked-list backed by the scopes vector
+    ScopeContext* parent_scope = nullptr; // establishes a tree structure over FunctionContext::scopes
     bool is_top_level_scope = false;
     hash_map<string, VariableContext> bindings = hash_map<string, VariableContext>(1, 1); // variables
+    // hash_map<string, CaptureContext> captures = hash_map<string, VariableContext>(1, 1);
 };
 struct FunctionContext {
     Compiler2* compiler;
@@ -66,52 +61,43 @@ struct FunctionContext {
 
     list<ScopeContext> scopes;
     ScopeContext* current_scope;
-    hash_map<string, CaptureContext> captures;
     array<RegisterState, MAX_REGISTERS> registers;
 
-    VariableContext& lookup(const string& name) {
-        // VariableContext& ScopeContext::lookup(const string& name) {
-        log("Lookup:", name);
-
-        for (auto s = current_scope; s->parent_scope && !s->is_top_level_scope; s = s->parent_scope) {
+    VariableContext* lookup_local(const string& name) {
+        auto s = current_scope;
+        while (true) {
             if (auto iter = s->bindings.find(name); iter != s->bindings.end()) {
-                return iter->second;
+                // log("Found local variable");
+                return &iter->second;
             }
+            if (s->is_top_level_scope || !s->parent_scope) {
+                break;
+            }
+            s = s->parent_scope;
+        }
+        return nullptr;
+    }
+
+    VariableContext* lookup(const string& name) {
+        // log("Lookup:", name);
+
+        // check for local variable within this function
+        if (auto v = lookup_local(name)) {
+            return v;
         }
 
-        // for (auto& [k, v]: bindings) {
-        //     log("     - ", k, (int)v.reg);
+        // check for capture in enclosing scopes
+        // if (parent_scope) {
+        //     for (auto s = parent_scope; s->parent_scope != nullptr; s = s->parent_scope) {
+        //         if (auto iter = s->bindings.find(name); iter != s->bindings.end()) {
+        //             log("Found capture: ", iter->second.reg);
+        //             // iter->second.is_captured = true;
+        //             // return iter->second;
+        //         }
+        //     }
         // }
-        // if (auto iter = bindings.find(name); iter != bindings.end()) {
-        //     log("Found binding:", iter->first);
-        //     return iter->second;
-        // }
 
-        // // if (is_top_level_scope) {
-        //     // top level scope should examine captures before checking parent scope
-        //     // if (auto iter = function->captures.find(name); iter != function->captures.end(); iter++) {
-        //     //     log("Found capture: ", iter->first);
-        //     //     return iter->second;
-        //     // }
-        // // }
-
-        // // if (parent_scope) {
-        // //     log("Trying parent scope");
-        // //     auto& res = parent_scope->lookup(name);
-        // //     if (is_top_level_scope) {
-        // //         log("Captured", name, "from parent scope");
-        // //         res.is_captured = true;
-        // //         // function->captures[name] = &res;
-        // //         auto& capture = function->captures.insert(name, {})->second;
-        // //         capture.is_captured = true;
-        // //         capture.reg = function->captures.size() - 1;
-        // //         // safe to take pointer because parent scope will always have completely compiled
-        // //         return capture;
-        // //     }
-        // //     return res;
-        // // }
-
-        // throw runtime_error("can't find variable: " + name);
+        throw runtime_error("can't find variable: " + name);
     }
 
     // get a free register
@@ -170,8 +156,6 @@ struct FunctionContext {
         current_scope = current_scope->parent_scope;
     }
     
-
-    
     // emit an instruction with 3 8 bit operands
     #define emit(op, r0, r1, r2)          program.instructions.emplace_back(Opcode::op, r0, r1, r2)
 
@@ -187,7 +171,6 @@ struct FunctionContext {
     uint8_t compile(Program& program) {
         // compile function literal
         // TODO: emit bindings for the N arguments
-        current_scope = parent_scope;
         push_scope(true);
         auto nargs = node->children[0].children.size(); // ParamDef
         for (auto i = 0; i < nargs; i++) {
@@ -206,60 +189,6 @@ struct FunctionContext {
     uint8_t compile(const AstNode& node, Program& program, uint8_t target_register = 0xff) {
         switch (node.type) {
             case AstType::Unknown: {} break;
-
-                // handle(StatList)
-        
-                // handle(ConstDeclStat)
-                // handle(VarDeclStat)
-                // handle(AssignStat)
-                // handle(PrintStat)
-            
-                // handle(IfStat)
-                // handle(WhileStat)
-                // handle(ReturnStat)
-            
-                // handle(EqExp)
-                // handle(NotEqExp)
-                // handle(LessExp)
-                // handle(GreaterExp)
-                // handle(LessEqExp)
-                // handle(GreaterEqExp)
-            // handle(OrExp)
-            // handle(AndExp)
-            // handle(BitOrExp)
-            // handle(BitAndExp)
-            // handle(BitXorExp)
-                // handle(ShiftLeftExp)
-            // handle(ShiftRightExp)
-                // handle(AddExp)
-                // handle(SubExp)
-                // handle(MulExp)
-                // handle(DivExp)
-            // handle(ModExp)
-            // handle(PowExp)
-            
-            // handle(TernaryExp)
-            // handle(NegateExp)
-            // handle(NotExp)
-            // handle(BitNotExp)
-                // handle(LenExp)
-            
-                // handle(CallExp)
-                // handle(ArgList)
-                // handle(IndexExp)
-                // handle(AccessExp)
-            
-                // handle(ClockExp)
-                // handle(RandomExp)
-            
-                // handle(FuncLiteral)
-                // handle(ParamDef)
-                // handle(NumLiteral)
-                // handle(StringLiteral)
-                // handle(ArrayLiteral)
-                // handle(ObjectLiteral)
-                // handle(Identifier)
-
             handle(StatList) { should_allocate(0);
                 push_scope();
                 for (auto& c: node.children) {
@@ -333,12 +262,12 @@ struct FunctionContext {
                 auto& lhs = node.children[0];
                 if (lhs.type == AstType::Identifier) {
                     // TODO: try and elide this MOVE with 'target' register
-                    auto& var = lookup(node.children[0].data_s);
-                    if (var.is_const) {
+                    auto* var = lookup(node.children[0].data_s);
+                    if (var->is_const) {
                         throw runtime_error("can't reassign const");
                     }
-                    var.is_reassigned = true;
-                    emit(MOVE, var.reg, reg, 0);
+                    var->is_reassigned = true;
+                    emit(MOVE, var->reg, reg, 0);
                 } else if (lhs.type == AstType::IndexExp) {
                     auto array_reg = compile(lhs.children[0], program);
                     auto index_reg = compile(lhs.children[1], program);
@@ -366,7 +295,7 @@ struct FunctionContext {
             }
             handle(Identifier) { should_allocate(0);
                 // return bindings[node.data_s];
-                return lookup(node.data_s).reg;
+                return lookup(node.data_s)->reg;
             }
             handle(NumLiteral) { should_allocate(1);
                 auto n = node.data_d;
@@ -391,11 +320,11 @@ struct FunctionContext {
                 auto out = allocate_register();
 
                 emit_u(ALLOC_FUNC, out, func.storage_index);
-                for (auto& [ k, v ]: func.captures) {
+                // for (auto& [ k, v ]: func.captures) {
                     // emit(CAPTURE, out, v.reg);
                     // need to grab V from the stack
                     // need absolute position for v
-                }
+                // }
 
                 if (node.children.size() == 3) {
                     bind_register(node.children[2].data_s, out, true);
