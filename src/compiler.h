@@ -179,7 +179,6 @@ struct Compiler {
                     if (var.is_const) {
                         throw runtime_error("Compile error: Can't reassign to const");
                     }
-                    var.is_reassigned = true;
                     child(1);
                     // emit(WRITE_VAR, var.stackpos); // value at top of stack into variable at stackpos
                 }

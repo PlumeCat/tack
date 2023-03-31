@@ -1,41 +1,25 @@
 fn madness() {
-
     let i = 0
 
-    let f1 = fn(callback) {
-        "
-        registers:
-            0: fn @ ?       callback
-            1: 2            j
-            2: 3            k
-        captures:
-            0: box@         i
-        "
-        let i = 0
-        let j = 2
-        let k = 3
-        print(i)
+    i = i + 10
+    print(i)
+
+    fn write() {
         i = i + 1
-        callback()
-        i = i + 1
-        print(i)
     }
 
-    let f2 = fn() {
-        let i = 0
-        i = i + 1
-        print(i)
+    i = i + 10
+    write()
+    print(i)
+    write()
+
+    fn read() {
+        return i
     }
 
-    let res = []
-    res << f1
-    res << f2
-    return res
+    write()
+
+    return read
 }
 
-
-let m = madness()
-let f1 = m[0]
-let f2 = m[1]
-
-f1(f2)
+print(madness()())

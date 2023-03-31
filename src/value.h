@@ -74,6 +74,7 @@ enum class Type : uint64_t {
 
     // function or closure
     Function = type_bits_function,
+    Closure = type_bits_closure,
 
     /*
     other possibilities:
@@ -93,8 +94,13 @@ using NullType = nullptr_t;
 using StringType = string;
 using ObjectType = hash_map<string, Value>;
 using ArrayType = vector<Value>;
+struct CaptureInfo {
+    uint8_t source_register;
+    uint8_t dest_register;
+};
 using FunctionType = struct {
     uint32_t code;
+    vector<CaptureInfo> captures; // registers to capture
 };
 using ClosureType = struct {
     FunctionType* func;
@@ -191,7 +197,7 @@ bool value_is_mat4(Value v)    { return (v._i & type_bits) == type_bits_mat4; }
 StringType* value_to_string(Value v)        { return (StringType*)(v._i & pointer_bits); }
 ArrayType* value_to_array(Value v)          { return (ArrayType*)(v._i & pointer_bits); }
 ObjectType* value_to_object(Value v)        { return (ObjectType*)(v._i & pointer_bits); }
-BoxType* value_to_box(Value v)              { return (BoxType*)(v._i & pointer_bits); }
+BoxType* value_to_boxed(Value v)            { return (BoxType*)(v._i & pointer_bits); }
 FunctionType* value_to_function(Value v)    { return (FunctionType*)(v._i & pointer_bits); }
 ClosureType* value_to_closure(Value v)      { return (ClosureType*)(v._i & pointer_bits); }
 vec2* value_to_vec2(Value v)                { return (vec2*)(v._i & pointer_bits); }
@@ -228,8 +234,9 @@ ostream& operator<<(ostream& o, const Value& v) {
         case (uint64_t)Type::Vec2:      return o << *value_to_vec2(v);
         case (uint64_t)Type::Vec3:      return o << *value_to_vec3(v);
         case (uint64_t)Type::Vec4:      return o << *value_to_vec4(v);
-        case type_bits_boxed:           return o << *value_to_box(v);
-        default:                        return o << "(unknown)" << hex << v._i << dec;
+        case (uint64_t)Type::Closure:   return o << "cl: " << hex << nouppercase << v._p << " " << value_to_closure(v)->func->code << " [" << value_to_closure(v)->captures << "]";
+        case type_bits_boxed:           return o << "box: " << hex << nouppercase << v._p << "(" << hex << nouppercase << value_to_boxed(v)->_p << ")";
+        default:                        return o << "(unknown)" << hex << nouppercase << v._i << dec;
         // default: return o << value_to_number(v);
     }
 }

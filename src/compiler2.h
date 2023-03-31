@@ -37,17 +37,14 @@ struct Compiler2 {
 static const uint32_t MAX_REGISTERS = 256;
 struct VariableContext {
     uint8_t reg;
-    uint8_t capture;
+    uint8_t capture_index; // if it's a capture
     bool is_const = false;
-    bool is_reassigned = false;
-    bool is_captured = true;
 };
 struct ScopeContext {
     FunctionContext* function;
     ScopeContext* parent_scope = nullptr; // establishes a tree structure over FunctionContext::scopes
     bool is_top_level_scope = false;
     hash_map<string, VariableContext> bindings = hash_map<string, VariableContext>(1, 1); // variables
-    // hash_map<string, CaptureContext> captures = hash_map<string, VariableContext>(1, 1);
 };
 struct FunctionContext {
     Compiler2* compiler;
@@ -59,12 +56,12 @@ struct FunctionContext {
     list<ScopeContext> scopes;
     ScopeContext* current_scope;
     array<RegisterState, MAX_REGISTERS> registers;
+    vector<CaptureInfo> captures;
 
-    VariableContext* lookup_local(const string& name) {
+    VariableContext* lookup(const string& name) {
         auto s = current_scope;
         while (true) {
             if (auto iter = s->bindings.find(name); iter != s->bindings.end()) {
-                // log("Found local variable");
                 return &iter->second;
             }
             if (s->is_top_level_scope || !s->parent_scope) {
@@ -72,18 +69,32 @@ struct FunctionContext {
             }
             s = s->parent_scope;
         }
-        return nullptr;
-    }
 
-    VariableContext* lookup_capture(const string& name) {
-        if (parent_scope) {
-            for (auto s = parent_scope; s->parent_scope != nullptr; s = s->parent_scope) {
-                if (auto iter = s->bindings.find(name); iter != s->bindings.end()) {
-                    // found capture
-                    return &iter->second;
-                }
+
+        // if it's not a local variable, check if it's a capture
+        s = parent_scope; // parent scope containing function
+        while (true) {
+            if (auto iter = s->bindings.find(name); iter != s->bindings.end()) {
+                // if there is a capture, we make a new local variable for the inner function
+                // at ALLOC_FUNC, the local variable from the outer function is put into a box
+                // the register containing the variable now contains the box
+                // the owning function can continue to use it transparently from there (with the box penalty)
+                
+                // needs optimization because now registers need to check if boxed all the time
+                // we could mark registers as containing boxes, and emit READ_BOX/WRITE_BOX as necessary
+                // however still going to need to rewrite parent function code until we have proper recursive single pass compile
+
+                auto reg = allocate_register();
+                captures.emplace_back(CaptureInfo { .source_register = iter->second.reg, .dest_register = reg });
+                return bind_register(name, reg, iter->second.is_const);
             }
+            if (s->is_top_level_scope || !s->parent_scope) {
+                // only allow 1 level of capture for the time being
+                break;
+            }
+            s = s->parent_scope;
         }
+
         return nullptr;
     }
 
@@ -111,9 +122,10 @@ struct FunctionContext {
     }
 
     // set a register as bound by a variable
-    void bind_register(const string& binding, uint8_t reg, bool is_const = false) {
+    VariableContext* bind_register(const string& binding, uint8_t reg, bool is_const = false) {
+        log("binding register: ", binding, (int)reg);
         registers[reg] = BOUND;
-        current_scope->bindings.insert(binding, { reg, is_const });
+        return &current_scope->bindings.insert(binding, { reg, is_const })->second;
     }
     
     // free a register if it's not bound
@@ -137,7 +149,7 @@ struct FunctionContext {
     void pop_scope() {
         // unbind all bound registers
         for (auto& b: current_scope->bindings) {
-            registers[b.second.reg] = FREE;
+            //registers[b.second.reg] = FREE; // TODO: un-disable once capture is working, and see if still works
         }
         // scopes.pop_back();
         current_scope = current_scope->parent_scope;
@@ -250,26 +262,17 @@ struct FunctionContext {
                 auto source_reg = compile(node.children[1], program);
                 auto& lhs = node.children[0];
                 if (lhs.type == AstType::Identifier) {
-                    if (auto var = lookup_local(node.children[0].data_s)) {
+                    if (auto var = lookup(node.children[0].data_s)) {
                         if (var->is_const) {
                             throw runtime_error("can't reassign const variable");
                         }
-                        var->is_reassigned = true;
-
                         // TODO: try and elide this MOVE
                         // if the moved-from register is "busy" but not "bound", then the value is not used again
                         // only need MOVE if assigning directly from another variable
                         // in which case MOVE is more like COPY
-                        //if (registers[reg] == BOUND) {
-                            emit(MOVE, var->reg, source_reg, 0);
-                        //} else {
-                        //  program.instructions[most_recent_write_instruction(source_reg)].output_register = var->reg;
-                        //}
-                    } else if (auto capture = lookup_capture(node.children[0].data_s)) {
-                        if (capture->is_const) {
-                            throw runtime_error("can't reassign const capture");
-                        }
-                        capture->is_reassigned = true;
+                        emit(MOVE, var->reg, source_reg, 0);
+                    } else {
+                        throw runtime_error("can't find variable: "s + node.children[0].data_s);
                     }
                 } else if (lhs.type == AstType::IndexExp) {
                     auto array_reg = compile(lhs.children[0], program);
@@ -294,20 +297,19 @@ struct FunctionContext {
                     free_register(key_reg);
                 }
                 free_register(source_reg);
-                return source_reg;
+                return source_reg; // unused
             }
             handle(Identifier) { should_allocate(0);
-                // return bindings[node.data_s];
-                if (auto v = lookup_local(node.data_s)) {
+                if (auto v = lookup(node.data_s)) {
                     return v->reg;
-                } else if (auto c = lookup_capture(node.data_s)) {
-                    /*if (c->reg != 0xff) {
-                        emit(BOX_READ, c->reg, c->capture_index);
-                    }*/
+                }/* else if (auto c = lookup_capture(node.data_s)) {
+                    auto box_reg = allocate_register();
+                    emit(READ_BOX, box_reg, c->capture_index, 0);
                     return c->reg;
+                }*/ else {
+                    throw runtime_error("can't find variable: "s + node.data_s);
                 }
-
-                throw runtime_error("can't find variable: "s + node.data_s);
+                return 0xff;
             }
             handle(NumLiteral) { should_allocate(1);
                 auto n = node.data_d;
@@ -332,11 +334,6 @@ struct FunctionContext {
                 auto out = allocate_register();
 
                 emit_u(ALLOC_FUNC, out, func.storage_index);
-                // for (auto& [ k, v ]: func.captures) {
-                    // emit(CAPTURE, out, v.reg);
-                    // need to grab V from the stack
-                    // need absolute position for v
-                // }
 
                 if (node.children.size() == 3) {
                     bind_register(node.children[2].data_s, out, true);
@@ -574,11 +571,9 @@ void Compiler2::compile(const AstNode& module, Program& program) {
     for (auto f = funcs.begin(); f != funcs.end(); f++) {
         // can't use range-based for because compiler.functions size changes
         auto start_addr = program.instructions.size();
-        program.functions.emplace_back(FunctionType { (uint32_t)start_addr });
-        program.storage[f->storage_index] = value_from_function(&program.functions.back());
-        //value_from_integer(program.functions.size() - 1);
-        
         f->compile(program);
+        program.functions.emplace_back(FunctionType { (uint32_t)start_addr, f->captures });
+        program.storage[f->storage_index] = value_from_function(&program.functions.back());
     }
 
     // for each function, box captured variables
@@ -596,7 +591,11 @@ struct Interpreter2 {
 
     void execute(const Program& program) {
         #define handle(opcode) break; case Opcode::opcode:
-        #define REGISTER(n) _stack[_stackbase+n]
+
+        // TODO: likely super inefficient
+        #define REGISTER_(n) _stack[_stackbase+n]
+        #define REGISTER(n)\
+            *(value_is_boxed(REGISTER_(n)) ? value_to_boxed(REGISTER_(n)) : &REGISTER_(n))
 
         auto _stack = array<Value, 4096> {};
         _stack.fill(value_null());
@@ -700,12 +699,27 @@ struct Interpreter2 {
                         REGISTER(i.r0) = value_from_number(arr->size());
                     }
                     handle(ALLOC_FUNC) {
-                        // REGISTER(i.r0) = program.storage[i.u1];
+                        // create closure
                         auto func = value_to_function(program.storage[i.u1]);
-                        _closures.emplace_back(ClosureType { func, {} });
-                        REGISTER(i.r0) = value_from_closure(&_closures.back());
-                        // _closures.emplace_back(func);
-                        // REGISTER(i.r0) = value_from_function(&_closures.back());
+                        _closures.emplace_back(ClosureType {func, {}});
+                        
+                        // capture captures
+                        // box new captures (TODO: does this work?)
+                        auto closure = &_closures.back();
+                        for (auto c : func->captures) {
+                            auto val = REGISTER_(c.source_register);
+                            if (!value_is_boxed(val)) {
+                                _boxes.emplace_back(val);
+                                auto box = value_from_boxed(&_boxes.back());
+                                closure->captures.emplace_back(box);
+                                REGISTER_(c.source_register) = box;
+                            } else {
+                                closure->captures.emplace_back(val);
+                            }
+                        }
+
+                        // done
+                        REGISTER(i.r0) = value_from_closure(closure);
                     }
                     handle(ALLOC_ARRAY) {
                         _arrays.emplace_back(ArrayType{});
@@ -774,14 +788,23 @@ struct Interpreter2 {
                         (*obj)[*value_to_string(key_val)] = REGISTER(i.r0);
                     }
                     handle(CALL) {
-                        // auto func_start = value_to_function(REGISTER(i.r0))->code;
-                        auto func_start = value_to_closure(REGISTER(i.r0))->func->code;
+                        auto closure = value_to_closure(REGISTER(i.r0));
+                        auto func = closure->func;
+                        auto func_start = func->code;
                         auto nargs = i.r1;
-                        auto new_base = i.r2;
-                        REGISTER(new_base)._i = _pc; // push return addr
-                        REGISTER(new_base+1)._i = _stackbase; // push return frameptr
+                        auto new_base = i.r2 + 2;
+                        REGISTER_(new_base - 2)._i = _pc; // push return addr
+                        REGISTER_(new_base - 1)._i = _stackbase; // push return frameptr
                         _pc = func_start - 1; // jump to addr
-                        _stackbase = _stackbase + new_base + 2; // new stack frame
+                        _stackbase = _stackbase + new_base; // new stack frame
+
+                        // write captures to registers
+                        for (auto i = 0; i < func->captures.size(); i++) {
+                            if (!value_is_boxed(closure->captures[i])) {
+                                throw runtime_error("unboxed capture");
+                            }
+                            REGISTER_(func->captures[i].dest_register) = closure->captures[i];
+                        }
                     }
                     handle(RANDOM) {
                         REGISTER(i.r0) = value_from_number(rand() % 10000);
@@ -798,6 +821,11 @@ struct Interpreter2 {
                         } else {
                             REGISTER(-2) = value_null();
                         }
+
+                        // "Clean" the stack
+                        // Must not leave any boxes in unused registers, or subsequent loads to register will mistakenly write-through
+                        // TODO: try and elide this, or make more efficient
+                        memset(_stack.data() + _stackbase, 0xffffffff, MAX_REGISTERS * sizeof(Value));
                         _pc = return_addr._i;
                         _stackbase = return_fptr._i;
                     }

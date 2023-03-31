@@ -10,6 +10,13 @@ make
 
 ## TODO:
 
+- [ ] Chunk based compile functions as they are encountered instead of pushing to queue
+	This will simplify lookups massively as scopes can go back to being a stack
+	instead of tracking all scopes and keeping a tree
+
+	Also simplifies closures
+
+
 ### Features
 - [ ] Proper for loops
 - [x] Arrays
