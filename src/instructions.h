@@ -1,5 +1,7 @@
 #pragma once
 
+#include <jlib/hash_map.h>
+
 #define opcodes() \
     opcode(UNKNOWN)\
     /* binary operations:*/\

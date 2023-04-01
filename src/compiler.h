@@ -1,11 +1,11 @@
 #pragma once
 
+#include <string>
 #include <list>
 #include <array>
 #include <vector>
 
-#include "parsing.h"
-#include "program.h"
+#include "instructions.h"
 #include "value.h"
 
 enum class RegisterState {
@@ -17,6 +17,26 @@ enum class RegisterState {
 
 static const uint32_t MAX_REGISTERS = 256;
 static const uint32_t STACK_FRAME_OVERHEAD = 4;
+
+struct AstNode;
+
+struct CaptureInfo {
+    uint8_t source_register;
+    uint8_t dest_register;
+};
+struct CompiledFunction {
+    std::string name;
+    std::vector<Instruction> instructions;
+    std::vector<Value> storage; // program constant storage goes at the bottom of the stack for now
+    std::list<std::string> strings; // string constants and literals storage - includes identifiers for objects
+    std::list<CompiledFunction> functions; // local functions (everything is a local function from the POV of the global context)
+    std::vector<CaptureInfo> capture_info;
+
+    uint16_t store_number(double d);
+    uint16_t store_string(const std::string& data);
+    uint16_t store_function();
+    std::string str(const std::string& prefix = "");
+};
 
 struct FunctionCompiler {
     struct VariableContext {
@@ -65,10 +85,9 @@ struct FunctionCompiler {
     void push_scope(ScopeContext* parent_scope, bool is_top_level = false);
     void pop_scope();
 
-    void compile_func(const AstNode& node, CompiledFunction* output, ScopeContext* parent_scope = nullptr);
-    uint8_t compile(const AstNode& node, CompiledFunction* output);
+    void compile_func(const AstNode* node, CompiledFunction* output, ScopeContext* parent_scope = nullptr);
+    uint8_t compile(const AstNode* node, CompiledFunction* output);
 
 };
-
 
 

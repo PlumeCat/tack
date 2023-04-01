@@ -1,4 +1,9 @@
-﻿#include <iostream>
+﻿#include "parsing.h"
+#include "value.h"
+#include "compiler.h"
+#include "interpreter.h"
+
+#include <iostream>
 #include <sstream>
 #include <vector>
 #include <string>
@@ -15,10 +20,6 @@
 #include <jlib/log.h>
 #include <jlib/text_file.h>
 
-#include "parsing.h"
-#include "value.h"
-#include "compiler.h"
-#include "interpreter.h"
 
 int main(int argc, char* argv[]) {
     auto check_arg = [&](const std::string& s) {
@@ -47,19 +48,14 @@ int main(int argc, char* argv[]) {
         auto global = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
         auto compiler = FunctionCompiler { .node = &global, .name = "(global)" };
         auto program = CompiledFunction{};
-        compiler.compile_func(global, &program);
+        compiler.compile_func(&global, &program);
 
-        // auto compiler = Compiler2{};
         auto vm = Interpreter{};
-        // compiler.compile(out_ast, program);
         if (check_arg("-D")) {
             log("Program:\n" + program.str());
         }
 
-        //auto before = steady_clock::now();
         vm.execute(&program);
-        //auto after = steady_clock::now();
-        //log("BC done in ", duration_cast<microseconds>(after - before).count() * 1e-6, "s");
     } catch (std::exception& e) {
         log(e.what());
     }

@@ -1,6 +1,6 @@
-#include <iostream>
-
 #include "value.h"
+
+#include <iostream>
 
 std::ostream& operator<<(std::ostream& o, const mat4& v) { return o << "mat4 { ... }"; }
 std::ostream& operator<<(std::ostream& o, const vec2& v) { return o << "vec2 { " << v.x << ", " << v.y << " }"; }

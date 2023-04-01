@@ -65,13 +65,10 @@ enum class Type : uint64_t {
     */
 };
 
-struct Value; // forward declare for who needs it
-struct CompiledFunction; // forward declare
+struct Value;
+struct CompiledFunction;
 using BoxType = Value;
 using NullType = nullptr_t;
-// using BooleanType = bool;
-// using IntegerType = int;
-// using NumberType = double;
 using StringType = std::string;
 using ObjectType = hash_map<std::string, Value>;
 using ArrayType = std::vector<Value>;
@@ -93,55 +90,55 @@ struct Value {
 };
 
 // create value
-inline constexpr Value value_null()      { return { UINT64_MAX }; }
-inline constexpr Value value_false()     { return { nan_bits | type_bits_boolean }; }
-inline constexpr Value value_true()      { return { nan_bits | type_bits_boolean | 1 }; }
+inline constexpr Value value_null()                     { return { UINT64_MAX }; }
+inline constexpr Value value_false()                    { return { nan_bits | type_bits_boolean }; }
+inline constexpr Value value_true()                     { return { nan_bits | type_bits_boolean | 1 }; }
 
 // create value
-inline Value value_from_boolean(bool b)     { return { nan_bits | type_bits_boolean | b }; }
-inline Value value_from_integer(int32_t i)   { return { nan_bits | type_bits_integer | i }; }
-inline Value value_from_number(double d) { return { ._d = d }; /* TODO: check for nan and mask off? */}
-inline Value value_from_pointer(void* ptr) { return { nan_bits | type_bits_pointer | ((uint64_t)ptr & pointer_bits) }; }
-inline Value value_from_closure(ClosureType* closure)  { return { nan_bits | type_bits_closure | uint64_t(closure) }; }
-inline Value value_from_boxed(BoxType* box)    { return { nan_bits | type_bits_boxed  | uint64_t(box) }; }
-inline Value value_from_string(const StringType* str){ return { nan_bits | type_bits_string | uint64_t(str) }; }
-inline Value value_from_object(ObjectType* obj){ return { nan_bits | type_bits_object | uint64_t(obj) }; }
-inline Value value_from_array(ArrayType* arr)  { return { nan_bits | type_bits_array  | uint64_t(arr) }; }
-inline Value value_from_vec2(vec2* v2)  { return { nan_bits | type_bits_vec2   | uint64_t(v2) }; }
-inline Value value_from_vec3(vec3* v3)  { return { nan_bits | type_bits_vec3   | uint64_t(v3) }; }
-inline Value value_from_vec4(vec4* v4)  { return { nan_bits | type_bits_vec4   | uint64_t(v4) }; }
-inline Value value_from_mat4(mat4* m4)  { return { nan_bits | type_bits_mat4   | uint64_t(m4) }; }
+inline Value value_from_boolean(bool b)                 { return { nan_bits | type_bits_boolean | b }; }
+inline Value value_from_integer(int32_t i)              { return { nan_bits | type_bits_integer | i }; }
+inline Value value_from_number(double d)                { return { ._d = d }; /* TODO: check for nan and mask off? */}
+inline Value value_from_pointer(void* ptr)              { return { nan_bits | type_bits_pointer | ((uint64_t)ptr & pointer_bits) }; }
+inline Value value_from_closure(ClosureType* closure)   { return { nan_bits | type_bits_closure | uint64_t(closure) }; }
+inline Value value_from_boxed(BoxType* box)             { return { nan_bits | type_bits_boxed  | uint64_t(box) }; }
+inline Value value_from_string(const StringType* str)   { return { nan_bits | type_bits_string | uint64_t(str) }; }
+inline Value value_from_object(ObjectType* obj)         { return { nan_bits | type_bits_object | uint64_t(obj) }; }
+inline Value value_from_array(ArrayType* arr)           { return { nan_bits | type_bits_array  | uint64_t(arr) }; }
+inline Value value_from_vec2(vec2* v2)                  { return { nan_bits | type_bits_vec2   | uint64_t(v2) }; }
+inline Value value_from_vec3(vec3* v3)                  { return { nan_bits | type_bits_vec3   | uint64_t(v3) }; }
+inline Value value_from_vec4(vec4* v4)                  { return { nan_bits | type_bits_vec4   | uint64_t(v4) }; }
+inline Value value_from_mat4(mat4* m4)                  { return { nan_bits | type_bits_mat4   | uint64_t(m4) }; }
 
 // type checks
-inline Type value_get_type(Value v)   { return isnan(v._d) ? (Type)(v._i & type_bits) : Type::Number; }
-inline bool value_is_null(Value v)    { return v._i == UINT64_MAX; }
-inline bool value_is_boolean(Value v) { return (v._i & type_bits) == type_bits_boolean; }
-inline bool value_is_integer(Value v) { return (v._i & type_bits) == type_bits_integer; }
-inline bool value_is_number(Value v)  { return !isnan(v._d); }
-inline bool value_is_pointer(Value v) { return (v._i & type_bits) == type_bits_pointer; }
-inline bool value_is_boxed(Value v)   { return isnan(v._d) && (v._i & type_bits) == type_bits_boxed;   }
-inline bool value_is_closure(Value v) { return (v._i & type_bits) == type_bits_closure; }
-inline bool value_is_string(Value v)  { return (v._i & type_bits) == type_bits_string;  }
-inline bool value_is_object(Value v)  { return (v._i & type_bits) == type_bits_object;  }
-inline bool value_is_array(Value v)   { return (v._i & type_bits) == type_bits_array;   }
-inline bool value_is_vec2(Value v)    { return (v._i & type_bits) == type_bits_vec2; }
-inline bool value_is_vec3(Value v)    { return (v._i & type_bits) == type_bits_vec3; }
-inline bool value_is_vec4(Value v)    { return (v._i & type_bits) == type_bits_vec4; }
-inline bool value_is_mat4(Value v)    { return (v._i & type_bits) == type_bits_mat4; }
+inline Type value_get_type(Value v)                     { return isnan(v._d) ? (Type)(v._i & type_bits) : Type::Number; }
+inline bool value_is_null(Value v)                      { return v._i == UINT64_MAX; }
+inline bool value_is_boolean(Value v)                   { return (v._i & type_bits) == type_bits_boolean; }
+inline bool value_is_integer(Value v)                   { return (v._i & type_bits) == type_bits_integer; }
+inline bool value_is_number(Value v)                    { return !isnan(v._d); }
+inline bool value_is_pointer(Value v)                   { return (v._i & type_bits) == type_bits_pointer; }
+inline bool value_is_boxed(Value v)                     { return isnan(v._d) && (v._i & type_bits) == type_bits_boxed;   }
+inline bool value_is_closure(Value v)                   { return (v._i & type_bits) == type_bits_closure; }
+inline bool value_is_string(Value v)                    { return (v._i & type_bits) == type_bits_string;  }
+inline bool value_is_object(Value v)                    { return (v._i & type_bits) == type_bits_object;  }
+inline bool value_is_array(Value v)                     { return (v._i & type_bits) == type_bits_array;   }
+inline bool value_is_vec2(Value v)                      { return (v._i & type_bits) == type_bits_vec2; }
+inline bool value_is_vec3(Value v)                      { return (v._i & type_bits) == type_bits_vec3; }
+inline bool value_is_vec4(Value v)                      { return (v._i & type_bits) == type_bits_vec4; }
+inline bool value_is_mat4(Value v)                      { return (v._i & type_bits) == type_bits_mat4; }
 
-inline StringType* value_to_string(Value v)        { return (StringType*)(v._i & pointer_bits); }
-inline ArrayType* value_to_array(Value v)          { return (ArrayType*)(v._i & pointer_bits); }
-inline ObjectType* value_to_object(Value v)        { return (ObjectType*)(v._i & pointer_bits); }
-inline BoxType* value_to_boxed(Value v)            { return (BoxType*)(v._i & pointer_bits); }
-inline ClosureType* value_to_closure(Value v)      { return (ClosureType*)(v._i & pointer_bits); }
-inline vec2* value_to_vec2(Value v)                { return (vec2*)(v._i & pointer_bits); }
-inline vec3* value_to_vec3(Value v)                { return (vec3*)(v._i & pointer_bits); }
-inline vec4* value_to_vec4(Value v)                { return (vec4*)(v._i & pointer_bits); }
-inline mat4* value_to_mat4(Value v)                { return (mat4*)(v._i & pointer_bits); }
-inline uint64_t value_to_null(Value v)             { return v._i; } // ???
-inline bool value_to_boolean(Value v)              { return (bool)(v._i & boolean_bits); }
-inline int32_t value_to_integer(Value v)           { return (int32_t)(v._i & integer_bits); }
-inline double value_to_number(Value v)             { return v._d; } // ???
-inline void* value_to_pointer(Value v)             { return (void*)(v._i & pointer_bits); }
+inline StringType* value_to_string(Value v)             { return (StringType*)(v._i & pointer_bits); }
+inline ArrayType* value_to_array(Value v)               { return (ArrayType*)(v._i & pointer_bits); }
+inline ObjectType* value_to_object(Value v)             { return (ObjectType*)(v._i & pointer_bits); }
+inline BoxType* value_to_boxed(Value v)                 { return (BoxType*)(v._i & pointer_bits); }
+inline ClosureType* value_to_closure(Value v)           { return (ClosureType*)(v._i & pointer_bits); }
+inline vec2* value_to_vec2(Value v)                     { return (vec2*)(v._i & pointer_bits); }
+inline vec3* value_to_vec3(Value v)                     { return (vec3*)(v._i & pointer_bits); }
+inline vec4* value_to_vec4(Value v)                     { return (vec4*)(v._i & pointer_bits); }
+inline mat4* value_to_mat4(Value v)                     { return (mat4*)(v._i & pointer_bits); }
+inline uint64_t value_to_null(Value v)                  { return v._i; } // ???
+inline bool value_to_boolean(Value v)                   { return (bool)(v._i & boolean_bits); }
+inline int32_t value_to_integer(Value v)                { return (int32_t)(v._i & integer_bits); }
+inline double value_to_number(Value v)                  { return v._d; } // ???
+inline void* value_to_pointer(Value v)                  { return (void*)(v._i & pointer_bits); }
 
 std::ostream& operator<<(std::ostream& o, const Value& v);

@@ -5,9 +5,6 @@ set(PROJECT_NAME tack)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED true)
 
-#set(CMAKE_CXX_FLAGS_RELEASE -Werror=return-value)
-#set(CMAKE_CXX_FLAGS_DEBUG -Werror=return-value)
-
 project(${PROJECT_NAME})
 message("Project:          ${PROJECT}")
 message("CMake build type: ${CMAKE_BUILD_TYPE}")

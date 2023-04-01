@@ -1,3 +1,7 @@
+#include "compiler.h"
+#include "value.h"
+#include "interpreter.h"
+
 #include <list>
 #include <vector>
 #include <array>
@@ -5,20 +9,14 @@
 #include <chrono>
 #include <jlib/log.h>
 
-#include "compiler.h"
-#include "program.h"
-#include "value.h"
-#include "interpreter.h"
-
 void Interpreter::execute(CompiledFunction* program) {
-#define handle(opcode) break; case Opcode::opcode:
 
     // TODO: likely super inefficient
-#define REGISTER_RAW(n) _stack[_stackbase+n]
-#define REGISTER(n)\
-            *(value_is_boxed(REGISTER_RAW(n)) ? value_to_boxed(REGISTER_RAW(n)) : &REGISTER_RAW(n))
+    #define handle(opcode) break; case Opcode::opcode: //log("Opcode: ", to_string(Opcode::opcode));
+    #define REGISTER_RAW(n) _stack[_stackbase+n]
+    #define REGISTER(n)     *(value_is_boxed(REGISTER_RAW(n)) ? value_to_boxed(REGISTER_RAW(n)) : &REGISTER_RAW(n))
 
-        // program counter
+    // program counter
     auto _pr = program; // current program
     auto _pc = 0u;
     auto _pe = _pr->instructions.size();
@@ -28,8 +26,9 @@ void Interpreter::execute(CompiledFunction* program) {
     auto _stackbase = STACK_FRAME_OVERHEAD;
     _stack.fill(value_null());
     _stack[0]._i = _pr->instructions.size(); // pseudo return address
-    _stack[1]._p = (void*)&program; // pseudo return program
+    _stack[1]._p = (void*)program; // pseudo return program
     _stack[2]._i = 0; // reset stack base to 0, should not be reached
+    _stack[3] = value_null();
 
     // heap
     auto _arrays = std::list<ArrayType> {};
@@ -271,3 +270,4 @@ void Interpreter::execute(CompiledFunction* program) {
         log("runtime error: ", e.what());
     }
 }
+

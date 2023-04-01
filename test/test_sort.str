@@ -28,7 +28,7 @@ fn join(a, b) {
     return c
 }
 
-fn quicksort(arr, qs, join) {
+fn quicksort(arr) {
     const n = #arr
     if n <= 1 { return arr }
 
@@ -60,7 +60,7 @@ fn quicksort(arr, qs, join) {
         i = i + 1
     }
 
-    return join(qs(lower, qs, join), qs(upper, qs, join))
+    return join(quicksort(lower), quicksort(upper))
 }
 
 const N = 500
@@ -73,14 +73,18 @@ while i < N {
     i = i + 1
     A << random()
 }
+print("starting")
+const before = clock()
+const B = quicksort(A)
+const after = clock()
+print("time taken")
+print(after - before)
 
 print(A)
-const before = clock()
-const B = quicksort(A, quicksort, join)
-const after = clock()
 print(B)
-
 
 if #A != #B {
     print("not same size!")
 }
+
+return
