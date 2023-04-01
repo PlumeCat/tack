@@ -29,13 +29,12 @@
     opcode(OPCODE_MAX)
     
 
-#include <unordered_map>
 #define opcode(x) x,
 enum class Opcode : uint8_t { opcodes() };
 #undef opcode
 #define opcode(x) { Opcode::x, #x },
-string to_string(Opcode opcode) {
-    static const hash_map<Opcode, string> opcode_to_string = { opcodes() };
+inline std::string to_string(Opcode opcode) {
+    static const hash_map<Opcode, std::string> opcode_to_string = { opcodes() };
     return opcode_to_string[opcode];
 }
 #undef opcode

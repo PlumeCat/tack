@@ -15,17 +15,13 @@
 #include <jlib/log.h>
 #include <jlib/text_file.h>
 
-using namespace std;
-using namespace std::chrono;
-
 #include "parsing.h"
 #include "value.h"
-#include "compiler2.h"
-#include "interpreter2.h"
-
+#include "compiler.h"
+#include "interpreter.h"
 
 int main(int argc, char* argv[]) {
-    auto check_arg = [&](const string& s) {
+    auto check_arg = [&](const std::string& s) {
         for (auto i = 0; i < argc; i++) {
             if (argv[i] == s) {
                 return true;
@@ -38,7 +34,7 @@ int main(int argc, char* argv[]) {
     auto fname = (argc >= 2) ? argv[1] : "source.str";
     auto s = read_text_file(fname);
     if (!s.has_value()) {
-        throw runtime_error("error opening source file: "s + argv[1]);
+        throw std::runtime_error("error opening source file: " + std::string(argv[1]));
     }
     auto source = s.value();
     auto out_ast = AstNode {};
@@ -54,7 +50,7 @@ int main(int argc, char* argv[]) {
         compiler.compile_func(global, &program);
 
         // auto compiler = Compiler2{};
-        auto vm = Interpreter2();
+        auto vm = Interpreter{};
         // compiler.compile(out_ast, program);
         if (check_arg("-D")) {
             log("Program:\n" + program.str());
@@ -64,7 +60,7 @@ int main(int argc, char* argv[]) {
         vm.execute(&program);
         //auto after = steady_clock::now();
         //log("BC done in ", duration_cast<microseconds>(after - before).count() * 1e-6, "s");
-    } catch (exception& e) {
+    } catch (std::exception& e) {
         log(e.what());
     }
 
