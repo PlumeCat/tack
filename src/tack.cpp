@@ -51,12 +51,15 @@ int main(int argc, char* argv[]) {
             log("AST: ", out_ast.tostring());
         }
         
-        auto program = Program {};
-        auto compiler = Compiler2{};
+        auto global = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
+        auto program = Program { .node = &global, .name = "(global)" };
+        program.compile(nullptr);
+
+        // auto compiler = Compiler2{};
         auto vm = Interpreter2();
-        compiler.compile(out_ast, program);
+        // compiler.compile(out_ast, program);
         if (check_arg("-D")) {
-            log(program.to_string());
+            log("Program:\n" + program.str());
         }
 
         //auto before = steady_clock::now();

@@ -7,9 +7,7 @@ fn madness() {
             print(i)
 
             fn write() {
-                "if 1 {"
-                        i = i + 1
-                "}"
+                i = i + 1
             }
 
             i = i + 10
@@ -18,9 +16,13 @@ fn madness() {
             write()
 
             fn read() {
+                i = i + 1
+                return fn() {
                     return i
+                }
             }
 
+            print(i)
             write()
 
             return read
@@ -28,4 +30,4 @@ fn madness() {
     }
 }
 
-print(madness()())
+print(madness()()())

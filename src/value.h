@@ -86,6 +86,7 @@ enum class Type : uint64_t {
 };
 
 struct Value; // forward declare for who needs it
+struct Program; // TODO: remove
 using BoxType = Value;
 using NullType = nullptr_t;
 // using BooleanType = bool;
@@ -98,10 +99,11 @@ struct CaptureInfo {
     uint8_t source_register;
     uint8_t dest_register;
 };
-using FunctionType = struct {
-    uint32_t code;
-    vector<CaptureInfo> captures; // registers to capture
-};
+//using FunctionType = struct {
+//    uint32_t code;
+//    vector<CaptureInfo> captures; // registers to capture
+//};
+using FunctionType = Program;
 using ClosureType = struct {
     FunctionType* func;
     vector<Value> captures; // contains boxes
@@ -229,12 +231,12 @@ ostream& operator<<(ostream& o, const Value& v) {
         case (uint64_t)Type::Pointer:   return o << value_to_pointer(v);
         case (uint64_t)Type::Object:    return o << "object {" << *value_to_object(v) << "}"; //*value_to_object(v);
         case (uint64_t)Type::Array:     return o << "array [" << *value_to_array(v) << "]"; //*value_to_array(v);
-        case (uint64_t)Type::Function:  return o << "fn @ " << value_to_function(v)->code;
+        // case (uint64_t)Type::Function:  return o << "fn @ " << value_to_function(v)->code;
         case (uint64_t)Type::Mat4:      return o << *value_to_mat4(v);
         case (uint64_t)Type::Vec2:      return o << *value_to_vec2(v);
         case (uint64_t)Type::Vec3:      return o << *value_to_vec3(v);
         case (uint64_t)Type::Vec4:      return o << *value_to_vec4(v);
-        case (uint64_t)Type::Closure:   return o << "cl: " << hex << nouppercase << v._p << " " << value_to_closure(v)->func->code << " [" << value_to_closure(v)->captures << "]";
+        case (uint64_t)Type::Closure:   return o << "closure: " << hex << nouppercase << v._p;
         case type_bits_boxed:           return o << "box: " << hex << nouppercase << v._p << "(" << hex << nouppercase << value_to_boxed(v)->_p << ")";
         default:                        return o << "(unknown)" << hex << nouppercase << v._i << dec;
         // default: return o << value_to_number(v);
