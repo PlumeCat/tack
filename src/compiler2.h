@@ -6,14 +6,14 @@
 #include "value.h"
 
 // emit an instruction with 3 8 bit operands
-#define emit(op, r0, r1, r2)            instructions.emplace_back(Opcode::op, r0, r1, r2)
+#define emit(op, r0, r1, r2)            output->instructions.emplace_back(Opcode::op, r0, r1, r2)
 
 // emit an instruction with 1 u8 operand r and 1 u16 operand u
-#define emit_u(op, r, u)                auto ins = Instruction{}; ins.opcode = Opcode::op; ins.r0 = r; ins.u1 = u; instructions.emplace_back(ins);
+#define emit_u(op, r, u)                auto ins = Instruction{}; ins.opcode = Opcode::op; ins.r0 = r; ins.u1 = u; output->instructions.emplace_back(ins);
 
 // rewrite an instruction with 3 8-bit operands
-#define rewrite(pos, type, r0, r1, r2)  instructions[pos] = { Opcode::type, r0, r1, r2 };
-#define label(name)                     auto name = instructions.size();
+#define rewrite(pos, type, r0, r1, r2)  output->instructions[pos] = { Opcode::type, r0, r1, r2 };
+#define label(name)                     auto name = output->instructions.size();
 #define should_allocate(n)
 #define handle(x)                       break; case AstType::x:
 
@@ -36,125 +36,39 @@ enum RegisterState {
 
 using StorageIndex = uint16_t;
 struct ScopeContext;
-struct Program;
-//struct Compiler2 {
-//    list<FunctionContext> funcs; // need to grow without invalidating pointers
-//    
-//    // returns the storage index of the start address
-//    FunctionContext& add_function(Program& program, ScopeContext* parent_scope, const AstNode* node);
-//    
-//    void compile(const AstNode& module, Program& program);
-//};
+struct FunctionCompiler;
 
 static const uint32_t MAX_REGISTERS = 256;
-static const uint32_t STACKFRAME_OVERHEAD = 4;
+static const uint32_t STACK_FRAME_OVERHEAD = 4;
 
 struct VariableContext {
     uint8_t reg;
     bool is_const = false;
 };
 struct ScopeContext {
-    Program* function;
+    FunctionCompiler* compiler;
     ScopeContext* parent_scope = nullptr; // establishes a tree structure over FunctionContext::scopes
     bool is_top_level_scope = false;
     hash_map<string, VariableContext> bindings = hash_map<string, VariableContext>(1, 1); // variables
 
-    // needs_capture = the lookup is happening in an enclosed function
-    VariableContext* lookup(const string& name);
+    // lookup a variable
+    // if it lives in a parent function, code will be emitted to capture it
+    VariableContext* lookup(const string& name, CompiledFunction* output);
 };
-struct Program {
-    // Compiler2* compiler;
+struct FunctionCompiler {
+    // AST node to compile
+    // TODO: make it not a parameter
     const AstNode* node;
-    // ScopeContext* parent_scope = nullptr; // enclosing scope - might belong to parent function
-    // StorageIndex storage_index;
+    // name of function (if any)
     string name;
 
+    // compiler state
     array<RegisterState, MAX_REGISTERS> registers;
     list<ScopeContext> scopes;
     vector<CaptureInfo> captures;
 
-    // Program& program;
-    vector<Instruction> instructions;
-    vector<Value> storage; // program constant storage goes at the bottom of the stack for now
-    list<string> strings; // string constants and literals storage - includes identifiers for objects
-    list<Program> functions;
-
-    string str(const string& prefix = ""s) {
-        auto s = stringstream{};
-        s << "function: " << prefix + name << endl;
-        auto i = 0;
-        for (auto bc : instructions) {
-            s << "    " << i << ": " << ::to_string(bc.opcode) << ' ' << (uint32_t)bc.r0 << ' ' << (uint32_t)bc.r1 << ' ' << (uint32_t)bc.r2 << '\n';
-            i++;
-        }
-
-        s << "  storage:\n";
-        i = 0;
-        for (auto& x : storage) {
-            // s << "    " << i << ": " << x << '\n';
-            i++;
-        }
-
-        s << "  strings:\n";
-        i = 0;
-        for (auto& _s: strings) {
-            // s << "    " << i << ": " << _s << '\n';
-            i++;
-        }
-
-        for (auto& f : functions) {
-            s << f.str(prefix + name + "::");
-        }
-        return s.str();
-    }
-
-    //// lookup a local variable
-    //VariableContext* lookup_local(const string& name) {
-    //    // TODO: handle globals as a special case
-    //    // may want more than 256 globals especially for functions
-    //    for (auto s = current_scope; !s->is_top_level_scope && s->parent_scope; s = s->parent_scope) {
-    //        if (auto iter = s->bindings.find(name); iter != s->bindings.end()) {
-    //            return &iter->second;
-    //        }
-    //    }
-    //    return nullptr;
-    //}
-
-    //// lookup a local variable in the enclosing function (or enclosing enclosing function, etc)
-    //// may emit code to read captured value into register
-    //VariableContext* lookup_parent(const string& name) {
-    //    auto s = parent_scope; // parent scope containing function
-    //    while (true) {
-    //        if (auto iter = s->bindings.find(name); iter != s->bindings.end()) {
-    //            // if there is a capture, we make a new local variable for the inner function
-    //            // at ALLOC_FUNC, the local variable from the outer function is put into a box
-    //            // the register containing the variable now contains the box
-    //            // the owning function can continue to use it transparently from there (with the box penalty)
-
-    //            // needs optimization because now registers need to check if boxed all the time
-    //            // we could mark registers as containing boxes, and emit READ_BOX/WRITE_BOX as necessary
-    //            // however still going to need to rewrite parent function code until we have proper recursive single pass compile
-
-    //            auto reg = allocate_register();
-    //            captures.emplace_back(CaptureInfo { .source_register = iter->second.reg, .dest_register = reg });
-    //            emit(READ_CAPTURE, reg, captures.size() - 1, 0);
-    //            return bind_register(name, reg, iter->second.is_const);
-    //        }
-    //        if (s->is_top_level_scope && s->parent_scope) {
-    //            // only allow 1 level of capture for the time being
-
-    //            break;
-    //        }
-    //        s = s->parent_scope;
-    //    }
-
-    //    return nullptr;
-    //}
-
-    VariableContext* lookup(const string& name) {
-        return scopes.back().lookup(name);
-    }
-
+    // lookup a variable in the current scope stack
+    VariableContext* lookup(const string& name, CompiledFunction* output) { return scopes.back().lookup(name, output); }
 
     // get a free register
     uint8_t allocate_register() {
@@ -199,7 +113,7 @@ struct Program {
         }
     }
 
-    void push_scope(bool is_top_level = false, ScopeContext* parent_scope = nullptr) {
+    void push_scope(ScopeContext* parent_scope, bool is_top_level = false) {
         scopes.emplace_back(ScopeContext { this, parent_scope, is_top_level});
     }
     void pop_scope() {
@@ -208,48 +122,28 @@ struct Program {
             //registers[b.second.reg] = FREE; // TODO: un-disable once capture is working, and see if still works
         }
         scopes.pop_back();
-    }
-    
+    }   
 
-    uint16_t store_number(double d) {
-        storage.emplace_back(value_from_number(d));
-        return storage.size() - 1;
-    }
-
-    uint16_t store_string(const string& data) {
-        strings.emplace_back(data);
-        storage.emplace_back(value_from_string(
-            &strings.back()
-        ));
-        return storage.size() - 1;
-    }
-    uint16_t store_function() {
-        functions.emplace_back();
-        storage.emplace_back(value_from_function(&functions.back()));
-        return storage.size() - 1;
-    }
-   
-
-    void compile(ScopeContext* parent_scope) {
+    void compile_func(const AstNode& node, CompiledFunction* output, ScopeContext* parent_scope = nullptr) {
         // compile function literal
         // TODO: emit bindings for the N arguments
-        push_scope(true, parent_scope);
-        auto nargs = node->children[0].children.size(); // ParamDef
+        push_scope(parent_scope, true);
+        auto nargs = node.children[0].children.size(); // ParamDef
         for (auto i = 0; i < nargs; i++) {
-            auto& param = node->children[0].children[i]; // Identifier
+            auto& param = node.children[0].children[i]; // Identifier
             bind_register(param.data_s, i, false); // TODO: could choose to make arguments const?
         }
-        auto reg = compile(node->children[1]);
+        auto reg = compile(node.children[1], output);
         emit(RET, 0, 0, 0);
         pop_scope();
     }
-    uint8_t compile(const AstNode& node, uint8_t target_register = 0xff) {
+    uint8_t compile(const AstNode& node, CompiledFunction* output) {
         switch (node.type) {
             case AstType::Unknown: {} break;
             handle(StatList) { should_allocate(0);
-                push_scope(false, &scopes.back());
+                push_scope(&scopes.back());
                 for (auto& c: node.children) {
-                    compile(c);
+                    compile(c, output);
                     free_all_registers();
                 }
                 pop_scope();
@@ -257,17 +151,17 @@ struct Program {
             }
             handle(IfStat) {
                 auto has_else = node.children.size() == 3;
-                auto cond_reg = compile(node.children[0]); // evaluate the expression
+                auto cond_reg = compile(node.children[0], output); // evaluate the expressi, outputon
                 label(condjump);
                 emit(CONDJUMP, cond_reg, 0, 0); // PLACEHOLDER
                 free_register(cond_reg); // can be reused
-                compile(node.children[1]); // compile the if body
+                compile(node.children[1], output); // compile the if bo, outputdy
                 label(endif);
                 
                 if (has_else) {
                     emit(JUMPF, 0, 0, 0); // PLACEHODLER
                     label(startelse);
-                    compile(node.children[2]);
+                    compile(node.children[2], output);
                     label(endelse);
                     if (endelse - endif > 0xff) {
                         throw runtime_error("jump too much");
@@ -287,11 +181,11 @@ struct Program {
             }
             handle(WhileStat) {
                 label(condeval);
-                auto cond_reg = compile(node.children[0]);
+                auto cond_reg = compile(node.children[0], output);
                 label(condjump);
                 emit(CONDJUMP, cond_reg, 0, 0);
                 free_register(cond_reg);
-                compile(node.children[1]);
+                compile(node.children[1], output);
                 label(jumpback);
                 if (jumpback - condeval > 0xff) {
                     throw runtime_error("jump too much");
@@ -305,20 +199,20 @@ struct Program {
                 return 0xff;
             }
             handle(VarDeclStat) { should_allocate(1);
-                auto reg = compile(node.children[1]);
+                auto reg = compile(node.children[1], output);
                 bind_register(node.children[0].data_s, reg);
                 return reg;
             }
             handle(ConstDeclStat) { should_allocate(1);
-                auto reg = compile(node.children[1]);
+                auto reg = compile(node.children[1], output);
                 bind_register(node.children[0].data_s, reg, true);
                 return reg;
             }
             handle(AssignStat) { should_allocate(0);
-                auto source_reg = compile(node.children[1]);
+                auto source_reg = compile(node.children[1], output);
                 auto& lhs = node.children[0];
                 if (lhs.type == AstType::Identifier) {
-                    if (auto var = lookup(node.children[0].data_s)) {
+                    if (auto var = lookup(node.children[0].data_s, output)) {
                         if (var->is_const) {
                             throw runtime_error("can't reassign const variable");
                         }
@@ -331,16 +225,16 @@ struct Program {
                         throw runtime_error("can't find variable: "s + node.children[0].data_s);
                     }
                 } else if (lhs.type == AstType::IndexExp) {
-                    auto array_reg = compile(lhs.children[0]);
-                    auto index_reg = compile(lhs.children[1]);
+                    auto array_reg = compile(lhs.children[0], output);
+                    auto index_reg = compile(lhs.children[1], output);
                     emit(STORE_ARRAY, source_reg, array_reg, index_reg);
                     free_register(index_reg);
                     free_register(array_reg);
                 } else if (lhs.type == AstType::AccessExp) {
-                    auto obj_reg = compile(lhs.children[0]);
+                    auto obj_reg = compile(lhs.children[0], output);
                     // save identifier as string and load it
                     auto key_reg = allocate_register();
-                    auto index = store_string(lhs.children[1].data_s);
+                    auto index = output->store_string(lhs.children[1].data_s);
                     emit_u(LOAD_CONST, key_reg, index);                    
                     emit(STORE_OBJECT, source_reg, obj_reg, key_reg);
                     free_register(obj_reg);
@@ -350,7 +244,7 @@ struct Program {
                 return source_reg; // unused
             }
             handle(Identifier) { should_allocate(0);
-                if (auto v = lookup(node.data_s)) {
+                if (auto v = lookup(node.data_s, output)) {
                     return v->reg;
                 } else {
                     throw runtime_error("can't find variable: "s + node.data_s);
@@ -360,24 +254,24 @@ struct Program {
             handle(NumLiteral) { should_allocate(1);
                 auto n = node.data_d;
                 auto out = allocate_register();
-                auto index = store_number(node.data_d);
+                auto index = output->store_number(node.data_d);
                 emit_u(LOAD_CONST, out, index);
                 return out;
             }
             handle(StringLiteral) { should_allocate(1);
                 auto out = allocate_register();
-                auto index = store_string(node.data_s);
+                auto index = output->store_string(node.data_s);
                 emit_u(LOAD_CONST, out, index);
                 return out;
             }
             handle(FuncLiteral) { should_allocate(1);
                 // note this may create some captures and emit READ_CAPTURE
-                // auto& func = compiler->add_function(program, current_scope, &node);
-                auto index = store_function();
-                auto func = value_to_function(storage[index]);
-                func->node = &node;
+                auto index = output->store_function();
+                auto func = (CompiledFunction*)value_to_pointer(output->storage[index]);
                 func->name = (node.children.size() == 3) ? node.children[2].data_s : "(anonymous)";
-                func->compile(&scopes.back());
+                
+                auto compiler = FunctionCompiler();
+                compiler.compile_func(node, func, &scopes.back());
                 
                 // load an initial closure
                 auto out = allocate_register();
@@ -396,14 +290,14 @@ struct Program {
                 // compile the arguments first and remember which registers they are in
                 auto arg_regs = vector<uint8_t>{};
                 for (auto i = 0; i < nargs; i++) {
-                    arg_regs.emplace_back(compile(node.children[1].children[i]));
+                    arg_regs.emplace_back(compile(node.children[1].children[i], output));
                 }
-                auto func_reg = compile(node.children[0]); // LHS evaluates to function
+                auto func_reg = compile(node.children[0], output); // LHS evaluates to functi, outputon
 
                 // copy arguments to top of stack in sequence
                 auto end_reg = get_end_register();
                 for (auto i = 0; i < nargs; i++) {
-                    emit(MOVE, end_reg + i + STACKFRAME_OVERHEAD, arg_regs[i], 0);
+                    emit(MOVE, end_reg + i + STACK_FRAME_OVERHEAD, arg_regs[i], 0);
                 }
                 
                 emit(CALL, func_reg, nargs, end_reg);
@@ -423,14 +317,14 @@ struct Program {
                 return reg;
             }
             handle(PrintStat) { // no output
-                auto in1 = compile(node.children[0]);
+                auto in1 = compile(node.children[0], output);
                 emit(PRINT, in1, 0, 0);
                 free_register(in1);
                 return 0xff;
             }
             handle(ReturnStat) {
                 if (node.children.size()) {
-                    auto return_register = compile(node.children[0]);
+                    auto return_register = compile(node.children[0], output);
                     if (return_register == 0xff) {
                         throw runtime_error("return value incorrect register");
                         // emit(RET, 0, 0, 0);
@@ -442,7 +336,7 @@ struct Program {
                 return 0xff; // it's irrelevant
             }
             handle(LenExp) {
-                auto in = compile(node.children[0]);
+                auto in = compile(node.children[0], output);
                 auto out = allocate_register();
                 emit(LEN, out, in, 0);
                 free_register(in);
@@ -457,8 +351,8 @@ struct Program {
                 //      out = allocate_register()
                 //      ...
                 // allows to reuse one of the registers (if not bound)
-                auto in1 = compile(node.children[0]);
-                auto in2 = compile(node.children[1]);
+                auto in1 = compile(node.children[0], output);
+                auto in2 = compile(node.children[1], output);
                 auto out = allocate_register();
                 emit(ADD, out, in1, in2);
                 free_register(in1);
@@ -466,8 +360,8 @@ struct Program {
                 return out;
             }
             handle(SubExp) {
-                auto in1 = compile(node.children[0]);
-                auto in2 = compile(node.children[1]);
+                auto in1 = compile(node.children[0], output);
+                auto in2 = compile(node.children[1], output);
                 auto out = allocate_register();
                 emit(SUB, out, in1, in2);
                 free_register(in1);
@@ -475,8 +369,8 @@ struct Program {
                 return out;
             }
             handle(LessExp) {
-                auto in1 = compile(node.children[0]);
-                auto in2 = compile(node.children[1]);
+                auto in1 = compile(node.children[0], output);
+                auto in2 = compile(node.children[1], output);
                 auto out = allocate_register();
                 emit(LESS, out, in1, in2);
                 free_register(in1);
@@ -484,8 +378,8 @@ struct Program {
                 return out;
             }
             handle(LessEqExp) {
-                auto in1 = compile(node.children[0]);
-                auto in2 = compile(node.children[1]);
+                auto in1 = compile(node.children[0], output);
+                auto in2 = compile(node.children[1], output);
                 auto out = allocate_register();
                 emit(LESSEQ, out, in1, in2);
                 free_register(in1);
@@ -493,8 +387,8 @@ struct Program {
                 return out;
             }
             handle(EqExp) {
-                auto in1 = compile(node.children[0]);
-                auto in2 = compile(node.children[1]);
+                auto in1 = compile(node.children[0], output);
+                auto in2 = compile(node.children[1], output);
                 auto out = allocate_register();
                 emit(EQUAL, out, in1, in2);
                 free_register(in1);
@@ -502,8 +396,8 @@ struct Program {
                 return out;
             }
             handle(NotEqExp) {
-                auto in1 = compile(node.children[0]);
-                auto in2 = compile(node.children[1]);
+                auto in1 = compile(node.children[0], output);
+                auto in2 = compile(node.children[1], output);
                 auto out = allocate_register();
                 emit(NEQUAL, out, in1, in2);
                 free_register(in1);
@@ -511,8 +405,8 @@ struct Program {
                 return out;
             }
             handle(GreaterExp) {
-                auto in1 = compile(node.children[0]);
-                auto in2 = compile(node.children[1]);
+                auto in1 = compile(node.children[0], output);
+                auto in2 = compile(node.children[1], output);
                 auto out = allocate_register();
                 emit(GREATER, out, in1, in2);
                 free_register(in1);
@@ -520,8 +414,8 @@ struct Program {
                 return out;
             }
             handle(GreaterEqExp) {
-                auto in1 = compile(node.children[0]);
-                auto in2 = compile(node.children[1]);
+                auto in1 = compile(node.children[0], output);
+                auto in2 = compile(node.children[1], output);
                 auto out = allocate_register();
                 emit(GREATEREQ, out, in1, in2);
                 free_register(in1);
@@ -529,8 +423,8 @@ struct Program {
                 return out;
             }
             handle(MulExp) { // 1 out
-                auto in1 = compile(node.children[0]);
-                auto in2 = compile(node.children[1]);
+                auto in1 = compile(node.children[0], output);
+                auto in2 = compile(node.children[1], output);
                 auto out = allocate_register();
                 emit(MUL, out, in1, in2);
                 free_register(in1);
@@ -538,8 +432,8 @@ struct Program {
                 return out;
             }
             handle(DivExp) { // 1 out
-                auto in1 = compile(node.children[0]);
-                auto in2 = compile(node.children[1]);
+                auto in1 = compile(node.children[0], output);
+                auto in2 = compile(node.children[1], output);
                 auto out = allocate_register();
                 emit(DIV, out, in1, in2);
                 free_register(in1);
@@ -558,14 +452,14 @@ struct Program {
                 return reg;
             }
             handle(ShiftLeftExp) {
-                auto arr = compile(node.children[0]);
-                auto value = compile(node.children[1]);
+                auto arr = compile(node.children[0], output);
+                auto value = compile(node.children[1], output);
                 emit(SHL, arr, value, 0);
                 return 0xff;
             }
             handle(IndexExp) {
-                auto arr = compile(node.children[0]);
-                auto ind = compile(node.children[1]);
+                auto arr = compile(node.children[0], output);
+                auto ind = compile(node.children[1], output);
                 auto out = allocate_register();
                 emit(LOAD_ARRAY, out, arr, ind);
                 free_register(arr);
@@ -573,12 +467,11 @@ struct Program {
                 return out;
             }
             handle(AccessExp) {
-                // TODO: object read
-                auto obj = compile(node.children[0]);
+                auto obj = compile(node.children[0], output);
                 
                 // save identifier as string and load it
                 auto key = allocate_register();
-                auto index = store_string(node.children[1].data_s);
+                auto index = output->store_string(node.children[1].data_s);
                 emit_u(LOAD_CONST, key, index);
                 
                 // load from object
@@ -598,26 +491,24 @@ struct Program {
 
 };
 
-VariableContext* ScopeContext::lookup(const string& name) {
+VariableContext* ScopeContext::lookup(const string& name, CompiledFunction* output) {
     if (auto iter = bindings.find(name); iter != bindings.end()) {
         return &iter->second;
     }
 
     if (parent_scope) {
         // not found by parent scope
-        if (auto var = parent_scope->lookup(name)) {
+        if (auto var = parent_scope->lookup(name, output)) {
             if (is_top_level_scope) { // handle capture scenario
                 // create a mirroring local variable
-                auto mirror_reg = function->allocate_register();
-                auto mirror = function->bind_register(name, mirror_reg, var->is_const);
+                auto mirror_reg = compiler->allocate_register();
+                auto mirror = compiler->bind_register(name, mirror_reg, var->is_const);
 
                 // record necessary capture into mirror variable
-                function->captures.emplace_back(CaptureInfo { .source_register = var->reg, .dest_register = mirror_reg });
+                output->capture_info.emplace_back(CaptureInfo { .source_register = var->reg, .dest_register = mirror_reg });
 
-                // emit code to read into mirror variable when the time comes
-                // auto& program = *function;
-                // TODO: terrible macro hack
-                function->emit(READ_CAPTURE, mirror_reg, function->captures.size() - 1, 0);
+                // emit code to read into mirror variable
+                emit(READ_CAPTURE, mirror_reg, output->capture_info.size() - 1, 0);
 
                 // return the MIRROR variable not the original!
                 return mirror;
@@ -637,302 +528,3 @@ VariableContext* ScopeContext::lookup(const string& name) {
 #undef rewrite
 #undef emit_u
 #undef emit
-
-//void Compiler2::compile(const AstNode& module, Program& program) {
-//    if (module.type != AstType::StatList) {
-//        throw runtime_error("expected statlist");
-//    }
-//
-//    auto node = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef, {}), module);
-//    add_function(program, nullptr, &node);
-//
-//    // compile all function literals and append to main bytecode
-//    // TODO: interesting, can this be parallelized?
-//    for (auto f = funcs.begin(); f != funcs.end(); f++) {
-//        // can't use range-based for because compiler.functions size changes
-//        auto start_addr = program.instructions.size();
-//        f->compile();
-//        program.functions.emplace_back(FunctionType { (uint32_t)start_addr, f->captures });
-//        program.storage[f->storage_index] = value_from_function(&program.functions.back());
-//    }
-//
-//    // for each function, box captured variables
-//}
-//FunctionContext& Compiler2::add_function(Program& program, ScopeContext* parent_scope, const AstNode* node) {
-//    auto storage_index = program.storage.size();
-//    program.storage.emplace_back(value_null());
-//    funcs.emplace_back(FunctionContext {
-//        .compiler = this,
-//        .node = node,
-//        .parent_scope = parent_scope,
-//        .storage_index = (StorageIndex) storage_index,
-//        .program = program
-//    });
-//    return funcs.back();
-//}
-//
-
-struct Interpreter2 {
-    // Lua only allows 256 registers, we should do the same
-
-    void execute(const Program& program) {
-        #define handle(opcode) break; case Opcode::opcode:
-
-        // TODO: likely super inefficient
-        #define REGISTER_RAW(n) _stack[_stackbase+n]
-        #define REGISTER(n)\
-            *(value_is_boxed(REGISTER_RAW(n)) ? value_to_boxed(REGISTER_RAW(n)) : &REGISTER_RAW(n))
-
-        // program counter
-        auto _pr = &program; // current program
-        auto _pc = 0u;
-        auto _pe = program.instructions.size();
-
-        // stack/registers
-        auto _stack = array<Value, 4096> {};
-        auto _stackbase = STACKFRAME_OVERHEAD;
-        _stack.fill(value_null());
-        _stack[0]._i = program.instructions.size(); // pseudo return address
-        _stack[1]._p = (void*)&program; // pseudo return program
-        _stack[2]._i = 0; // reset stack base to 0
-        
-        // heap
-        auto _arrays = list<ArrayType>{};
-        auto _objects = list<ObjectType>{};
-        auto _closures = list<ClosureType>{};
-        auto _boxes = list<Value>{};
-        auto error = [&](auto err) { throw runtime_error(err); return value_null(); };
-
-        try {
-            while (_pc < _pe) {
-                auto i = _pr->instructions[_pc];
-                switch (i.opcode) {
-                    case Opcode::UNKNOWN: break;
-                    handle(LOAD_I) {
-                        REGISTER(i.r0) = value_from_integer(i.s1);
-                    }
-                    handle(LOAD_CONST) {
-                        REGISTER(i.r0) = _pr->storage[i.r1];
-                    }
-                    handle(ADD) {
-                        REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) + value_to_number(REGISTER(i.r2)));
-                    }
-                    handle(SUB) {
-                        REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) - value_to_number(REGISTER(i.r2)));
-                    }
-                    handle(MUL) {
-                        REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) * value_to_number(REGISTER(i.r2)));
-                    }
-                    handle(DIV) {
-                        REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) / value_to_number(REGISTER(i.r2)));
-                    }
-                    // TODO: Bin ops need type checking
-                    handle(SHL) {
-                        auto* arr = value_to_array(REGISTER(i.r0));
-                        arr->emplace_back(REGISTER(i.r1));
-                    }
-                    handle(LESS) {
-                        REGISTER(i.r0) = value_from_boolean(
-                            value_to_number(REGISTER(i.r1)) <
-                            value_to_number(REGISTER(i.r2))
-                        );
-                    }
-                    handle(EQUAL) {
-                        REGISTER(i.r0) = value_from_boolean(
-                            value_to_number(REGISTER(i.r1)) ==
-                            value_to_number(REGISTER(i.r2))
-                        );
-                    }
-                    handle(NEQUAL) {
-                        REGISTER(i.r0) = value_from_boolean(
-                            value_to_number(REGISTER(i.r1)) !=
-                            value_to_number(REGISTER(i.r2))
-                        );
-                    }
-                    handle(LESSEQ) {
-                        REGISTER(i.r0) = value_from_boolean(
-                            value_to_number(REGISTER(i.r1)) <=
-                            value_to_number(REGISTER(i.r2))
-                        );
-                    }
-                    handle(GREATER) {
-                        REGISTER(i.r0) = value_from_boolean(
-                            value_to_number(REGISTER(i.r1)) >
-                            value_to_number(REGISTER(i.r2))
-                        );
-                    }
-                    handle(GREATEREQ) {
-                        REGISTER(i.r0) = value_from_boolean(
-                            value_to_number(REGISTER(i.r1)) >=
-                            value_to_number(REGISTER(i.r2))
-                        );
-                    }
-                    handle(MOVE) { REGISTER(i.r0) = REGISTER(i.r1); }
-                    handle(CONDJUMP) {
-                        auto val = REGISTER(i.r0);
-                        if (!(
-                            (value_get_type(val) == Type::Boolean && value_to_boolean(val)) ||
-                            (value_get_type(val) == Type::Integer && value_to_integer(val)) ||
-                            (value_get_type(val) == Type::Number && value_to_number(val))
-                        )) { _pc += i.r1 - 1; }
-                    }
-                    handle(JUMPF) { _pc += i.r0 - 1; }
-                    handle(JUMPB) { _pc -= i.r0 + 1; }
-                    handle(LEN) {
-                        auto* arr = value_to_array(REGISTER(i.r1));
-                        REGISTER(i.r0) = value_from_number(arr->size());
-                    }
-                    handle(ALLOC_FUNC) {
-                        // create closure
-                        auto func = value_to_function(_pr->storage[i.u1]);
-                        _closures.emplace_back(ClosureType {func, {}});
-                        
-                        // capture captures
-                        // box new captures (TODO: does this work?)
-                        auto closure = &_closures.back();
-                        for (auto c : func->captures) {
-                            auto val = REGISTER_RAW(c.source_register);
-                            if (!value_is_boxed(val)) {
-                                _boxes.emplace_back(val);
-                                auto box = value_from_boxed(&_boxes.back());
-                                closure->captures.emplace_back(box);
-                                // box existing variable inplace
-                                REGISTER_RAW(c.source_register) = box;
-                            } else {
-                                closure->captures.emplace_back(val);
-                            }
-                        }
-
-                        // done
-                        REGISTER(i.r0) = value_from_closure(closure);
-                    }
-                    handle(READ_CAPTURE) {
-                        REGISTER_RAW(i.r0) = value_to_array(REGISTER_RAW(-1))->at(i.r1);
-                    }
-                    handle(ALLOC_ARRAY) {
-                        _arrays.emplace_back(ArrayType{});
-                        REGISTER(i.r0) = value_from_array(&_arrays.back());
-                    }
-                    handle(ALLOC_OBJECT) {
-                        _objects.emplace_back(ObjectType{});
-                        REGISTER(i.r0) = value_from_object(&_objects.back());
-                    }
-                    handle(LOAD_ARRAY) {
-                        auto arr_val = REGISTER(i.r1);
-                        auto ind_val = REGISTER(i.r2); 
-                        auto* arr = value_to_array(arr_val);
-                        auto ind_type = value_get_type(ind_val);
-                        auto ind = (ind_type == Type::Integer)
-                            ? value_to_integer(ind_val) 
-                            : (ind_type == Type::Number) 
-                                ? (int)value_to_number(ind_val)
-                                : error("expected number")._i;
-
-                        if (ind >= arr->size()) {
-                            error("outof range index");
-                        }
-                        REGISTER(i.r0) = (*arr)[ind];
-                    }
-                    handle(STORE_ARRAY) {
-                        auto arr_val = REGISTER(i.r1);
-                        if (value_get_type(arr_val) != Type::Array) {
-                            error("expected array");
-                        }
-                        auto* arr = value_to_array(arr_val);
-                        
-                        auto ind_val = REGISTER(i.r2); 
-                        auto ind_type = value_get_type(ind_val);
-                        auto ind = (ind_type == Type::Integer)
-                            ? value_to_integer(ind_val) 
-                            : (ind_type == Type::Number) 
-                                ? (int)value_to_number(ind_val)
-                                : error("expected number")._i;
-                        
-                        if (ind > arr->size()) {
-                            error("outof range index");
-                        }
-                        (*arr)[ind] = REGISTER(i.r0);
-                    }
-                    handle(LOAD_OBJECT) {
-                        auto obj_val = REGISTER(i.r1);
-                        auto key_val = REGISTER(i.r2);
-                        auto* obj = value_to_object(obj_val);
-                        if (value_get_type(key_val) != Type::String) {
-                            error("expected string key");
-                        }
-                        auto iter = obj->find(*value_to_string(key_val));
-                        if (iter == obj->end()) {
-                            error("key not found");
-                        }
-                        REGISTER(i.r0) = iter->second;
-                    }
-                    handle(STORE_OBJECT) {
-                        auto obj_val = REGISTER(i.r1);
-                        auto key_val = REGISTER(i.r2);
-                        auto* obj = value_to_object(obj_val);
-                        if (value_get_type(key_val) != Type::String) {
-                            error("expected string key");
-                        }
-                        (*obj)[*value_to_string(key_val)] = REGISTER(i.r0);
-                    }
-                    handle(CALL) {
-                        auto closure = value_to_closure(REGISTER(i.r0));
-                        auto nargs = i.r1;
-                        auto new_base = i.r2 + STACKFRAME_OVERHEAD;
-                        REGISTER_RAW(new_base - 4)._i = _pc; // push return addr
-                        REGISTER_RAW(new_base - 3)._p = (void*)_pr; // return program
-                        REGISTER_RAW(new_base - 2)._i = _stackbase; // push return frameptr
-                        REGISTER_RAW(new_base - 1) = value_from_array(&closure->captures);
-                        _pr = closure->func;
-                        // _pc = func_start - 1; // jump to addr
-                        _pc = -1; // TODO: gather all instructions into one big chunk to avoid this
-                        _pe = _pr->instructions.size();
-                        _stackbase = _stackbase + new_base; // new stack frame
-                    }
-                    handle(RANDOM) {
-                        REGISTER(i.r0) = value_from_number(rand() % 10000);
-                    }
-                    handle(CLOCK) {
-                        REGISTER(i.r0) = value_from_number(duration_cast<microseconds>(steady_clock::now().time_since_epoch()).count() / 1e6);
-                    }
-                    handle(RET) {
-                        auto return_addr = REGISTER_RAW(-4);
-                        auto return_func = REGISTER_RAW(-3);
-                        auto return_stack= REGISTER_RAW(-2);
-
-                        REGISTER_RAW(-4) = i.r0 ? REGISTER_RAW(i.r1) : value_null();
-                        REGISTER_RAW(-3) = value_null();
-                        REGISTER_RAW(-2) = value_null();
-                        REGISTER_RAW(-1) = value_null();
-
-                        // "Clean" the stack
-                        // Must not leave any boxes in unused registers, or subsequent loads to register will mistakenly write-through
-                        // TODO: try and elide this, or make more efficient
-                        memset(_stack.data() + _stackbase, 0xffffffff, MAX_REGISTERS * sizeof(Value));
-                        
-                        _pc = return_addr._i;
-                        _pr = (Program*)return_func._p;
-                        _pe = _pr->instructions.size();
-                        _stackbase = return_stack._i;
-
-                        if (_stackbase == 0) {
-                            // end of program
-                            _pc = _pe;
-                        }
-
-
-                    }
-                    handle(PRINT) {
-                        log<true,false>(REGISTER(i.r0));
-                    }
-                    break; default: error("unknown instruction: " + to_string(i.opcode));
-                }
-                _pc++;
-            }
-        }
-        catch (exception& e) {
-            // TODO: stack unwind
-            log("runtime error: "s, e.what());
-        }
-    }
-};

@@ -44,7 +44,7 @@ declare_type_bits(boxed,  0b1011) // 0xb // TODO: box won't be needed once we ha
 declare_type_bits(array,  0b1010) // 0xa
 
 // Unused
-declare_type_bits(function,0b1100)// 0xc
+//declare_type_bits(function,0b1100)// 0xc
 declare_type_bits(closure, 0b1101)// 0xd
 declare_type_bits(______4,0b1110) // 0xe
 
@@ -70,10 +70,9 @@ enum class Type : uint64_t {
     // containers
     Array = type_bits_array,
     Object = type_bits_object,
-    // Boxed
 
     // function or closure
-    Function = type_bits_function,
+    //Function = type_bits_function,
     Closure = type_bits_closure,
 
     /*
@@ -86,7 +85,7 @@ enum class Type : uint64_t {
 };
 
 struct Value; // forward declare for who needs it
-struct Program; // TODO: remove
+struct CompiledFunction; // forward declare
 using BoxType = Value;
 using NullType = nullptr_t;
 // using BooleanType = bool;
@@ -95,17 +94,8 @@ using NullType = nullptr_t;
 using StringType = string;
 using ObjectType = hash_map<string, Value>;
 using ArrayType = vector<Value>;
-struct CaptureInfo {
-    uint8_t source_register;
-    uint8_t dest_register;
-};
-//using FunctionType = struct {
-//    uint32_t code;
-//    vector<CaptureInfo> captures; // registers to capture
-//};
-using FunctionType = Program;
 using ClosureType = struct {
-    FunctionType* func;
+    CompiledFunction* func;
     vector<Value> captures; // contains boxes
 };
 struct vec2 { float x, y; };
@@ -167,7 +157,7 @@ Value value_from_pointer(void* ptr) {
     // should also be valid for 32 bit pointers
     return { nan_bits | type_bits_pointer | u_ptr };
 }
-Value value_from_function(FunctionType* func)    { return { nan_bits | type_bits_function | uint64_t(func) }; }
+///Value value_from_function(FunctionType* func)    { return { nan_bits | type_bits_function | uint64_t(func) }; }
 Value value_from_closure(ClosureType* closure)  { return { nan_bits | type_bits_closure | uint64_t(closure) }; }
 Value value_from_boxed(BoxType* box)    { return { nan_bits | type_bits_boxed  | uint64_t(box) }; }
 Value value_from_string(const StringType* str){ return { nan_bits | type_bits_string | uint64_t(str) }; }
@@ -186,7 +176,7 @@ bool value_is_integer(Value v) { return (v._i & type_bits) == type_bits_integer;
 bool value_is_number(Value v)  { return !isnan(v._d); }
 bool value_is_pointer(Value v) { return (v._i & type_bits) == type_bits_pointer; }
 bool value_is_boxed(Value v)   { return isnan(v._d) && (v._i & type_bits) == type_bits_boxed;   }
-bool value_is_function(Value v){ return (v._i & type_bits) == type_bits_function; }
+///bool value_is_function(Value v){ return (v._i & type_bits) == type_bits_function; }
 bool value_is_closure(Value v) { return (v._i & type_bits) == type_bits_closure; }
 bool value_is_string(Value v)  { return (v._i & type_bits) == type_bits_string;  }
 bool value_is_object(Value v)  { return (v._i & type_bits) == type_bits_object;  }
@@ -200,7 +190,7 @@ StringType* value_to_string(Value v)        { return (StringType*)(v._i & pointe
 ArrayType* value_to_array(Value v)          { return (ArrayType*)(v._i & pointer_bits); }
 ObjectType* value_to_object(Value v)        { return (ObjectType*)(v._i & pointer_bits); }
 BoxType* value_to_boxed(Value v)            { return (BoxType*)(v._i & pointer_bits); }
-FunctionType* value_to_function(Value v)    { return (FunctionType*)(v._i & pointer_bits); }
+///FunctionType* value_to_function(Value v)    { return (FunctionType*)(v._i & pointer_bits); }
 ClosureType* value_to_closure(Value v)      { return (ClosureType*)(v._i & pointer_bits); }
 vec2* value_to_vec2(Value v)                { return (vec2*)(v._i & pointer_bits); }
 vec3* value_to_vec3(Value v)                { return (vec3*)(v._i & pointer_bits); }
@@ -229,8 +219,8 @@ ostream& operator<<(ostream& o, const Value& v) {
         case (uint64_t)Type::Integer:   return o << value_to_integer(v);
         case (uint64_t)Type::String:    return o << *value_to_string(v);
         case (uint64_t)Type::Pointer:   return o << value_to_pointer(v);
-        case (uint64_t)Type::Object:    return o << "object {" << *value_to_object(v) << "}"; //*value_to_object(v);
-        case (uint64_t)Type::Array:     return o << "array [" << *value_to_array(v) << "]"; //*value_to_array(v);
+        case (uint64_t)Type::Object:    return o << "object {" << *value_to_object(v) << "}";
+        case (uint64_t)Type::Array:     return o << "array [" << *value_to_array(v) << "]";
         // case (uint64_t)Type::Function:  return o << "fn @ " << value_to_function(v)->code;
         case (uint64_t)Type::Mat4:      return o << *value_to_mat4(v);
         case (uint64_t)Type::Vec2:      return o << *value_to_vec2(v);

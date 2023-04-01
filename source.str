@@ -1,3 +1,13 @@
+fn add(a, b) { return a + b }
+
+
+fn add3(a, b, c) {
+    return add(add(a, b), c)
+}
+
+print(add3(1, 2, 3))
+
+
 fn madness() {
     let i = 0
 

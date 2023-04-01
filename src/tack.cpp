@@ -20,9 +20,6 @@ using namespace std::chrono;
 
 #include "parsing.h"
 #include "value.h"
-// #include "compiler.h"
-// #include "interpreter.h"
-
 #include "compiler2.h"
 #include "interpreter2.h"
 
@@ -52,8 +49,9 @@ int main(int argc, char* argv[]) {
         }
         
         auto global = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
-        auto program = Program { .node = &global, .name = "(global)" };
-        program.compile(nullptr);
+        auto compiler = FunctionCompiler { .node = &global, .name = "(global)" };
+        auto program = CompiledFunction{};
+        compiler.compile_func(global, &program);
 
         // auto compiler = Compiler2{};
         auto vm = Interpreter2();
@@ -63,7 +61,7 @@ int main(int argc, char* argv[]) {
         }
 
         //auto before = steady_clock::now();
-        vm.execute(program);
+        vm.execute(&program);
         //auto after = steady_clock::now();
         //log("BC done in ", duration_cast<microseconds>(after - before).count() * 1e-6, "s");
     } catch (exception& e) {
