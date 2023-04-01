@@ -110,13 +110,13 @@ inline Value value_from_vec4(vec4* v4)                  { return { nan_bits | ty
 inline Value value_from_mat4(mat4* m4)                  { return { nan_bits | type_bits_mat4   | uint64_t(m4) }; }
 
 // type checks
-inline Type value_get_type(Value v)                     { return isnan(v._d) ? (Type)(v._i & type_bits) : Type::Number; }
+inline Type value_get_type(Value v)                     { return std::isnan(v._d) ? (Type)(v._i & type_bits) : Type::Number; }
 inline bool value_is_null(Value v)                      { return v._i == UINT64_MAX; }
 inline bool value_is_boolean(Value v)                   { return (v._i & type_bits) == type_bits_boolean; }
 inline bool value_is_integer(Value v)                   { return (v._i & type_bits) == type_bits_integer; }
-inline bool value_is_number(Value v)                    { return !isnan(v._d); }
+inline bool value_is_number(Value v)                    { return !std::isnan(v._d); }
 inline bool value_is_pointer(Value v)                   { return (v._i & type_bits) == type_bits_pointer; }
-inline bool value_is_boxed(Value v)                     { return isnan(v._d) && (v._i & type_bits) == type_bits_boxed;   }
+inline bool value_is_boxed(Value v)                     { return std::isnan(v._d) && (v._i & type_bits) == type_bits_boxed;   }
 inline bool value_is_closure(Value v)                   { return (v._i & type_bits) == type_bits_closure; }
 inline bool value_is_string(Value v)                    { return (v._i & type_bits) == type_bits_string;  }
 inline bool value_is_object(Value v)                    { return (v._i & type_bits) == type_bits_object;  }

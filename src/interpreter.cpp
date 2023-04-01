@@ -2,12 +2,15 @@
 #include "value.h"
 #include "interpreter.h"
 
+#include <jlib/log.h>
+
 #include <list>
 #include <vector>
 #include <array>
 #include <exception>
 #include <chrono>
-#include <jlib/log.h>
+#include <cstring>
+
 
 void Interpreter::execute(CompiledFunction* program) {
 
@@ -244,7 +247,7 @@ void Interpreter::execute(CompiledFunction* program) {
                     // "Clean" the stack
                     // Must not leave any boxes in unused registers, or subsequent loads to register will mistakenly write-through
                     // TODO: try and elide this, or make more efficient
-                    memset(_stack.data() + _stackbase, 0xffffffff, MAX_REGISTERS * sizeof(Value));
+                    std::memset(_stack.data() + _stackbase, 0xffffffff, MAX_REGISTERS * sizeof(Value));
 
                     _pc = return_addr._i;
                     _pr = (CompiledFunction*)return_func._p;
@@ -255,8 +258,6 @@ void Interpreter::execute(CompiledFunction* program) {
                         // end of program
                         _pc = _pe;
                     }
-
-
                 }
                 handle(PRINT) {
                     log<true, false>(REGISTER(i.r0));

@@ -9,7 +9,7 @@ std::ostream& operator<<(std::ostream& o, const vec4& v) { return o << "vec2 { "
 std::ostream& operator<<(std::ostream& o, const ArrayType& arr);
 std::ostream& operator<<(std::ostream& o, const ObjectType& obj);
 std::ostream& operator<<(std::ostream& o, const Value& v) {
-    if (!isnan(v._d)) {
+    if (!std::isnan(v._d)) {
         return o << value_to_number(v);
     }
     switch (v._i & type_bits) {
