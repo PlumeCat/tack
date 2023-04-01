@@ -14,6 +14,7 @@
     opcode(LOAD_CONST) \
     opcode(LOAD_I) \
     opcode(MOVE) \
+    opcode(READ_CAPTURE)\
     \
     /* lua allows 200 local variables; safet*/\
     /* lua can jump 1<<24 instructions */\

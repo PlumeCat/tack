@@ -40,7 +40,7 @@ declare_type_bits(mat4,   0b0111) // 0x7
 // Other
 declare_type_bits(string, 0b1000) // 0x8
 declare_type_bits(object, 0b1001) // 0x9 // TODO: decide about interning/hashing/SSO
-declare_type_bits(boxed,  0b1011) // 0xb
+declare_type_bits(boxed,  0b1011) // 0xb // TODO: box won't be needed once we have labelled registers
 declare_type_bits(array,  0b1010) // 0xa
 
 // Unused
