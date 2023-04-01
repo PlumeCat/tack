@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
     if (!s.has_value()) {
         throw std::runtime_error("error opening source file: " + std::string(argv[1]));
     }
-    auto source = s.value();
+    auto& source = s.value();
     auto out_ast = AstNode {};
     try {
         parse(source, out_ast);
@@ -46,8 +46,8 @@ int main(int argc, char* argv[]) {
         }
         
         auto global = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
-        auto compiler = FunctionCompiler { .node = &global, .name = "(global)" };
-        auto program = CompiledFunction{};
+        auto compiler = Compiler { .node = &global, .name = "(global)" };
+        auto program = CodeFragment {};
         compiler.compile_func(&global, &program);
 
         auto vm = Interpreter{};

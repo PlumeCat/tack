@@ -63,25 +63,20 @@ fn quicksort(arr) {
     return join(quicksort(lower), quicksort(upper))
 }
 
-const N = 500
-
-"let A = array_random(N)"
+const N = 1000
 const A = []
 
 let i = 0
 while i < N {
     i = i + 1
-    A << random()
+    A << i
 }
-print("starting")
+
 const before = clock()
 const B = quicksort(A)
 const after = clock()
 print("time taken")
 print(after - before)
-
-print(A)
-print(B)
 
 if #A != #B {
     print("not same size!")

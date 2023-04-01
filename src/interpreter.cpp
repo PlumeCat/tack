@@ -12,7 +12,7 @@
 #include <cstring>
 
 
-void Interpreter::execute(CompiledFunction* program) {
+void Interpreter::execute(CodeFragment* program) {
 
     // TODO: likely super inefficient
     #define handle(opcode) break; case Opcode::opcode: //log("Opcode: ", to_string(Opcode::opcode));
@@ -36,7 +36,7 @@ void Interpreter::execute(CompiledFunction* program) {
     // heap
     auto _arrays = std::list<ArrayType> {};
     auto _objects = std::list<ObjectType> {};
-    auto _closures = std::list<ClosureType> {};
+    auto _functions = std::list<FunctionType> {};
     auto _boxes = std::list<Value> {};
     auto error = [&](auto err) { throw std::runtime_error(err); return value_null(); };
 
@@ -123,27 +123,27 @@ void Interpreter::execute(CompiledFunction* program) {
                 }
                 handle(ALLOC_FUNC) {
                     // create closure
-                    auto func = (CompiledFunction*)value_to_pointer(_pr->storage[i.u1]);
-                    _closures.emplace_back(ClosureType { func, {} });
+                    auto code = (CodeFragment*)value_to_pointer(_pr->storage[i.u1]);
+                    _functions.emplace_back(FunctionType { code, {} });
 
                     // capture captures
                     // box new captures (TODO: does this work?)
-                    auto closure = &_closures.back();
-                    for (auto c : func->capture_info) {
+                    auto func = &_functions.back();
+                    for (auto c : code->capture_info) {
                         auto val = REGISTER_RAW(c.source_register);
                         if (!value_is_boxed(val)) {
                             _boxes.emplace_back(val);
                             auto box = value_from_boxed(&_boxes.back());
-                            closure->captures.emplace_back(box);
+                            func->captures.emplace_back(box);
                             // box existing variable inplace
                             REGISTER_RAW(c.source_register) = box;
                         } else {
-                            closure->captures.emplace_back(val);
+                            func->captures.emplace_back(val);
                         }
                     }
 
                     // done
-                    REGISTER(i.r0) = value_from_closure(closure);
+                    REGISTER(i.r0) = value_from_function(func);
                 }
                 handle(READ_CAPTURE) {
                     REGISTER_RAW(i.r0) = value_to_array(REGISTER_RAW(-1))->at(i.r1);
@@ -215,15 +215,15 @@ void Interpreter::execute(CompiledFunction* program) {
                     (*obj)[*value_to_string(key_val)] = REGISTER(i.r0);
                 }
                 handle(CALL) {
-                    auto closure = value_to_closure(REGISTER(i.r0));
+                    auto func = value_to_function(REGISTER(i.r0));
                     auto nargs = i.r1;
                     auto new_base = i.r2 + STACK_FRAME_OVERHEAD;
                     REGISTER_RAW(new_base - 4)._i = _pc; // push return addr
                     REGISTER_RAW(new_base - 3)._p = (void*)_pr; // return program
                     REGISTER_RAW(new_base - 2)._i = _stackbase; // push return frameptr
-                    REGISTER_RAW(new_base - 1) = value_from_array(&closure->captures);
+                    REGISTER_RAW(new_base - 1) = value_from_array(&func->captures);
 
-                    _pr = closure->func;
+                    _pr = func->bytecode;
                     _pc = -1; // TODO: gather all instructions into one big chunk to avoid this
                     _pe = _pr->instructions.size();
                     _stackbase = _stackbase + new_base; // new stack frame
@@ -250,7 +250,7 @@ void Interpreter::execute(CompiledFunction* program) {
                     std::memset(_stack.data() + _stackbase, 0xffffffff, MAX_REGISTERS * sizeof(Value));
 
                     _pc = return_addr._i;
-                    _pr = (CompiledFunction*)return_func._p;
+                    _pr = (CodeFragment*)return_func._p;
                     _pe = _pr->instructions.size();
                     _stackbase = return_stack._i;
 

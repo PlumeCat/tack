@@ -1,35 +1,19 @@
-fn add(a, b) { return a + b }
-
-
-fn add3(a, b, c) {
-    return add(add(a, b), c)
-}
-
-print(add3(1, 2, 3))
-
-
-fn madness() {
+fn map(array, func) {
+    const result = []
+    const  n = #array
     let i = 0
-    i = i + 10
-
-    fn write() {
+    while i < n {
+        result << func(array[i])
         i = i + 1
     }
-
-    i = i + 10
-    write()
-    write()
-
-    fn read() {
-        i = i + 1
-        return fn() {
-            return i
-        }
-    }
-    
-    write()
-
-    return read
+    return result
 }
 
-print(madness()()())
+
+const foo = []
+foo << 1
+foo << 2
+foo << 3
+print(foo[4])
+const bar = map(foo, fn(x) { return x * 2 })
+print(bar)

@@ -24,8 +24,8 @@ std::ostream& operator<<(std::ostream& o, const Value& v) {
         case (uint64_t)Type::Vec2:      return o << *value_to_vec2(v);
         case (uint64_t)Type::Vec3:      return o << *value_to_vec3(v);
         case (uint64_t)Type::Vec4:      return o << *value_to_vec4(v);
-        case (uint64_t)Type::Closure:   return o << "closure: " << std::hex << v._p;
-        case type_bits_boxed:           return o << "box: " << std::hex << v._p << "(" << std::hex << value_to_boxed(v)->_p << ")";
+        case (uint64_t)Type::Function:  return o << "closure: " << std::hex << v._p;
+        case type_bits_boxed:           return o << "box: "     << std::hex << v._p << "(" << std::hex << value_to_boxed(v)->_p << ")";
         default:                        return o << "(unknown)" << std::hex << v._i;
     }
 }
@@ -50,3 +50,4 @@ std::ostream& operator<<(std::ostream& o, const ObjectType& obj) {
     }
     return o;
 }
+

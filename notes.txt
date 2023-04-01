@@ -99,17 +99,23 @@ Instructions:
 	only has 256 "registers" to play with
 
 	however should not need that many; 200 local variables is perverse
+	also make sure to reuse registers where the variable has gone out of scope
+	(not sure if Lua does this)
 
-	it is known to use 32bit instructions, so safe to assume
+	lua is known to use 32bit instructions, so safe to assume
 	there are 8bits for opcode then 3x 8bit operands
 
-	from also abusive testing, lua can jump over 1<<24 instructions
-	so presumably using all 3 operands for jumps (the )
+	from also abusive testing, lua can jump over about 1<<23 instructions
+	so presumably using all 3 operands for jumps
 
 	lua only has JMP, not CONDJUMP, instead the EQ type instructions
 	are used to implement condjumps; EQ conditionally jumps the next
 	instruction, so you can schedule an unconditional jump straight after
 	to implement condjump
+
+	we could do something similar, just call it the CONDSKIP instruction, remove condjump
+	and add an unconditional jump for control flow, then emit CONDSKIP for conditions
+	and remove the current CONDJUMP, which can only jump over 256 instructions :(
 
 Objects, arrays, closures
 	objects will need some kind of 'prototype' or 'index' field to implement classes

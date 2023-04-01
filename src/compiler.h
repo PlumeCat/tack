@@ -24,12 +24,12 @@ struct CaptureInfo {
     uint8_t source_register;
     uint8_t dest_register;
 };
-struct CompiledFunction {
+struct CodeFragment {
     std::string name;
     std::vector<Instruction> instructions;
     std::vector<Value> storage; // program constant storage goes at the bottom of the stack for now
     std::list<std::string> strings; // string constants and literals storage - includes identifiers for objects
-    std::list<CompiledFunction> functions; // local functions (everything is a local function from the POV of the global context)
+    std::list<CodeFragment> functions; // local functions (everything is a local function from the POV of the global context)
     std::vector<CaptureInfo> capture_info;
 
     uint16_t store_number(double d);
@@ -38,20 +38,20 @@ struct CompiledFunction {
     std::string str(const std::string& prefix = "");
 };
 
-struct FunctionCompiler {
+struct Compiler {
     struct VariableContext {
         uint8_t reg;
         bool is_const = false;
     };
     struct ScopeContext {
-        FunctionCompiler* compiler;
+        Compiler* compiler;
         ScopeContext* parent_scope = nullptr; // establishes a tree structure over FunctionContext::scopes
         bool is_top_level_scope = false;
         hash_map<std::string, VariableContext> bindings = hash_map<std::string, VariableContext>(1, 1); // variables
 
         // lookup a variable
         // if it lives in a parent function, code will be emitted to capture it
-        VariableContext* lookup(const std::string& name, CompiledFunction* output);
+        VariableContext* lookup(const std::string& name, CodeFragment* output);
     };
     // AST node to compile
     // TODO: make it not a parameter
@@ -65,7 +65,7 @@ struct FunctionCompiler {
     std::vector<CaptureInfo> captures;
 
     // lookup a variable in the current scope stack
-    VariableContext* lookup(const std::string& name, CompiledFunction* output);
+    VariableContext* lookup(const std::string& name, CodeFragment* output);
 
     // get a free register
     uint8_t allocate_register();
@@ -85,8 +85,8 @@ struct FunctionCompiler {
     void push_scope(ScopeContext* parent_scope, bool is_top_level = false);
     void pop_scope();
 
-    void compile_func(const AstNode* node, CompiledFunction* output, ScopeContext* parent_scope = nullptr);
-    uint8_t compile(const AstNode* node, CompiledFunction* output);
+    void compile_func(const AstNode* node, CodeFragment* output, ScopeContext* parent_scope = nullptr);
+    uint8_t compile(const AstNode* node, CodeFragment* output);
 
 };
 

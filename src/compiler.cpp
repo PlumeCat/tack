@@ -18,23 +18,23 @@
 
 
 
-uint16_t CompiledFunction::store_number(double d) {
+uint16_t CodeFragment::store_number(double d) {
     storage.emplace_back(value_from_number(d));
     return storage.size() - 1;
 }
 
-uint16_t CompiledFunction::store_string(const std::string & data) {
+uint16_t CodeFragment::store_string(const std::string & data) {
     strings.emplace_back(data);
     storage.emplace_back(value_from_string(&strings.back()));
     return storage.size() - 1;
 }
-uint16_t CompiledFunction::store_function() {
+uint16_t CodeFragment::store_function() {
     functions.emplace_back();
     storage.emplace_back(value_from_pointer(&functions.back()));
     return storage.size() - 1;
 }
 
-std::string CompiledFunction::str(const std::string & prefix) {
+std::string CodeFragment::str(const std::string & prefix) {
     auto s = std::stringstream {};
     s << "function: " << prefix + name << std::endl;
     auto i = 0;
@@ -63,12 +63,12 @@ std::string CompiledFunction::str(const std::string & prefix) {
     return s.str();
 }
 
-FunctionCompiler::VariableContext* FunctionCompiler::lookup(const std::string& name, CompiledFunction* output) {
+Compiler::VariableContext* Compiler::lookup(const std::string& name, CodeFragment* output) {
     return scopes.back().lookup(name, output);
 }
 
 // get a free register
-uint8_t FunctionCompiler::allocate_register() {
+uint8_t Compiler::allocate_register() {
     // TODO: lifetime analysis for variables
     // make the register available as soon as the variable is not used any more
     for (auto i = 0; i < MAX_REGISTERS; i++) {
@@ -81,7 +81,7 @@ uint8_t FunctionCompiler::allocate_register() {
 }
 
 // get the register immediately after the highest non-free register
-uint8_t FunctionCompiler::get_end_register() {
+uint8_t Compiler::get_end_register() {
     for (auto i = 255; i > 0; i--) {
         if (registers[i - 1] != RegisterState::FREE) {
             return i;
@@ -91,29 +91,29 @@ uint8_t FunctionCompiler::get_end_register() {
 }
 
 // set a register as bound by a variable
-FunctionCompiler::VariableContext* FunctionCompiler::bind_register(const std::string& binding, uint8_t reg, bool is_const) {
+Compiler::VariableContext* Compiler::bind_register(const std::string& binding, uint8_t reg, bool is_const) {
     registers[reg] = RegisterState::BOUND;
     return &scopes.back().bindings.insert(binding, { reg, is_const })->second;
 }
 
 // free a register if it's not bound
-void FunctionCompiler::free_register(uint8_t reg) {
+void Compiler::free_register(uint8_t reg) {
     if (registers[reg] != RegisterState::BOUND) {
         registers[reg] = RegisterState::FREE;
     }
 }
 
 // free all unbound registers
-void FunctionCompiler::free_all_registers() {
+void Compiler::free_all_registers() {
     for (auto i = 0; i < MAX_REGISTERS; i++) {
         free_register(i);
     }
 }
 
-void FunctionCompiler::push_scope(ScopeContext* parent_scope, bool is_top_level) {
+void Compiler::push_scope(ScopeContext* parent_scope, bool is_top_level) {
     scopes.emplace_back(ScopeContext { this, parent_scope, is_top_level });
 }
-void FunctionCompiler::pop_scope() {
+void Compiler::pop_scope() {
     // unbind all bound registers
     for (auto& b : scopes.back().bindings) {
         //registers[b.second.reg] = FREE; // TODO: un-disable once capture is working, and see if still works
@@ -122,7 +122,7 @@ void FunctionCompiler::pop_scope() {
 }
 
 
-void FunctionCompiler::compile_func(const AstNode* node, CompiledFunction* output, ScopeContext* parent_scope) {
+void Compiler::compile_func(const AstNode* node, CodeFragment* output, ScopeContext* parent_scope) {
     // compile function literal
     // TODO: emit bindings for the N arguments
     push_scope(parent_scope, true);
@@ -137,7 +137,7 @@ void FunctionCompiler::compile_func(const AstNode* node, CompiledFunction* outpu
 }
 
 
-uint8_t FunctionCompiler::compile(const AstNode* node, CompiledFunction* output) {
+uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
     switch (node->type) {
     case AstType::Unknown: {} break;
         handle(StatList) {
@@ -275,7 +275,7 @@ uint8_t FunctionCompiler::compile(const AstNode* node, CompiledFunction* output)
             should_allocate(1);
             // note this may create some captures and emit READ_CAPTURE
             auto index = output->store_function();
-            auto func = (CompiledFunction*)value_to_pointer(output->storage[index]);
+            auto func = (CodeFragment*)value_to_pointer(output->storage[index]);
             func->name = (node->children.size() == 3) ? node->children[2].data_s : "(anonymous)";
 
             // add a const binding if it's a named function
@@ -285,7 +285,7 @@ uint8_t FunctionCompiler::compile(const AstNode* node, CompiledFunction* output)
             }
 
             // compiler
-            auto compiler = FunctionCompiler {};
+            auto compiler = Compiler {};
             compiler.compile_func(node, func, &scopes.back());
 
             // allocate new closure into new register
@@ -499,7 +499,7 @@ uint8_t FunctionCompiler::compile(const AstNode* node, CompiledFunction* output)
     return 0;
 }
 
-FunctionCompiler::VariableContext* FunctionCompiler::ScopeContext::lookup(const std::string& name, CompiledFunction* output) {
+Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& name, CodeFragment* output) {
     if (auto iter = bindings.find(name); iter != bindings.end()) {
         return &iter->second;
     }

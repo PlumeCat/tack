@@ -4,37 +4,46 @@
 
 ```bash
 mkdir build
-cmake .. -G 'Unix Makefiles'
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
 make
 ```
-
-## TODO:
-
-- [ ] Chunk based compile functions as they are encountered instead of pushing to queue
-	This will simplify lookups massively as scopes can go back to being a stack
-	instead of tracking all scopes and keeping a tree
-
-	Also simplifies closures
-
+(ensure cmake is generating a Makefile with `cmake .. -G 'Unix Makefiles')
 
 ### Features
-- [ ] Proper for loops
-- [x] Arrays
-- [x] Objects
-- [x] Comments
-- [ ] Closures
-- [x] Const variables
-- [ ] Calling C functions and vice versa
-- [ ] Garbage collector
-- [ ] Algebraics
+- [ ] variadic print
+- [ ] a more usable looping construct
+- [ ] break and continue? labelled break?
+- [x] arrays
+- [x] objects
+- [x] comments
+- [x] closures
+- [x] consts
+- [ ] calling C functions and vice versa
+- [ ] garbage collector. must be allowed to retain pointers in C world
+- [ ] algebraics
 
 ### Other
-- [ ] review notes and apply optimizations
-- [ ] poor man's JIT: loop over instructions and emit machine code corresponding to a direct function call per opcode
-- [ ] deduplicate consts
-- [ ] possibly intern strings - definitely intern identifiers
-- [ ] allow more than 256 constants (!)
+- [ ] mark boxed registers and elide the box check with every register access. should allow to remove the box type
 - [ ] initialization for array and object literals
-- [ ] Compile as library
-- [ ] QOL improvements
-- [ ] Language standard library
+- [ ] review notes and apply optimizations
+- [ ] ensure const is respected for captures
+- [ ] replace CONDJUMP with something like CONDSKIP (see notes)
+- [ ] deduplicate consts
+	- if possible, dedupe across fragments
+- [ ] possibly intern strings - definitely intern identifiers
+- [x] allow more than 256 constants
+- [ ] compile as static lib for embeddability
+- [ ] a nice REPL
+- [ ] language standard library, doesn't have to be massive
+- [ ] python style slice syntax
+- [ ] write a small game to test
+- [ ] poor man's JIT: loop over instructions and emit machine code corresponding to a direct function call per opcode
+	- believe this is called a templating JIT, performance might be OK
+	- for extra points, write/disassembly the ASM for each opcode and emit it inline, elide the calls
+- [ ] need to think about comparisons; '==' vs python style 'is'
+- [ ] need to think about coercions
+- [ ] need to think about are 32 bit signed integers worth it?
+- [ ] type specialized instructions
+- [ ] debugging facilities. maybe even a full debugger. interop with vscode
+- [ ] language server
