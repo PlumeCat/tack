@@ -46,8 +46,8 @@ int main(int argc, char* argv[]) {
         }
         
         auto global = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
-        auto compiler = Compiler { .node = &global, .name = "(global)" };
-        auto program = CodeFragment {};
+        auto compiler = Compiler {};
+        auto program = CodeFragment { .name = "(global)" };
         compiler.compile_func(&global, &program);
 
         auto vm = Interpreter{};

@@ -3,6 +3,8 @@
 
 #include <sstream>
 
+
+
 // emit an instruction with 3 8 bit operands
 #define emit(op, r0, r1, r2)            output->instructions.emplace_back(Opcode::op, r0, r1, r2)
 
@@ -15,7 +17,8 @@
 #define should_allocate(n)
 #define handle(x)                       break; case AstType::x:
 #define error(msg)                      throw std::runtime_error("compiler error: " msg)
-
+#define child(n)                        compile(&node->children[n])
+#define lookup_var(name)                scopes.back().lookup(name)
 
 
 uint16_t CodeFragment::store_number(double d) {
@@ -57,15 +60,51 @@ std::string CodeFragment::str(const std::string & prefix) {
         i++;
     }
 
+    i = 0;
+    s << "  captures:\n";
+    for (auto& c: capture_info) {
+        s << "    " << i << ": " << (int)c.source_register << " -> " << (int)c.dest_register << '\n';
+        i++;
+    }
+
     for (auto& f : functions) {
         s << f.str(prefix + name + "::");
     }
     return s.str();
 }
 
-Compiler::VariableContext* Compiler::lookup(const std::string& name, CodeFragment* output) {
-    return scopes.back().lookup(name, output);
+
+Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& name) {
+    if (auto iter = bindings.find(name); iter != bindings.end()) {
+        return &iter->second;
+    }
+
+    if (parent_scope) {
+        // not found by parent scope
+        if (auto var = parent_scope->lookup(name)) {
+            if (is_top_level_scope) { // handle capture scenario
+                // create a mirroring local variable
+                auto mirror_reg = compiler->allocate_register();
+                auto mirror = compiler->bind_register(name, mirror_reg, var->is_const);
+
+                // record necessary capture into mirror variable
+                compiler->output->capture_info.emplace_back(CaptureInfo { .source_register = var->reg, .dest_register = mirror_reg });
+
+                // emit code to read into mirror variable
+                compiler->emit(READ_CAPTURE, mirror_reg, compiler->output->capture_info.size() - 1, 0);
+
+                // return the MIRROR variable not the original!
+                return mirror;
+            } else {
+                // normal scenario
+                return var;
+            }
+        }
+    }
+
+    return nullptr;
 }
+
 
 // get a free register
 uint8_t Compiler::allocate_register() {
@@ -125,6 +164,7 @@ void Compiler::pop_scope() {
 void Compiler::compile_func(const AstNode* node, CodeFragment* output, ScopeContext* parent_scope) {
     // compile function literal
     // TODO: emit bindings for the N arguments
+    this->output = output;
     push_scope(parent_scope, true);
     auto nargs = node->children[0].children.size(); // ParamDef
     for (auto i = 0; i < nargs; i++) {
@@ -132,20 +172,20 @@ void Compiler::compile_func(const AstNode* node, CodeFragment* output, ScopeCont
         bind_register(param.data_s, i, false); // TODO: could choose to make arguments const?
         // arguments are never boxes
     }
-    auto reg = compile(&node->children[1], output);
+    auto reg = child(1);
     emit(RET, 0, 0, 0);
     pop_scope();
 }
 
 
-uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
+uint8_t Compiler::compile(const AstNode* node) {
     switch (node->type) {
     case AstType::Unknown: {} break;
         handle(StatList) {
             should_allocate(0);
             push_scope(&scopes.back());
-            for (auto& c : node->children) {
-                compile(&c, output);
+            for (auto i = 0; i < node->children.size(); i++) {
+                child(i);
                 free_all_registers();
             }
             pop_scope();
@@ -153,17 +193,17 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
         }
         handle(IfStat) {
             auto has_else = node->children.size() == 3;
-            auto cond_reg = compile(&node->children[0], output); // evaluate the expressi, outputon
+            auto cond_reg = child(0);
             label(condjump);
             emit(CONDJUMP, cond_reg, 0, 0); // PLACEHOLDER
             free_register(cond_reg); // can be reused
-            compile(&node->children[1], output); // compile the if bo, outputdy
+            child(1);
             label(endif);
 
             if (has_else) {
                 emit(JUMPF, 0, 0, 0); // PLACEHODLER
                 label(startelse);
-                compile(&node->children[2], output);
+                child(2);
                 label(endelse);
                 if (endelse - endif > 0xff) {
                     error("jump too much");
@@ -183,11 +223,11 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
         }
         handle(WhileStat) {
             label(condeval);
-            auto cond_reg = compile(&node->children[0], output);
+            auto cond_reg = child(0);
             label(condjump);
             emit(CONDJUMP, cond_reg, 0, 0);
             free_register(cond_reg);
-            compile(&node->children[1], output);
+            child(1);
             label(jumpback);
             if (jumpback - condeval > 0xff) {
                 error("jump too much");
@@ -202,22 +242,22 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
         }
         handle(VarDeclStat) {
             should_allocate(1);
-            auto reg = compile(&node->children[1], output);
+            auto reg = child(1);
             bind_register(node->children[0].data_s, reg);
             return reg;
         }
         handle(ConstDeclStat) {
             should_allocate(1);
-            auto reg = compile(&node->children[1], output);
+            auto reg = child(1);
             bind_register(node->children[0].data_s, reg, true);
             return reg;
         }
         handle(AssignStat) {
             should_allocate(0);
-            auto source_reg = compile(&node->children[1], output);
+            auto source_reg = child(1);
             auto& lhs = node->children[0];
             if (lhs.type == AstType::Identifier) {
-                if (auto var = lookup(node->children[0].data_s, output)) {
+                if (auto var = lookup_var(node->children[0].data_s)) {
                     if (var->is_const) {
                         error("can't reassign const variable");
                     }
@@ -232,13 +272,13 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
                     error("can't find variable: " + node->children[0].data_s);
                 }
             } else if (lhs.type == AstType::IndexExp) {
-                auto array_reg = compile(&lhs.children[0], output);
-                auto index_reg = compile(&lhs.children[1], output);
+                auto array_reg = compile(&lhs.children[0]);
+                auto index_reg = compile(&lhs.children[1]);
                 emit(STORE_ARRAY, source_reg, array_reg, index_reg);
                 free_register(index_reg);
                 free_register(array_reg);
             } else if (lhs.type == AstType::AccessExp) {
-                auto obj_reg = compile(&lhs.children[0], output);
+                auto obj_reg = compile(&lhs.children[0]);
                 // save identifier as string and load it
                 auto key_reg = allocate_register();
                 auto index = output->store_string(lhs.children[1].data_s);
@@ -252,7 +292,7 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
         }
         handle(Identifier) {
             should_allocate(0);
-            if (auto v = lookup(node->data_s, output)) {
+            if (auto v = lookup_var(node->data_s)) {
                 return v->reg;
             } else {
                 error("can't find variable: " + node->data_s);
@@ -303,9 +343,9 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
             // compile the arguments first and remember which registers they are in
             auto arg_regs = std::vector<uint8_t> {};
             for (auto i = 0; i < nargs; i++) {
-                arg_regs.emplace_back(compile(&node->children[1].children[i], output));
+                arg_regs.emplace_back(compile(&node->children[1].children[i]));
             }
-            auto func_reg = compile(&node->children[0], output); // LHS evaluates to functi, outputon
+            auto func_reg = child(0); // LHS evaluates to functi, outputon
 
             // copy arguments to top of stack in sequence
             auto end_reg = get_end_register();
@@ -330,14 +370,14 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
             return reg;
         }
         handle(PrintStat) { // no output
-            auto in1 = compile(&node->children[0], output);
+            auto in1 = child(0);
             emit(PRINT, in1, 0, 0);
             free_register(in1);
             return 0xff;
         }
         handle(ReturnStat) {
             if (node->children.size()) {
-                auto return_register = compile(&node->children[0], output);
+                auto return_register = child(0);
                 if (return_register == 0xff) {
                     error("return value incorrect register");
                     // emit(RET, 0, 0, 0);
@@ -349,7 +389,7 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
             return 0xff; // it's irrelevant
         }
         handle(LenExp) {
-            auto in = compile(&node->children[0], output);
+            auto in = child(0);
             auto out = allocate_register();
             emit(LEN, out, in, 0);
             free_register(in);
@@ -364,8 +404,8 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
             //      out = allocate_register()
             //      ...
             // allows to reuse one of the registers (if not bound)
-            auto in1 = compile(&node->children[0], output);
-            auto in2 = compile(&node->children[1], output);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(ADD, out, in1, in2);
             free_register(in1);
@@ -373,8 +413,8 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
             return out;
         }
         handle(SubExp) {
-            auto in1 = compile(&node->children[0], output);
-            auto in2 = compile(&node->children[1], output);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(SUB, out, in1, in2);
             free_register(in1);
@@ -382,8 +422,8 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
             return out;
         }
         handle(LessExp) {
-            auto in1 = compile(&node->children[0], output);
-            auto in2 = compile(&node->children[1], output);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(LESS, out, in1, in2);
             free_register(in1);
@@ -391,8 +431,8 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
             return out;
         }
         handle(LessEqExp) {
-            auto in1 = compile(&node->children[0], output);
-            auto in2 = compile(&node->children[1], output);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(LESSEQ, out, in1, in2);
             free_register(in1);
@@ -400,8 +440,8 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
             return out;
         }
         handle(EqExp) {
-            auto in1 = compile(&node->children[0], output);
-            auto in2 = compile(&node->children[1], output);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(EQUAL, out, in1, in2);
             free_register(in1);
@@ -409,8 +449,8 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
             return out;
         }
         handle(NotEqExp) {
-            auto in1 = compile(&node->children[0], output);
-            auto in2 = compile(&node->children[1], output);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(NEQUAL, out, in1, in2);
             free_register(in1);
@@ -418,8 +458,8 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
             return out;
         }
         handle(GreaterExp) {
-            auto in1 = compile(&node->children[0], output);
-            auto in2 = compile(&node->children[1], output);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(GREATER, out, in1, in2);
             free_register(in1);
@@ -427,8 +467,8 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
             return out;
         }
         handle(GreaterEqExp) {
-            auto in1 = compile(&node->children[0], output);
-            auto in2 = compile(&node->children[1], output);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(GREATEREQ, out, in1, in2);
             free_register(in1);
@@ -436,8 +476,8 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
             return out;
         }
         handle(MulExp) { // 1 out
-            auto in1 = compile(&node->children[0], output);
-            auto in2 = compile(&node->children[1], output);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(MUL, out, in1, in2);
             free_register(in1);
@@ -445,8 +485,8 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
             return out;
         }
         handle(DivExp) { // 1 out
-            auto in1 = compile(&node->children[0], output);
-            auto in2 = compile(&node->children[1], output);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(DIV, out, in1, in2);
             free_register(in1);
@@ -465,14 +505,14 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
             return reg;
         }
         handle(ShiftLeftExp) {
-            auto arr = compile(&node->children[0], output);
-            auto value = compile(&node->children[1], output);
+            auto arr = child(0);
+            auto value = child(1);
             emit(SHL, arr, value, 0);
             return 0xff;
         }
         handle(IndexExp) {
-            auto arr = compile(&node->children[0], output);
-            auto ind = compile(&node->children[1], output);
+            auto arr = child(0);
+            auto ind = child(1);
             auto out = allocate_register();
             emit(LOAD_ARRAY, out, arr, ind);
             free_register(arr);
@@ -480,7 +520,7 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
             return out;
         }
         handle(AccessExp) {
-            auto obj = compile(&node->children[0], output);
+            auto obj = child(0);
 
             // save identifier as string and load it
             auto key = allocate_register();
@@ -500,37 +540,6 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
 
     error("forgot to return a register");
     return 0;
-}
-
-Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& name, CodeFragment* output) {
-    if (auto iter = bindings.find(name); iter != bindings.end()) {
-        return &iter->second;
-    }
-
-    if (parent_scope) {
-        // not found by parent scope
-        if (auto var = parent_scope->lookup(name, output)) {
-            if (is_top_level_scope) { // handle capture scenario
-                // create a mirroring local variable
-                auto mirror_reg = compiler->allocate_register();
-                auto mirror = compiler->bind_register(name, mirror_reg, var->is_const);
-
-                // record necessary capture into mirror variable
-                output->capture_info.emplace_back(CaptureInfo { .source_register = var->reg, .dest_register = mirror_reg });
-
-                // emit code to read into mirror variable
-                emit(READ_CAPTURE, mirror_reg, output->capture_info.size() - 1, 0);
-
-                // return the MIRROR variable not the original!
-                return mirror;
-            } else {
-                // normal scenario
-                return var;
-            }
-        }
-    }
-
-    return nullptr;
 }
 
 
