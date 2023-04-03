@@ -11,12 +11,14 @@
 enum class RegisterState {
     FREE = 0,
     BUSY = 1,
-    BOUND = 2
+    BOUND = 2,
+    BOUND_BOX = 3,
 };
 
 
 static const uint32_t MAX_REGISTERS = 256;
 static const uint32_t STACK_FRAME_OVERHEAD = 4;
+static const uint32_t STACK_SIZE = 4096;
 
 struct AstNode;
 
@@ -74,7 +76,7 @@ struct Compiler {
     uint8_t get_end_register();
 
     // set a register as bound by a variable
-    VariableContext* bind_register(const std::string& binding, uint8_t reg, bool is_const = false);
+    VariableContext* bind_register(const std::string& binding, uint8_t reg, bool is_const = false, bool is_box = false);
     
     // free a register if it's not bound
     void free_register(uint8_t reg);

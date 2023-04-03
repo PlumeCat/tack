@@ -25,9 +25,10 @@ void Interpreter::execute(CodeFragment* program) {
     auto _pe = _pr->instructions.size();
 
     // stack/registers
-    auto _stack = std::array<Value, 4096> {};
+    auto _stack = new Value[STACK_SIZE]; //std::array<Value, 4096> {};
     auto _stackbase = STACK_FRAME_OVERHEAD;
-    _stack.fill(value_null());
+
+    std::memset(_stack, 0xffffffff, sizeof(Value) * STACK_SIZE);
     _stack[0]._i = _pr->instructions.size(); // pseudo return address
     _stack[1]._p = (void*)program; // pseudo return program
     _stack[2]._i = 0; // reset stack base to 0, should not be reached
@@ -178,7 +179,6 @@ void Interpreter::execute(CodeFragment* program) {
                         error("expected array");
                     }
                     auto* arr = value_to_array(arr_val);
-
                     auto ind_val = REGISTER(i.r2);
                     auto ind_type = value_get_type(ind_val);
                     auto ind = (ind_type == Type::Integer)
@@ -222,7 +222,6 @@ void Interpreter::execute(CodeFragment* program) {
                     REGISTER_RAW(new_base - 3)._p = (void*)_pr; // return program
                     REGISTER_RAW(new_base - 2)._i = _stackbase; // push return frameptr
                     REGISTER_RAW(new_base - 1) = value_from_array(&func->captures);
-
                     _pr = func->bytecode;
                     _pc = -1; // TODO: gather all instructions into one big chunk to avoid this
                     _pe = _pr->instructions.size();
@@ -247,7 +246,7 @@ void Interpreter::execute(CodeFragment* program) {
                     // "Clean" the stack
                     // Must not leave any boxes in unused registers, or subsequent loads to register will mistakenly write-through
                     // TODO: try and elide this, or make more efficient
-                    std::memset(_stack.data() + _stackbase, 0xffffffff, MAX_REGISTERS * sizeof(Value));
+                    std::memset(_stack + _stackbase, 0xffffffff, std::min(MAX_REGISTERS, STACK_SIZE - _stackbase) * sizeof(Value));
 
                     _pc = return_addr._i;
                     _pr = (CodeFragment*)return_func._p;

@@ -2,7 +2,9 @@
 
 ## Building
 
+
 ```bash
+git clone git@github.com:jamesmjdm/jlib # requires jlib in sister folder
 mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release

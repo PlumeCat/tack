@@ -91,14 +91,14 @@ uint8_t Compiler::get_end_register() {
 }
 
 // set a register as bound by a variable
-Compiler::VariableContext* Compiler::bind_register(const std::string& binding, uint8_t reg, bool is_const) {
-    registers[reg] = RegisterState::BOUND;
+Compiler::VariableContext* Compiler::bind_register(const std::string& binding, uint8_t reg, bool is_const, bool is_box) {
+    registers[reg] = is_box ? RegisterState::BOUND_BOX : RegisterState::BOUND;
     return &scopes.back().bindings.insert(binding, { reg, is_const })->second;
 }
 
 // free a register if it's not bound
 void Compiler::free_register(uint8_t reg) {
-    if (registers[reg] != RegisterState::BOUND) {
+    if (registers[reg] == RegisterState::BUSY) {
         registers[reg] = RegisterState::FREE;
     }
 }
@@ -130,6 +130,7 @@ void Compiler::compile_func(const AstNode* node, CodeFragment* output, ScopeCont
     for (auto i = 0; i < nargs; i++) {
         auto& param = node->children[0].children[i]; // Identifier
         bind_register(param.data_s, i, false); // TODO: could choose to make arguments const?
+        // arguments are never boxes
     }
     auto reg = compile(&node->children[1], output);
     emit(RET, 0, 0, 0);
@@ -225,6 +226,8 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
                     // only need MOVE if assigning directly from another variable
                     // in which case MOVE is more like COPY
                     emit(MOVE, var->reg, source_reg, 0);
+
+                    // boxed read
                 } else {
                     error("can't find variable: " + node->children[0].data_s);
                 }
@@ -492,7 +495,7 @@ uint8_t Compiler::compile(const AstNode* node, CodeFragment* output) {
             return out;
         }
 
-    default: { error("unknown ast: " + to_string(node->type)); } break;
+        default: { error("unknown ast: " + to_string(node->type)); } break;
     }
 
     error("forgot to return a register");
