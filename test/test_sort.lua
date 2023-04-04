@@ -87,9 +87,9 @@ local after = os.clock()
 -- table_print(B)
 
 print("Time taken: " .. tostring(after - before))
-print("data:")
-for i, v in pairs(_G) do
-    if _G_old[i] == nil then
-        print(i, v)
-    end
-end
+-- print("data:")
+-- for i, v in pairs(_G) do
+--     if _G_old[i] == nil then
+--         print(i, v)
+--     end
+-- end

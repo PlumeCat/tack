@@ -1,6 +1,7 @@
 #include "compiler.h"
 #include "parsing.h"
 
+#include <jlib/log.h>
 #include <sstream>
 
 
@@ -86,6 +87,8 @@ Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& nam
                 // create a mirroring local variable
                 auto mirror_reg = compiler->allocate_register();
                 auto mirror = compiler->bind_register(name, mirror_reg, var->is_const);
+                var->is_box = true;
+                mirror->is_box = true;
 
                 // record necessary capture into mirror variable
                 compiler->output->capture_info.emplace_back(CaptureInfo { .source_register = var->reg, .dest_register = mirror_reg });
@@ -261,13 +264,15 @@ uint8_t Compiler::compile(const AstNode* node) {
                     if (var->is_const) {
                         error("can't reassign const variable");
                     }
+                    if (var->is_box) {
+                        emit(WRITE_BOX, var->reg, source_reg, 0);
+                    } else {
+                        emit(MOVE, var->reg, source_reg, 0);
+                    }
                     // TODO: try and elide this MOVE
                     // if the moved-from register is "busy" but not "bound", then the value is not used again
                     // only need MOVE if assigning directly from another variable
                     // in which case MOVE is more like COPY
-                    emit(MOVE, var->reg, source_reg, 0);
-
-                    // boxed read
                 } else {
                     error("can't find variable: " + node->children[0].data_s);
                 }
@@ -293,7 +298,13 @@ uint8_t Compiler::compile(const AstNode* node) {
         handle(Identifier) {
             should_allocate(0);
             if (auto v = lookup_var(node->data_s)) {
-                return v->reg;
+                if (v->is_box) {
+                    auto reg = allocate_register();
+                    emit(READ_BOX, reg, v->reg, 0);
+                    return reg;
+                } else {
+                    return v->reg;
+                }
             } else {
                 error("can't find variable: " + node->data_s);
             }
@@ -323,8 +334,9 @@ uint8_t Compiler::compile(const AstNode* node) {
 
             // add a const binding if it's a named function
             auto out = allocate_register();
+            auto var = (VariableContext*)nullptr;
             if (node->children.size() == 3) {
-                bind_register(node->children[2].data_s, out, true);
+                var = bind_register(node->children[2].data_s, out, true);
             }
 
             // compiler
@@ -332,7 +344,15 @@ uint8_t Compiler::compile(const AstNode* node) {
             compiler.compile_func(node, func, &scopes.back());
 
             // allocate new closure into new register
-            emit_u(ALLOC_FUNC, out, index);
+
+            if (var && var->is_box) {
+                // function was used inside itself somewhere so it's boxed
+                auto temp = allocate_register();
+                emit_u(ALLOC_FUNC, temp, index);
+                emit(WRITE_BOX, out, temp, 0);
+            } else {
+                emit_u(ALLOC_FUNC, out, index);
+            }
 
             return out;
         }
@@ -345,7 +365,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             for (auto i = 0; i < nargs; i++) {
                 arg_regs.emplace_back(compile(&node->children[1].children[i]));
             }
-            auto func_reg = child(0); // LHS evaluates to functi, outputon
+            auto func_reg = child(0); // LHS evaluates to function
 
             // copy arguments to top of stack in sequence
             auto end_reg = get_end_register();

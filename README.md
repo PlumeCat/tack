@@ -30,7 +30,9 @@ make
 - [ ] initialization for array and object literals
 - [ ] review notes and apply optimizations
 - [ ] ensure const is respected for captures
+- [ ] optimize captures by checking for reads/reassigns, etc
 - [ ] replace CONDJUMP with something like CONDSKIP (see notes)
+- [ ] remove jlib. take the hashmap for string -> double and optimize the heck out of it
 - [ ] deduplicate consts
 	- if possible, dedupe across fragments
 - [ ] possibly intern strings - definitely intern identifiers
@@ -46,6 +48,8 @@ make
 - [ ] need to think about comparisons; '==' vs python style 'is'
 - [ ] need to think about coercions
 - [ ] need to think about are 32 bit signed integers worth it?
+- [ ] need to think about object keys, do we allow all types as hash, or just string?
+- [ ] computed keys for objects/object literals
 - [ ] type specialized instructions
 - [ ] debugging facilities. maybe even a full debugger. interop with vscode
 - [ ] language server

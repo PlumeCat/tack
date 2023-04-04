@@ -44,6 +44,7 @@ struct Compiler {
     struct VariableContext {
         uint8_t reg;
         bool is_const = false;
+        bool is_box = false;
     };
     struct ScopeContext {
         Compiler* compiler;

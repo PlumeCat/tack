@@ -12,6 +12,9 @@
             "group": {
                 "kind": "build",
                 "isDefault": true
+            },
+            "presentation": {
+                "clear": true
             }
         },
         {
@@ -25,6 +28,8 @@
             "group": {
                 "kind": "build",
                 "isDefault": false
+            },"presentation": {
+                "clear": true
             }
         },
         {
@@ -35,7 +40,10 @@
                 "cwd": "${workspaceFolder}/build/Debug",
                 "env": { "CMAKE_BUILD_TYPE": "Debug" }
             },
-            "problemMatcher": []
+            "problemMatcher": [],
+            "presentation": {
+                "clear": true
+            }
         },
         {
             "label": "CMake - Release",
@@ -45,7 +53,10 @@
                 "cwd": "${workspaceFolder}/build/Release",
                 "env": { "CMAKE_BUILD_TYPE": "Release" }
             },
-            "problemMatcher": []
+            "problemMatcher": [],
+            "presentation": {
+                "clear": true
+            }
         }
     ]
 }

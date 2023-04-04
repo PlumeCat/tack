@@ -18,7 +18,9 @@ fn madness() {
             write()
 
             fn read() {
+                let b = 0
                 return fn() {
+                    b = i
                     return i
                 }
             }
@@ -29,5 +31,20 @@ fn madness() {
 }
 
 let x = madness()()()
-print("expect 23")
 print(x)
+
+
+
+fn f() {
+    fn g() {
+        print("g")
+    }
+    fn h() {
+        return g
+    }
+
+    return h
+}
+
+let _f = f()
+_f()()

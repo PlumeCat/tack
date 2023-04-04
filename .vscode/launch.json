@@ -5,7 +5,9 @@
             "request": "launch",
             "name": "Launch Debug",
             "program": "${workspaceFolder}/build/Debug/tack",
-            "args": [ "test/test_closure.str", "-D", ],
+            // "args": [ "test/test_recursion_small.str", "-D", ],
+            "args": [ "test/test_sort.str", "-D", ],
+            // "args": [ "test/test_closure.str", "-D", ],
             "preLaunchTask": "Build - Debug",
             "cwd": "${workspaceFolder}"
         }, {

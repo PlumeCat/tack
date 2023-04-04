@@ -17,7 +17,8 @@ void Interpreter::execute(CodeFragment* program) {
     // TODO: likely super inefficient
     #define handle(opcode) break; case Opcode::opcode: //log("Opcode: ", to_string(Opcode::opcode));
     #define REGISTER_RAW(n) _stack[_stackbase+n]
-    #define REGISTER(n)     *(value_is_boxed(REGISTER_RAW(n)) ? value_to_boxed(REGISTER_RAW(n)) : &REGISTER_RAW(n))
+    #define REGISTER(n) REGISTER_RAW(n)
+    // #define REGISTER(n)     *(value_is_boxed(REGISTER_RAW(n)) ? value_to_boxed(REGISTER_RAW(n)) : &REGISTER_RAW(n))
 
     // program counter
     auto _pr = program; // current program
@@ -25,10 +26,12 @@ void Interpreter::execute(CodeFragment* program) {
     auto _pe = _pr->instructions.size();
 
     // stack/registers
-    auto _stack = new Value[STACK_SIZE]; //std::array<Value, 4096> {};
+    // auto _stack = new Value[STACK_SIZE];
+    auto _stack = std::array<Value, 4096> {};
     auto _stackbase = STACK_FRAME_OVERHEAD;
 
-    std::memset(_stack, 0xffffffff, sizeof(Value) * STACK_SIZE);
+    _stack.fill(value_null());
+    // std::memset(_stack.data(), 0xffffffff, sizeof(Value) * STACK_SIZE);
     _stack[0]._i = _pr->instructions.size(); // pseudo return address
     _stack[1]._p = (void*)program; // pseudo return program
     _stack[2]._i = 0; // reset stack base to 0, should not be reached
@@ -146,6 +149,12 @@ void Interpreter::execute(CodeFragment* program) {
                     // done
                     REGISTER(i.r0) = value_from_function(func);
                 }
+                handle(READ_BOX) {
+                    REGISTER(i.r0) = *value_to_boxed(REGISTER_RAW(i.r1));
+                }
+                handle(WRITE_BOX) {
+                    *value_to_boxed(REGISTER_RAW(i.r0)) = REGISTER(i.r1);
+                }
                 handle(READ_CAPTURE) {
                     REGISTER_RAW(i.r0) = value_to_array(REGISTER_RAW(-1))->at(i.r1);
                 }
@@ -246,7 +255,7 @@ void Interpreter::execute(CodeFragment* program) {
                     // "Clean" the stack
                     // Must not leave any boxes in unused registers, or subsequent loads to register will mistakenly write-through
                     // TODO: try and elide this, or make more efficient
-                    std::memset(_stack + _stackbase, 0xffffffff, std::min(MAX_REGISTERS, STACK_SIZE - _stackbase) * sizeof(Value));
+                    std::memset(_stack.data() + _stackbase, 0xffffffff, std::min(MAX_REGISTERS, STACK_SIZE - _stackbase) * sizeof(Value));
 
                     _pc = return_addr._i;
                     _pr = (CodeFragment*)return_func._p;
