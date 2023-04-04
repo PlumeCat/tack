@@ -16,9 +16,7 @@ void Interpreter::execute(CodeFragment* program) {
 
     // TODO: likely super inefficient
     #define handle(opcode) break; case Opcode::opcode: //log("Opcode: ", to_string(Opcode::opcode));
-    #define REGISTER_RAW(n) _stack[_stackbase+n]
-    #define REGISTER(n) REGISTER_RAW(n)
-    // #define REGISTER(n)     *(value_is_boxed(REGISTER_RAW(n)) ? value_to_boxed(REGISTER_RAW(n)) : &REGISTER_RAW(n))
+    #define REGISTER(n) _stack[_stackbase + n]
 
     // program counter
     auto _pr = program; // current program
@@ -134,13 +132,16 @@ void Interpreter::execute(CodeFragment* program) {
                     // box new captures (TODO: does this work?)
                     auto func = &_functions.back();
                     for (auto c : code->capture_info) {
-                        auto val = REGISTER_RAW(c.source_register);
+                        auto val = REGISTER(c.source_register);
                         if (!value_is_boxed(val)) {
-                            _boxes.emplace_back(val);
-                            auto box = value_from_boxed(&_boxes.back());
-                            func->captures.emplace_back(box);
-                            // box existing variable inplace
-                            REGISTER_RAW(c.source_register) = box;
+
+                            if (c.source_register == i.r0) {
+                                // function capturing itself
+                                // TODO: is this valid?
+                                func->captures.emplace_back(value_from_function(func));
+                            } else {
+                                error("unboxed capture!" + std::to_string(c.source_register));
+                            }
                         } else {
                             func->captures.emplace_back(val);
                         }
@@ -149,22 +150,25 @@ void Interpreter::execute(CodeFragment* program) {
                     // done
                     REGISTER(i.r0) = value_from_function(func);
                 }
+                handle(NOOP) {
+                    REGISTER(i.r0) = value_from_number(654321);
+                }
+                handle(ALLOC_BOX) {
+                    _boxes.emplace_back(value_from_number(123456));
+                    REGISTER(i.r0) = value_from_boxed(&_boxes.back());
+                }
                 handle(READ_BOX) {
-                    REGISTER(i.r0) = *value_to_boxed(REGISTER_RAW(i.r1));
+                    REGISTER(i.r0) = *value_to_boxed(REGISTER(i.r1));
                 }
                 handle(WRITE_BOX) {
-                    *value_to_boxed(REGISTER_RAW(i.r0)) = REGISTER(i.r1);
+                    *value_to_boxed(REGISTER(i.r0)) = REGISTER(i.r1);
                 }
                 handle(READ_CAPTURE) {
-                    REGISTER_RAW(i.r0) = value_to_array(REGISTER_RAW(-1))->at(i.r1);
+                    REGISTER(i.r0) = value_to_array(REGISTER(-1))->at(i.r1);
                 }
                 handle(ALLOC_ARRAY) {
                     _arrays.emplace_back(ArrayType {});
                     REGISTER(i.r0) = value_from_array(&_arrays.back());
-                }
-                handle(ALLOC_OBJECT) {
-                    _objects.emplace_back(ObjectType {});
-                    REGISTER(i.r0) = value_from_object(&_objects.back());
                 }
                 handle(LOAD_ARRAY) {
                     auto arr_val = REGISTER(i.r1);
@@ -201,6 +205,10 @@ void Interpreter::execute(CodeFragment* program) {
                     }
                     (*arr)[ind] = REGISTER(i.r0);
                 }
+                handle(ALLOC_OBJECT) {
+                    _objects.emplace_back(ObjectType {});
+                    REGISTER(i.r0) = value_from_object(&_objects.back());
+                }
                 handle(LOAD_OBJECT) {
                     auto obj_val = REGISTER(i.r1);
                     auto key_val = REGISTER(i.r2);
@@ -227,35 +235,31 @@ void Interpreter::execute(CodeFragment* program) {
                     auto func = value_to_function(REGISTER(i.r0));
                     auto nargs = i.r1;
                     auto new_base = i.r2 + STACK_FRAME_OVERHEAD;
-                    REGISTER_RAW(new_base - 4)._i = _pc; // push return addr
-                    REGISTER_RAW(new_base - 3)._p = (void*)_pr; // return program
-                    REGISTER_RAW(new_base - 2)._i = _stackbase; // push return frameptr
-                    REGISTER_RAW(new_base - 1) = value_from_array(&func->captures);
+                    
+                    REGISTER(new_base - 4)._i = _pc; // push return addr
+                    REGISTER(new_base - 3)._p = (void*)_pr; // return program
+                    REGISTER(new_base - 2)._i = _stackbase; // push return frameptr
+                    REGISTER(new_base - 1) = value_from_array(&func->captures);
+                    
                     _pr = func->bytecode;
                     _pc = -1; // TODO: gather all instructions into one big chunk to avoid this
                     _pe = _pr->instructions.size();
                     _stackbase = _stackbase + new_base; // new stack frame
                 }
-                handle(RANDOM) {
-                    REGISTER(i.r0) = value_from_number(rand() % 10000);
-                }
-                handle(CLOCK) {
-                    REGISTER(i.r0) = value_from_number(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 1e6);
-                }
                 handle(RET) {
-                    auto return_addr = REGISTER_RAW(-4);
-                    auto return_func = REGISTER_RAW(-3);
-                    auto return_stack = REGISTER_RAW(-2);
+                    auto return_addr = REGISTER(-4);
+                    auto return_func = REGISTER(-3);
+                    auto return_stack = REGISTER(-2);
 
-                    REGISTER_RAW(-4) = i.r0 ? REGISTER_RAW(i.r1) : value_null();
-                    REGISTER_RAW(-3) = value_null();
-                    REGISTER_RAW(-2) = value_null();
-                    REGISTER_RAW(-1) = value_null();
+                    REGISTER(-4) = i.r0 ? REGISTER(i.r1) : value_null();
+                    REGISTER(-3) = value_null();
+                    REGISTER(-2) = value_null();
+                    REGISTER(-1) = value_null();
 
                     // "Clean" the stack
                     // Must not leave any boxes in unused registers, or subsequent loads to register will mistakenly write-through
                     // TODO: try and elide this, or make more efficient
-                    std::memset(_stack.data() + _stackbase, 0xffffffff, std::min(MAX_REGISTERS, STACK_SIZE - _stackbase) * sizeof(Value));
+                    // std::memset(_stack.data() + _stackbase, 0xffffffff, std::min(MAX_REGISTERS, STACK_SIZE - _stackbase) * sizeof(Value));
 
                     _pc = return_addr._i;
                     _pr = (CodeFragment*)return_func._p;
@@ -267,6 +271,12 @@ void Interpreter::execute(CodeFragment* program) {
                         _pc = _pe;
                     }
                 }
+                handle(RANDOM) {
+                    REGISTER(i.r0) = value_from_number(rand() % 10000);
+                }
+                handle(CLOCK) {
+                    REGISTER(i.r0) = value_from_number(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 1e6);
+                }
                 handle(PRINT) {
                     log<true, false>(REGISTER(i.r0));
                 }
@@ -275,8 +285,16 @@ void Interpreter::execute(CodeFragment* program) {
             _pc++;
         }
     } catch (std::exception& e) {
-        // TODO: stack unwind
         log("runtime error: ", e.what());
+
+        // stack unwind
+        auto sb = _stackbase;
+        while (sb > 4) {
+            auto func = (CodeFragment*)_stack[sb - 3]._p;
+            log(" - ", func->name);
+            sb = _stack[sb - 2]._i;
+            // _stack[sb + ]
+        }
     }
 }
 

@@ -18,9 +18,7 @@ fn madness() {
             write()
 
             fn read() {
-                let b = 0
                 return fn() {
-                    b = i
                     return i
                 }
             }
@@ -33,11 +31,10 @@ fn madness() {
 let x = madness()()()
 print(x)
 
-
-
+"
 fn f() {
     fn g() {
-        print("g")
+        print(2354)
     }
     fn h() {
         return g
@@ -46,5 +43,5 @@ fn f() {
     return h
 }
 
-let _f = f()
-_f()()
+let _f = f
+_f()()()"

@@ -1,3 +1,9 @@
+fn add(a, b) {
+    return a + b
+}
+
+print(add(1, 2))
+
 fn factorial(n) {
     if n < 2 {
         return 1
@@ -6,3 +12,21 @@ fn factorial(n) {
 }
 
 print(factorial(5))
+
+print("foop")
+
+fn test_maybe_box(a) {
+
+    let i = 0
+    if a {
+        fn foo() {
+            print(i)
+        }
+        foo()
+    }
+    i = i + 1
+    print(i)
+}
+
+
+test_maybe_box(1)

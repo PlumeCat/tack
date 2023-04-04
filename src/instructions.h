@@ -16,7 +16,10 @@
     opcode(LOAD_CONST) \
     opcode(LOAD_I) \
     opcode(MOVE) \
-    opcode(READ_CAPTURE)\
+    opcode(READ_CAPTURE) \
+    \
+    /* NOOP can be used as placeholder; TODO: optimizer should remove them */\
+    opcode(NOOP) \
     \
     /* lua allows 200 local variables; safet*/\
     /* lua can jump 1<<24 instructions */\

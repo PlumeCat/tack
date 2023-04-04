@@ -31,6 +31,7 @@ make
 - [ ] review notes and apply optimizations
 - [ ] ensure const is respected for captures
 - [ ] optimize captures by checking for reads/reassigns, etc
+- [ ] MOVE elision as much as possible.
 - [ ] replace CONDJUMP with something like CONDSKIP (see notes)
 - [ ] remove jlib. take the hashmap for string -> double and optimize the heck out of it
 - [ ] deduplicate consts

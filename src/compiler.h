@@ -8,11 +8,12 @@
 #include "instructions.h"
 #include "value.h"
 
+#include <jlib/log.h>
+
 enum class RegisterState {
     FREE = 0,
     BUSY = 1,
-    BOUND = 2,
-    BOUND_BOX = 3,
+    BOUND = 2
 };
 
 
@@ -26,6 +27,7 @@ struct CaptureInfo {
     uint8_t source_register;
     uint8_t dest_register;
 };
+
 struct CodeFragment {
     std::string name;
     std::vector<Instruction> instructions;
@@ -37,11 +39,12 @@ struct CodeFragment {
     uint16_t store_number(double d);
     uint16_t store_string(const std::string& data);
     uint16_t store_function();
-    std::string str(const std::string& prefix = "");
+    std::string str();
 };
 
 struct Compiler {
     struct VariableContext {
+        uint32_t declaration; // instruction where ALLOC_BOX needs to be
         uint8_t reg;
         bool is_const = false;
         bool is_box = false;
@@ -68,11 +71,11 @@ struct Compiler {
     // get a free register
     uint8_t allocate_register();
 
+    // get a free register and mark as bound by a variable
+    VariableContext* bind_register(const std::string& binding, bool is_const = false);
+    
     // get the register immediately after the highest non-free register
     uint8_t get_end_register();
-
-    // set a register as bound by a variable
-    VariableContext* bind_register(const std::string& binding, uint8_t reg, bool is_const = false, bool is_box = false);
     
     // free a register if it's not bound
     void free_register(uint8_t reg);
@@ -80,7 +83,10 @@ struct Compiler {
     // free all unbound registers
     void free_all_registers();
 
+    // when entering a new lexical scope
     void push_scope(ScopeContext* parent_scope, bool is_top_level = false);
+    
+    // when leaving a lexical scope
     void pop_scope();
 
     void compile_func(const AstNode* node, CodeFragment* output, ScopeContext* parent_scope = nullptr);

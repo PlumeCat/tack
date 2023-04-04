@@ -231,6 +231,7 @@ DEFPARSER(literal, {
 			TRY(block) {
 				if (identifier.type == AstType::Identifier) {
 					SUCCESS(AstType::FuncLiteral, param_def, block, identifier);
+					// SUCCESS(AstType::ConstDeclStat, identifier, )
 				} else {
 					SUCCESS(AstType::FuncLiteral, param_def, block);
 				}

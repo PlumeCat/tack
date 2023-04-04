@@ -1,28 +1,32 @@
-fn factorial(n) {
-    if n <= 1 {
-        return 1
-    }
-    return n * factorial(n - 1)
-}
+let i = 100
+let j = 2
+let k = 3
+print(i)
+if 0 {
+    print("200")
+    let i = 200
+} else {
+    print(i)
+    print("first reassign?")
+    i = i + 10
 
-
-fn map(array, func) {
-    const result = []
-    const  n = #array
-    let i = 0
-    while i < n {
-        result << func(array[i])
+    fn write() {
+        print("write")
         i = i + 1
+        j = j + 2
     }
-    return result
-}
 
+    i = i + 10
+    write()
+    write()
 
-const foo = []
-let i = 0
-while i < 10 {
-    i = i + 1
-    foo << i
+    fn read() {
+        let b = 0
+        return fn() {
+            b = i
+            k =243
+            return i
+        }
+    }
+    write()
 }
-const bar = map(foo, factorial)
-print(bar)

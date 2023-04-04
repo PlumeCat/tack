@@ -7,15 +7,15 @@
 
 
 // emit an instruction with 3 8 bit operands
-#define emit(op, r0, r1, r2)            output->instructions.emplace_back(Opcode::op, r0, r1, r2)
+#define emit(op, r0, r1, r2)            output->instructions.emplace_back(Opcode::op, r0, r1, r2);
 
 // emit an instruction with 1 u8 operand r and 1 u16 operand u
 #define emit_u(op, r, u)                auto ins = Instruction{}; ins.opcode = Opcode::op; ins.r0 = r; ins.u1 = u; output->instructions.emplace_back(ins);
 
 // rewrite an instruction with 3 8-bit operands
 #define rewrite(pos, type, r0, r1, r2)  output->instructions[pos] = { Opcode::type, r0, r1, r2 };
+#define emit_at(pos, type, r0, r1, r2)  output->instructions.insert(pos, { Opcode::type, r0, r1, r2 });
 #define label(name)                     auto name = output->instructions.size();
-#define should_allocate(n)
 #define handle(x)                       break; case AstType::x:
 #define error(msg)                      throw std::runtime_error("compiler error: " msg)
 #define child(n)                        compile(&node->children[n])
@@ -38,38 +38,38 @@ uint16_t CodeFragment::store_function() {
     return storage.size() - 1;
 }
 
-std::string CodeFragment::str(const std::string & prefix) {
+std::string CodeFragment::str() {
     auto s = std::stringstream {};
-    s << "function: " << prefix + name << std::endl;
+    s << "function: " << name << std::endl;
     auto i = 0;
     for (auto bc : instructions) {
-        s << "    " << i << ": " << ::to_string(bc.opcode) << ' ' << (uint32_t)bc.r0 << ' ' << (uint32_t)bc.r1 << ' ' << (uint32_t)bc.r2 << '\n';
+        s << "    " << i << " | " << ::to_string(bc.opcode) << ' ' << (uint32_t)bc.r0 << ' ' << (uint32_t)bc.r1 << ' ' << (uint32_t)bc.r2 << '\n';
         i++;
     }
 
     s << "  storage:\n";
     i = 0;
     for (auto& x : storage) {
-        s << "    " << i << ": " << x << '\n';
+        s << "    " << i << " | " << x << '\n';
         i++;
     }
 
     s << "  strings:\n";
     i = 0;
     for (auto& _s : strings) {
-        s << "    " << i << ": " << _s << '\n';
+        s << "    " << i << " | " << _s << '\n';
         i++;
     }
 
     i = 0;
     s << "  captures:\n";
     for (auto& c: capture_info) {
-        s << "    " << i << ": " << (int)c.source_register << " -> " << (int)c.dest_register << '\n';
+        s << "    " << i << " | " << (int)c.source_register << " -> " << (int)c.dest_register << '\n';
         i++;
     }
 
     for (auto& f : functions) {
-        s << f.str(prefix + name + "::");
+        s << f.str();
     }
     return s.str();
 }
@@ -83,18 +83,67 @@ Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& nam
     if (parent_scope) {
         // not found by parent scope
         if (auto var = parent_scope->lookup(name)) {
-            if (is_top_level_scope) { // handle capture scenario
+            if (is_top_level_scope) {
+                // we just captured something from an enclosing function
                 // create a mirroring local variable
-                auto mirror_reg = compiler->allocate_register();
-                auto mirror = compiler->bind_register(name, mirror_reg, var->is_const);
-                var->is_box = true;
+                auto mirror = compiler->bind_register(name, var->is_const);
                 mirror->is_box = true;
-
-                // record necessary capture into mirror variable
-                compiler->output->capture_info.emplace_back(CaptureInfo { .source_register = var->reg, .dest_register = mirror_reg });
-
                 // emit code to read into mirror variable
-                compiler->emit(READ_CAPTURE, mirror_reg, compiler->output->capture_info.size() - 1, 0);
+                compiler->emit(READ_CAPTURE, mirror->reg, compiler->output->capture_info.size(), 0);
+                // record capture into mirror variable
+                compiler->output->capture_info.emplace_back(CaptureInfo { .source_register = var->reg, .dest_register = mirror->reg });
+
+                if (!var->is_box) {
+                    var->is_box = true;
+
+                    // add an ALLOC_BOX in the parent scope
+                    parent_scope->compiler->output->instructions[var->declaration] = {
+                        Opcode::ALLOC_BOX, var->reg, 0, 0
+                    };
+                    // parent_scope->compiler->emit_at(
+                    //     parent_scope->compiler->output->instructions.begin() + var->declaration,
+                    //     ALLOC_BOX, var->reg, 0, 0
+                    // );
+                    
+                    // rewrite all MOVE as WRITE_BOX or READ_BOX
+                    for (auto i = var->declaration + 1; i < parent_scope->compiler->output->instructions.size(); i++) {
+                        auto& ins = parent_scope->compiler->output->instructions[i];
+                        if (ins.opcode == Opcode::MOVE) {
+                            if (ins.r0 == var->reg) {
+                                // WRITE_BOX
+                                ins.opcode = Opcode::WRITE_BOX;
+                            } else if (ins.r1 == var->reg) {
+                                // READ_BOX
+                                ins.opcode = Opcode::READ_BOX;
+                            }
+                        }
+                    }
+
+                }
+                // it's safe to emit this into the parent compiler, any control flow
+                // will not have finished compiling, so it will still emit correct jumps
+                // parent_scope->compiler->emit(ALLOC_BOX, )
+                
+                // TODO: emit WRITE_BOX for subsequent writes (any MOVE with r0 == var->reg)
+                // any MOVE gets replaced with WRITE_BOX 1:1 so no issue with control flow
+                
+                
+                // TODO: emit READ_BOX for subsequent reads (any MOVE with r1 == var->reg)
+                // problem for control flow eg:
+
+                // let i = 0
+                // if (x) {
+                //      x = i
+                // }
+                // ...
+                // ...
+                // fn() { return i + 1 }
+
+                // needs to emit READ_BOX for i in the loop, but can't change the jump :(
+
+
+                // keep list of reads?
+                // emit no-op MOVE for reads?
 
                 // return the MIRROR variable not the original!
                 return mirror;
@@ -133,9 +182,12 @@ uint8_t Compiler::get_end_register() {
 }
 
 // set a register as bound by a variable
-Compiler::VariableContext* Compiler::bind_register(const std::string& binding, uint8_t reg, bool is_const, bool is_box) {
-    registers[reg] = is_box ? RegisterState::BOUND_BOX : RegisterState::BOUND;
-    return &scopes.back().bindings.insert(binding, { reg, is_const })->second;
+Compiler::VariableContext* Compiler::bind_register(const std::string& binding, bool is_const) {
+    auto reg = allocate_register();
+    registers[reg] = RegisterState::BOUND;
+    label(decl);
+    emit(NOOP, reg, 0, 0); // placeholder in case ALLOC_BOX is needed
+    return &scopes.back().bindings.insert(binding, { (uint32_t)decl, reg, is_const })->second;
 }
 
 // free a register if it's not bound
@@ -166,14 +218,15 @@ void Compiler::pop_scope() {
 
 void Compiler::compile_func(const AstNode* node, CodeFragment* output, ScopeContext* parent_scope) {
     // compile function literal
-    // TODO: emit bindings for the N arguments
     this->output = output;
     push_scope(parent_scope, true);
     auto nargs = node->children[0].children.size(); // ParamDef
     for (auto i = 0; i < nargs; i++) {
         auto& param = node->children[0].children[i]; // Identifier
-        bind_register(param.data_s, i, false); // TODO: could choose to make arguments const?
-        // arguments are never boxes
+        auto var = bind_register(param.data_s, false); // TODO: could choose to make arguments const?
+        // move register i into argument variable
+        emit(MOVE, var->reg, i, 0);
+
     }
     auto reg = child(1);
     emit(RET, 0, 0, 0);
@@ -185,7 +238,6 @@ uint8_t Compiler::compile(const AstNode* node) {
     switch (node->type) {
     case AstType::Unknown: {} break;
         handle(StatList) {
-            should_allocate(0);
             push_scope(&scopes.back());
             for (auto i = 0; i < node->children.size(); i++) {
                 child(i);
@@ -198,28 +250,20 @@ uint8_t Compiler::compile(const AstNode* node) {
             auto has_else = node->children.size() == 3;
             auto cond_reg = child(0);
             label(condjump);
-            emit(CONDJUMP, cond_reg, 0, 0); // PLACEHOLDER
+            emit(CONDJUMP, cond_reg, 0, 0); // PLACEHOLDER condtionally jump over if body
             free_register(cond_reg); // can be reused
             child(1);
             label(endif);
 
             if (has_else) {
-                emit(JUMPF, 0, 0, 0); // PLACEHODLER
+                label(skipelse);
+                emit(JUMPF, 0, 0, 0); // PLACEHODLER jump over else body at end of if
                 label(startelse);
                 child(2);
                 label(endelse);
-                if (endelse - endif > 0xff) {
-                    error("jump too much");
-                }
-                rewrite(endif, JUMPF, uint8_t(endelse - endif), 0, 0);
-                if (startelse - condjump > 0xff) {
-                    error("jump too much");
-                }
+                rewrite(skipelse, JUMPF, uint8_t(endelse - endif), 0, 0);
                 rewrite(condjump, CONDJUMP, cond_reg, uint8_t(startelse - condjump), 0);
             } else {
-                if (endif - condjump > 0xff) {
-                    error("jump too much");
-                }
                 rewrite(condjump, CONDJUMP, cond_reg, uint8_t(endif - condjump), 0);
             }
             return 0xff;
@@ -232,37 +276,35 @@ uint8_t Compiler::compile(const AstNode* node) {
             free_register(cond_reg);
             child(1);
             label(jumpback);
-            if (jumpback - condeval > 0xff) {
-                error("jump too much");
-            }
             emit(JUMPB, uint8_t(jumpback - condeval), 0, 0);
             label(endwhile);
-            if (endwhile - condjump > 0xff) {
-                error("jump too much");
-            }
             rewrite(condjump, CONDJUMP, cond_reg, uint8_t(endwhile - condjump), 0);
             return 0xff;
         }
         handle(VarDeclStat) {
-            should_allocate(1);
             auto reg = child(1);
-            bind_register(node->children[0].data_s, reg);
-            return reg;
+            auto new_reg = allocate_register();
+            auto var = bind_register(node->children[0].data_s);
+            emit(MOVE, var->reg, reg, 0); // TODO: optimize this out
+            return var->reg;
         }
         handle(ConstDeclStat) {
-            should_allocate(1);
             auto reg = child(1);
-            bind_register(node->children[0].data_s, reg, true);
-            return reg;
+            auto new_reg = allocate_register();
+            auto var = bind_register(node->children[0].data_s, true);
+            emit(MOVE, var->reg, reg, 0); // TODO: optimize this out
+            return var->reg;
         }
         handle(AssignStat) {
-            should_allocate(0);
             auto source_reg = child(1);
             auto& lhs = node->children[0];
             if (lhs.type == AstType::Identifier) {
                 if (auto var = lookup_var(node->children[0].data_s)) {
                     if (var->is_const) {
                         error("can't reassign const variable");
+                    }
+                    if (source_reg == var->reg) {
+                        // writing a variable to itself? nah
                     }
                     if (var->is_box) {
                         emit(WRITE_BOX, var->reg, source_reg, 0);
@@ -296,14 +338,16 @@ uint8_t Compiler::compile(const AstNode* node) {
             return source_reg; // unused
         }
         handle(Identifier) {
-            should_allocate(0);
             if (auto v = lookup_var(node->data_s)) {
                 if (v->is_box) {
                     auto reg = allocate_register();
                     emit(READ_BOX, reg, v->reg, 0);
                     return reg;
                 } else {
-                    return v->reg;
+                    auto reg = allocate_register();
+                    emit(MOVE, reg, v->reg, 0); // placeholder may get rewritten as READ_BOX
+                    // desperately need to elide these
+                    return reg;
                 }
             } else {
                 error("can't find variable: " + node->data_s);
@@ -311,7 +355,6 @@ uint8_t Compiler::compile(const AstNode* node) {
             return 0xff;
         }
         handle(NumLiteral) {
-            should_allocate(1);
             auto n = node->data_d;
             auto out = allocate_register();
             auto index = output->store_number(node->data_d);
@@ -319,45 +362,55 @@ uint8_t Compiler::compile(const AstNode* node) {
             return out;
         }
         handle(StringLiteral) {
-            should_allocate(1);
             auto out = allocate_register();
             auto index = output->store_string(node->data_s);
             emit_u(LOAD_CONST, out, index);
             return out;
         }
         handle(FuncLiteral) {
-            should_allocate(1);
             // note this may create some captures and emit READ_CAPTURE
             auto index = output->store_function();
             auto func = (CodeFragment*)value_to_pointer(output->storage[index]);
             func->name = (node->children.size() == 3) ? node->children[2].data_s : "(anonymous)";
+            func->name = output->name + "::" + func->name;
+
+            // if there's an extra identifier node, it's a named function
+            auto is_named = (node->children.size() == 3);
 
             // add a const binding if it's a named function
-            auto out = allocate_register();
+            // TODO: this needs to happen at the AST level, not here (which register do we return?)
             auto var = (VariableContext*)nullptr;
-            if (node->children.size() == 3) {
-                var = bind_register(node->children[2].data_s, out, true);
+            if (is_named) {
+                var = bind_register(node->children[2].data_s, true);
             }
 
-            // compiler
+            /*
+            Problem:
+                compile_func needs to go below is_named MOVE
+                because if the function is recursive it needs
+                to capture itself, so it needs to rewrite the MOVE
+                as a WRITE_BOX
+
+                however for capture-capture scenario, 
+            */
+
+            
+            // allocate new closure
+            auto out = allocate_register();
+            emit_u(ALLOC_FUNC, out, index);
+
+            // write to the const binding after alloc
+            if (is_named) {
+                emit(MOVE, var->reg, out, 0);
+            }
+            
+            // compile
             auto compiler = Compiler {};
             compiler.compile_func(node, func, &scopes.back());
-
-            // allocate new closure into new register
-
-            if (var && var->is_box) {
-                // function was used inside itself somewhere so it's boxed
-                auto temp = allocate_register();
-                emit_u(ALLOC_FUNC, temp, index);
-                emit(WRITE_BOX, out, temp, 0);
-            } else {
-                emit_u(ALLOC_FUNC, out, index);
-            }
 
             return out;
         }
         handle(CallExp) {
-            should_allocate(1);
             auto nargs = node->children[1].children.size();
 
             // compile the arguments first and remember which registers they are in
@@ -373,7 +426,7 @@ uint8_t Compiler::compile(const AstNode* node) {
                 emit(MOVE, end_reg + i + STACK_FRAME_OVERHEAD, arg_regs[i], 0);
             }
 
-            emit(CALL, func_reg, nargs, end_reg);
+            emit(CALL, func_reg, (uint8_t)nargs, end_reg);
 
             // return value goes in end-reg so mark it as used
             registers[end_reg] = RegisterState::BUSY;
@@ -565,7 +618,6 @@ uint8_t Compiler::compile(const AstNode* node) {
 
 #undef error
 #undef handle
-#undef should_allocate
 #undef label
 #undef rewrite
 #undef emit_u
