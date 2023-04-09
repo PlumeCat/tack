@@ -15,6 +15,7 @@
 #define should_allocate(n)
 #define handle(x)                       break; case AstType::x:
 #define error(msg)                      throw std::runtime_error("compiler error: " msg)
+#define child(n)                        compile(&node->children[n]);
 
 
 
@@ -134,7 +135,7 @@ void Compiler::compile_func(const AstNode* node, CodeFragment* output, ScopeCont
         auto& param = node->children[0].children[i]; // Identifier
         bind_register(param.data_s, i, false); // TODO: could choose to make arguments const?
     }
-    auto reg = compile(&node->children[1]);
+    auto reg = child(1);
     emit(RET, 0, 0, 0);
     pop_scope();
 }
@@ -187,17 +188,17 @@ uint8_t Compiler::compile(const AstNode* node) {
         }
         handle(IfStat) {
             auto has_else = node->children.size() == 3;
-            auto cond_reg = compile(&node->children[0]); // evaluate the expressi, outputon
+            auto cond_reg = child(0); // evaluate the expressi, outputon
             label(condjump);
             emit(CONDJUMP, cond_reg, 0, 0); // PLACEHOLDER
             free_register(cond_reg); // can be reused
-            compile(&node->children[1]); // compile the if body
+            child(1); // compile the if body
             label(endif);
 
             if (has_else) {
                 emit(JUMPF, 0, 0, 0); // PLACEHODLER
                 label(startelse);
-                compile(&node->children[2]);
+                child(2);
                 label(endelse);
                 if (endelse - endif > 0xff) {
                     error("jump too much");
@@ -217,11 +218,11 @@ uint8_t Compiler::compile(const AstNode* node) {
         }
         handle(WhileStat) {
             label(condeval);
-            auto cond_reg = compile(&node->children[0]);
+            auto cond_reg = child(0);
             label(condjump);
             emit(CONDJUMP, cond_reg, 0, 0);
             free_register(cond_reg);
-            compile(&node->children[1]);
+            child(1);
             label(jumpback);
             if (jumpback - condeval > 0xff) {
                 error("jump too much");
@@ -236,19 +237,19 @@ uint8_t Compiler::compile(const AstNode* node) {
         }
         handle(VarDeclStat) {
             should_allocate(1);
-            auto reg = compile(&node->children[1]);
+            auto reg = child(1);
             bind_register(node->children[0].data_s, reg);
             return reg;
         }
         handle(ConstDeclStat) {
             should_allocate(1);
-            auto reg = compile(&node->children[1]);
+            auto reg = child(1);
             bind_register(node->children[0].data_s, reg, true);
             return reg;
         }
         handle(AssignStat) {
             should_allocate(0);
-            auto source_reg = compile(&node->children[1]);
+            auto source_reg = child(1);
             auto& lhs = node->children[0];
             if (lhs.type == AstType::Identifier) {
                 if (auto var = lookup(node->children[0].data_s)) {
@@ -339,7 +340,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             for (auto i = 0; i < nargs; i++) {
                 arg_regs.emplace_back(compile(&node->children[1].children[i]));
             }
-            auto func_reg = compile(&node->children[0]); // LHS evaluates to function
+            auto func_reg = child(0); // LHS evaluates to function
 
             // copy arguments to top of stack in sequence
             auto end_reg = get_end_register();
@@ -364,14 +365,14 @@ uint8_t Compiler::compile(const AstNode* node) {
             return reg;
         }
         handle(PrintStat) { // no output
-            auto in1 = compile(&node->children[0]);
+            auto in1 = child(0);
             emit(PRINT, in1, 0, 0);
             free_register(in1);
             return 0xff;
         }
         handle(ReturnStat) {
             if (node->children.size()) {
-                auto return_register = compile(&node->children[0]);
+                auto return_register = child(0);
                 if (return_register == 0xff) {
                     error("return value incorrect register");
                     // emit(RET, 0, 0, 0);
@@ -383,7 +384,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             return 0xff; // it's irrelevant
         }
         handle(LenExp) {
-            auto in = compile(&node->children[0]);
+            auto in = child(0);
             auto out = allocate_register();
             emit(LEN, out, in, 0);
             free_register(in);
@@ -398,8 +399,8 @@ uint8_t Compiler::compile(const AstNode* node) {
             //      out = allocate_register()
             //      ...
             // allows to reuse one of the registers (if not bound)
-            auto in1 = compile(&node->children[0]);
-            auto in2 = compile(&node->children[1]);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(ADD, out, in1, in2);
             free_register(in1);
@@ -407,8 +408,8 @@ uint8_t Compiler::compile(const AstNode* node) {
             return out;
         }
         handle(SubExp) {
-            auto in1 = compile(&node->children[0]);
-            auto in2 = compile(&node->children[1]);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(SUB, out, in1, in2);
             free_register(in1);
@@ -416,8 +417,8 @@ uint8_t Compiler::compile(const AstNode* node) {
             return out;
         }
         handle(LessExp) {
-            auto in1 = compile(&node->children[0]);
-            auto in2 = compile(&node->children[1]);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(LESS, out, in1, in2);
             free_register(in1);
@@ -425,8 +426,8 @@ uint8_t Compiler::compile(const AstNode* node) {
             return out;
         }
         handle(LessEqExp) {
-            auto in1 = compile(&node->children[0]);
-            auto in2 = compile(&node->children[1]);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(LESSEQ, out, in1, in2);
             free_register(in1);
@@ -434,8 +435,8 @@ uint8_t Compiler::compile(const AstNode* node) {
             return out;
         }
         handle(EqExp) {
-            auto in1 = compile(&node->children[0]);
-            auto in2 = compile(&node->children[1]);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(EQUAL, out, in1, in2);
             free_register(in1);
@@ -443,8 +444,8 @@ uint8_t Compiler::compile(const AstNode* node) {
             return out;
         }
         handle(NotEqExp) {
-            auto in1 = compile(&node->children[0]);
-            auto in2 = compile(&node->children[1]);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(NEQUAL, out, in1, in2);
             free_register(in1);
@@ -452,8 +453,8 @@ uint8_t Compiler::compile(const AstNode* node) {
             return out;
         }
         handle(GreaterExp) {
-            auto in1 = compile(&node->children[0]);
-            auto in2 = compile(&node->children[1]);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(GREATER, out, in1, in2);
             free_register(in1);
@@ -461,8 +462,8 @@ uint8_t Compiler::compile(const AstNode* node) {
             return out;
         }
         handle(GreaterEqExp) {
-            auto in1 = compile(&node->children[0]);
-            auto in2 = compile(&node->children[1]);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(GREATEREQ, out, in1, in2);
             free_register(in1);
@@ -470,8 +471,8 @@ uint8_t Compiler::compile(const AstNode* node) {
             return out;
         }
         handle(MulExp) { // 1 out
-            auto in1 = compile(&node->children[0]);
-            auto in2 = compile(&node->children[1]);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(MUL, out, in1, in2);
             free_register(in1);
@@ -479,8 +480,8 @@ uint8_t Compiler::compile(const AstNode* node) {
             return out;
         }
         handle(DivExp) { // 1 out
-            auto in1 = compile(&node->children[0]);
-            auto in2 = compile(&node->children[1]);
+            auto in1 = child(0);
+            auto in2 = child(1);
             auto out = allocate_register();
             emit(DIV, out, in1, in2);
             free_register(in1);
@@ -499,14 +500,14 @@ uint8_t Compiler::compile(const AstNode* node) {
             return reg;
         }
         handle(ShiftLeftExp) {
-            auto arr = compile(&node->children[0]);
-            auto value = compile(&node->children[1]);
+            auto arr = child(0);
+            auto value = child(1);
             emit(SHL, arr, value, 0);
             return 0xff;
         }
         handle(IndexExp) {
-            auto arr = compile(&node->children[0]);
-            auto ind = compile(&node->children[1]);
+            auto arr = child(0);
+            auto ind = child(1);
             auto out = allocate_register();
             emit(LOAD_ARRAY, out, arr, ind);
             free_register(arr);
@@ -514,7 +515,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             return out;
         }
         handle(AccessExp) {
-            auto obj = compile(&node->children[0]);
+            auto obj = child(0);
 
             // save identifier as string and load it
             auto key = allocate_register();
@@ -544,3 +545,4 @@ uint8_t Compiler::compile(const AstNode* node) {
 #undef rewrite
 #undef emit_u
 #undef emit
+#undef child
