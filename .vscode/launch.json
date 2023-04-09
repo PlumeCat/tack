@@ -6,6 +6,8 @@
             "name": "Launch Debug",
             "program": "${workspaceFolder}/build/Debug/tack",
             "args": [ "source.str", "-A", "-D" ],
+            // "args": [ "test/test_sort.str", "-A", "-D" ],
+            // "args": [ "test/test_closure.str", "-A", "-D" ],
             "preLaunchTask": "Build - Debug",
             "cwd": "${workspaceFolder}"
         }, {

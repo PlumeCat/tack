@@ -51,11 +51,12 @@ struct Compiler {
 
         // lookup a variable
         // if it lives in a parent function, code will be emitted to capture it
-        VariableContext* lookup(const std::string& name, CodeFragment* output);
+        VariableContext* lookup(const std::string& name);
     };
     // AST node to compile
     // TODO: make it not a parameter
     const AstNode* node;
+    CodeFragment* output;
     // name of function (if any)
     std::string name;
 
@@ -65,7 +66,7 @@ struct Compiler {
     std::vector<CaptureInfo> captures;
 
     // lookup a variable in the current scope stack
-    VariableContext* lookup(const std::string& name, CodeFragment* output);
+    VariableContext* lookup(const std::string& name);
 
     // get a free register
     uint8_t allocate_register();
@@ -86,7 +87,7 @@ struct Compiler {
     void pop_scope();
 
     void compile_func(const AstNode* node, CodeFragment* output, ScopeContext* parent_scope = nullptr);
-    uint8_t compile(const AstNode* node, CodeFragment* output);
+    uint8_t compile(const AstNode* node);
 
 };
 

@@ -1,0 +1,22 @@
+fn madness() {
+    let i = 100
+    if 1 {
+        let i = 200
+        if 0 {
+            let i = 300
+        } else {
+            i = i + 1
+            fn write() {
+                i = i + 1
+            }
+            write()
+            fn read() {
+                return fn() {
+                    return i
+                }
+            }
+        }
+    }
+}
+
+print(madness()()())

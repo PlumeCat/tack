@@ -21,6 +21,7 @@
         "deque": "cpp",
         "list": "cpp",
         "limits": "cpp",
-        "ios": "cpp"
+        "ios": "cpp",
+        "__hash_table": "cpp"
     }
 }

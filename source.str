@@ -1,3 +1,5 @@
+print("test basic")
+
 fn map(array, func) {
     const result = []
     const  n = #array
@@ -14,6 +16,29 @@ const foo = []
 foo << 1
 foo << 2
 foo << 3
-print(foo[4])
 const bar = map(foo, fn(x) { return x * 2 })
 print(bar)
+
+print("test recursion (ie self-capture)")
+
+fn factorial(n) {
+    if n < 2 {
+        return 1
+    }
+    return n * factorial(n-1)
+}
+
+print(factorial(5))
+
+print("test multi-level capture")
+
+fn capture2() {
+    let i = 32
+    return fn () {
+        return fn () {
+            print(i * i)
+        }
+    }
+}
+
+capture2()()()
