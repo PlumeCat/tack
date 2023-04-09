@@ -216,6 +216,19 @@ Types
 		to decide which code to call
 		inline caching: deciding the call at runtime as quickly as possible.
 
+Boxes:
+	currently we box *values* and have a special type for it. Then on register access (read or write),
+	we check whether the register contains a box, and read-write to that instead if so.
+	this involves a wasteful check every single register access, 1-3 register accesses per instruction
+	
+	however in theory we can see whether every variable needs to be boxed or not at compile time
+	so we should emit ALLOC_BOX when a boxed variable is encountered 
+	and READ_BOX and WRITE_BOX for each boxed variable usage
+
+	this will necessitate to emit NOOP and MOVE for variable declaration and read (we already emit
+	MOVE for writes) and then if the variable is boxed, replace all NOOP with ALLOC_BOX, MOVE with 
+	READ_BOX/WRITE_BOX
+
 Notes:
 	Functions vs closures vs "quasi-closures"
 

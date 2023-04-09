@@ -22,22 +22,21 @@ make
 - [ ] calling C functions and vice versa
 - [ ] garbage collector. must be allowed to retain pointers in C world
 - [ ] algebraics
+- [ ] initialization for array and object literals
 
 ### Other
-- [ ] mark boxed registers and elide the box check with every register access. should allow to remove the box type
-- [ ] initialization for array and object literals
+- [ ] replace CONDJUMP with something like CONDSKIP (see notes)
 - [ ] review notes and apply optimizations
 - [ ] ensure const is respected for captures
-- [ ] replace CONDJUMP with something like CONDSKIP (see notes)
 - [ ] deduplicate consts
 	- if possible, dedupe across fragments
-- [ ] possibly intern strings - definitely intern identifiers
+- [ ] possibly intern strings - definitely intern/prehash identifiers
 - [x] allow more than 256 constants
 - [ ] compile as static lib for embeddability
 - [ ] a nice REPL
 - [ ] language standard library, doesn't have to be massive
-- [ ] python style slice syntax
-- [ ] write a small game to test
+- [ ] python style slice syntax for arrays
+- [ ] write a small game / opengl binding to test
 - [ ] poor man's JIT: loop over instructions and emit machine code corresponding to a direct function call per opcode
 	- believe this is called a templating JIT, performance might be OK
 	- for extra points, write/disassembly the ASM for each opcode and emit it inline, elide the calls
