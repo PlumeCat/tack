@@ -57,3 +57,9 @@ fn() {
     }
 }()()
 
+print("test object")
+
+let v = {
+    x = 1, y = 2,
+}
+print(v)

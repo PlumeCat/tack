@@ -2,6 +2,7 @@
 #include "value.h"
 #include "interpreter.h"
 
+#define JLIB_LOG_VISUALSTUDIO
 #include <jlib/log.h>
 
 #include <list>
@@ -160,6 +161,12 @@ void Interpreter::execute(CodeFragment* program) {
                 }
                 handle(ALLOC_OBJECT) {
                     _objects.emplace_back(ObjectType {});
+                    // emplace child elements
+                    for (auto e = 0; e < i.r1; e++) {
+                        auto key = value_to_string(REGISTER(i.r2 + e * 2));
+                        auto val = REGISTER(i.r2 + e * 2 + 1);
+                        _objects.back()[*key] = val;
+                    }
                     REGISTER(i.r0) = value_from_object(&_objects.back());
                 }
                 handle(LOAD_ARRAY) {

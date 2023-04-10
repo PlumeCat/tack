@@ -508,9 +508,28 @@ uint8_t Compiler::compile(const AstNode* node) {
             return array_reg;
         }
         handle(ObjectLiteral) {
-            auto reg = allocate_register();
-            emit(ALLOC_OBJECT, reg, 0, 0);
-            return reg;
+            auto obj_reg = allocate_register();
+
+            // TODO: key loading / stack usage a bit inefficient here as well
+            auto n_elems = node->children.size();
+            auto key_indices = std::vector<uint8_t>{};
+            auto val_regs = std::vector<uint8_t>{};
+            for (auto n = 0; n < n_elems; n++) {
+                // each child node is an AssignStat
+                auto key = output->store_string(node->children[n].children[0].data_s);
+                auto val = compile(&node->children[n].children[1]);
+                key_indices.emplace_back(key);
+                val_regs.emplace_back(val);
+            }
+
+            auto end_reg = get_end_register();
+            for (auto n = 0; n < n_elems; n++) {
+                emit_u(LOAD_CONST, end_reg + n * 2, key_indices[n]);
+                emit(MOVE, end_reg + n * 2 + 1, val_regs[n], 0);
+            }
+
+            emit(ALLOC_OBJECT, obj_reg, n_elems, end_reg);
+            return obj_reg;
         }
         handle(ShiftLeftExp) {
             auto arr = child(0);

@@ -1,5 +1,8 @@
 #include "parsing.h"
 
+#define JLIB_LOG_VISUALSTUDIO
+#include <jlib/log.h>
+
 // parsing utils
 using namespace std;
 
@@ -185,16 +188,18 @@ DEFPARSER(literal, {
 
 			while (true) {
 				TRY(identifier) {
+					cout << identifier.data_s << endl;
 					TRYs('=') {
 						TRY(exp) {
 							res.children.emplace_back(AstType::AssignStat, identifier, exp);
+							cout << exp.data_d << endl;
 							TRYs(',') {} else break;
-						} else FAIL();
-					} else FAIL();
+						} else ERROR("expected expression after '=' (object)")
+					} else ERROR("expected '=' after key (object)")
 				} else break;
 			}
 
-			EXPECT('}');
+			TRYs('}') {} else ERROR("expected ',' or '}' after member")
 			SUCCESS(res);
 		}
 	});
