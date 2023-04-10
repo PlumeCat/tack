@@ -150,6 +150,12 @@ void Interpreter::execute(CodeFragment* program) {
                 }
                 handle(ALLOC_ARRAY) {
                     _arrays.emplace_back(ArrayType {});
+
+                    // emplace child elements
+                    for (auto e = 0; e < i.r1; e++) {
+                        _arrays.back().emplace_back(REGISTER(i.r2 + e));
+                    }
+
                     REGISTER(i.r0) = value_from_array(&_arrays.back());
                 }
                 handle(ALLOC_OBJECT) {

@@ -8,6 +8,7 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make
 ```
+
 (ensure cmake is generating a Makefile with `cmake .. -G 'Unix Makefiles')
 
 ### Features
@@ -22,6 +23,7 @@ make
 - [ ] calling C functions and vice versa
 - [ ] garbage collector. must be allowed to retain pointers in C world
 - [ ] algebraics
+- [ ] provision for error handling (note: lua has pcall(func) not true exceptions)
 - [ ] initialization for array and object literals
 
 ### Other

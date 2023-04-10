@@ -12,7 +12,7 @@ fn map(array, func) {
 }
 
 
-const foo = []
+const foo = [ 1, 2, 3 ]
 foo << 1
 foo << 2
 foo << 3
@@ -42,3 +42,18 @@ fn capture2() {
 }
 
 capture2()()()
+
+
+print("test array")
+
+fn() {
+    let a = [ 1, 2, 3, 4, 5 ]
+    print(a)
+
+    return fn() {
+        let b = 123
+        let c = [ 1, a, b ]
+        print(c)
+    }
+}()()
+

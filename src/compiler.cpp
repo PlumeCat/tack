@@ -489,10 +489,23 @@ uint8_t Compiler::compile(const AstNode* node) {
             return out;
         }
         handle(ArrayLiteral) {
-            auto reg = allocate_register();
-            // TODO: child elements
-            emit(ALLOC_ARRAY, reg, 0, 0);
-            return reg;
+            auto array_reg = allocate_register();
+
+            // TODO: inefficient stack usage, try and elide some of these MOVEs, also with function calls
+            auto n_elems = node->children.size();
+            auto elem_regs = std::vector<uint8_t>{};
+            for (auto n = 0; n < n_elems; n++) {
+                auto r = child(n);
+                elem_regs.emplace_back(r);
+            }
+
+            auto end_reg = get_end_register();
+            for (auto n = 0; n < n_elems; n++) {
+                emit(MOVE, end_reg + n, elem_regs[n], 0);
+            }
+
+            emit(ALLOC_ARRAY, array_reg, n_elems, end_reg);
+            return array_reg;
         }
         handle(ObjectLiteral) {
             auto reg = allocate_register();
