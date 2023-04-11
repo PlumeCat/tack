@@ -24,7 +24,7 @@ make
 - [ ] garbage collector. must be allowed to retain pointers in C world
 - [ ] algebraics
 - [ ] provision for error handling (note: lua has pcall(func) not true exceptions)
-- [ ] initialization for array and object literals
+- [x] initialization for array and object literals
 
 ### Other
 - [ ] replace CONDJUMP with something like CONDSKIP (see notes)
@@ -34,6 +34,7 @@ make
 	- if possible, dedupe across fragments
 - [ ] possibly intern strings - definitely intern/prehash identifiers
 - [x] allow more than 256 constants
+- [ ] specialize global lookups, treat it like LOAD_CONST (will want more than 256 global lookups)
 - [ ] compile as static lib for embeddability
 - [ ] a nice REPL
 - [ ] language standard library, doesn't have to be massive

@@ -17,6 +17,7 @@
     opcode(LOAD_I) \
     opcode(MOVE) \
     opcode(READ_CAPTURE)\
+    opcode(READ_GLOBAL) opcode(WRITE_GLOBAL)\
     \
     /* lua allows 200 local variables; safet*/\
     /* lua can jump 1<<24 instructions */\

@@ -1,5 +1,6 @@
 #include "compiler.h"
 #include "parsing.h"
+#include "interpreter.h"
 
 #include <sstream>
 
@@ -65,7 +66,13 @@ std::string CodeFragment::str(const std::string & prefix) {
 }
 
 Compiler::VariableContext* Compiler::lookup(const std::string& name) {
-    return scopes.back().lookup(name);
+    if (auto var = scopes.back().lookup(name)) {
+        return var;
+    }
+
+    if (auto global = globals_map.find(name); global != globals_map.end()) {
+        return &globals[global];
+    }
 }
 
 // get a free register
@@ -142,14 +149,16 @@ void Compiler::compile_func(const AstNode* node, CodeFragment* output, ScopeCont
 
 
 Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& name) {
+    // lookup local
     if (auto iter = bindings.find(name); iter != bindings.end()) {
         return &iter->second;
     }
 
+    // lookup capture in parent scope
     if (parent_scope) {
         // not found by parent scope
         if (auto var = parent_scope->lookup(name)) {
-            if (is_top_level_scope) { // handle capture scenario
+            if (is_function_scope) { // handle capture scenario
                 // create a mirroring local variable
                 auto mirror_reg = compiler->allocate_register();
                 auto mirror = compiler->bind_register(name, mirror_reg, var->is_const);
@@ -168,7 +177,7 @@ Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& nam
             }
         }
     }
-
+    
     return nullptr;
 }
 
@@ -238,13 +247,23 @@ uint8_t Compiler::compile(const AstNode* node) {
         handle(VarDeclStat) {
             should_allocate(1);
             auto reg = child(1);
-            bind_register(node->children[0].data_s, reg);
+
+            if (scopes.back().is_global_scope) {
+                // create global binding
+            } else {
+                bind_register(node->children[0].data_s, reg);
+            }
             return reg;
         }
         handle(ConstDeclStat) {
             should_allocate(1);
             auto reg = child(1);
-            bind_register(node->children[0].data_s, reg, true);
+
+            if (scopes.back().is_global_scope) {
+                interpreter->_globals = 
+            } else {
+                bind_register(node->children[0].data_s, reg, true);
+            }
             return reg;
         }
         handle(AssignStat) {
@@ -253,14 +272,18 @@ uint8_t Compiler::compile(const AstNode* node) {
             auto& lhs = node->children[0];
             if (lhs.type == AstType::Identifier) {
                 if (auto var = lookup(node->children[0].data_s)) {
-                    if (var->is_const) {
-                        error("can't reassign const variable");
+                    if (var->is_global) {
+                        emit_u(WRITE_GLOBAL, source_reg, var->g_id);
                     }
-                    // TODO: try and elide this MOVE
-                    // if the moved-from register is "busy" but not "bound", then the value is not used again
-                    // only need MOVE if assigning directly from another variable
-                    // in which case MOVE is more like COPY
-                    emit(MOVE, var->reg, source_reg, 0);
+                    else if (var->is_const) {
+                        error("can't reassign const variable");
+                    } else {
+                        // TODO: try and elide this MOVE
+                        // if the moved-from register is "busy" but not "bound", then the value is not used again
+                        // only need MOVE if assigning directly from another variable
+                        // in which case MOVE is more like COPY
+                        emit(MOVE, var->reg, source_reg, 0);
+                    }
                 } else {
                     error("can't find variable: " + node->children[0].data_s);
                 }
@@ -286,7 +309,13 @@ uint8_t Compiler::compile(const AstNode* node) {
         handle(Identifier) {
             should_allocate(0);
             if (auto v = lookup(node->data_s)) {
-                return v->reg;
+                if (v->is_global) {
+                    return v->reg;
+                } else {
+                    auto reg = allocate_register();
+                    emit_u(READ_GLOBAL, reg, v->g_id);
+                    return reg;
+                }
             } else {
                 error("can't find variable: " + node->data_s);
             }
@@ -322,7 +351,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             
             // compiler - must happen before ALLOC_FUNC because
             // child compiler can emit READ_CAPTURE into current scope
-            auto compiler = Compiler {};
+            auto compiler = Compiler { .interpreter = interpreter };
             compiler.compile_func(node, func, &scopes.back());
 
             // allocate new closure into new register

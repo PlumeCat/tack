@@ -19,6 +19,7 @@ static const uint32_t MAX_REGISTERS = 256;
 static const uint32_t STACK_FRAME_OVERHEAD = 4;
 
 struct AstNode;
+struct Interpreter;
 
 struct CaptureInfo {
     uint8_t source_register;
@@ -42,11 +43,15 @@ struct Compiler {
     struct VariableContext {
         uint8_t reg;
         bool is_const = false;
+        uint16_t g_id = 0;
+        bool is_global = false;
+
     };
     struct ScopeContext {
         Compiler* compiler;
-        ScopeContext* parent_scope = nullptr; // establishes a tree structure over FunctionContext::scopes
-        bool is_top_level_scope = false;
+        ScopeContext* parent_scope = nullptr;
+        bool is_function_scope = false;
+        bool is_global_scope = false;
         hash_map<std::string, VariableContext> bindings = hash_map<std::string, VariableContext>(1, 1); // variables
 
         // lookup a variable
@@ -55,10 +60,9 @@ struct Compiler {
     };
     // AST node to compile
     // TODO: make it not a parameter
+    const Interpreter* interpreter;
     const AstNode* node;
     CodeFragment* output;
-    // name of function (if any)
-    std::string name;
 
     // compiler state
     std::array<RegisterState, MAX_REGISTERS> registers;

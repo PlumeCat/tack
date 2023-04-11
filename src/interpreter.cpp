@@ -1,6 +1,7 @@
 #include "compiler.h"
 #include "value.h"
 #include "interpreter.h"
+#include "parsing.h"
 
 #define JLIB_LOG_VISUALSTUDIO
 #include <jlib/log.h>
@@ -12,6 +13,29 @@
 #include <chrono>
 #include <cstring>
 
+
+
+void Interpreter::set_global(const std::string& name, Value value) {
+}
+
+void Interpreter::execute(const std::string& code) {
+    auto out_ast = AstNode {};
+    parse(code, out_ast);
+    /*if (check_arg("-A")) {
+        log("AST: ", out_ast.tostring());
+    }*/
+
+    auto global = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
+    auto compiler = Compiler { .interpreter = this };
+    auto program = CodeFragment {};
+    compiler.compile_func(&global, &program);
+    execute(&program);
+    
+    /*if (check_arg("-D")) {
+        log("Program:\n" + program.str());
+    }*/
+
+}
 
 void Interpreter::execute(CodeFragment* program) {
 

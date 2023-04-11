@@ -20,6 +20,15 @@
 #include <jlib/log.h>
 #include <jlib/text_file.h>
 
+Value tack_print(int nargs, Value* args) {
+    return { 0 };
+}
+Value tack_random(int nargs, Value* args) {
+    return { 0 };
+}
+Value tack_clock(int nargs, Value* args) {
+    return { 0 };
+}
 
 int main(int argc, char* argv[]) {
     auto check_arg = [&](const std::string& s) {
@@ -38,24 +47,13 @@ int main(int argc, char* argv[]) {
         throw std::runtime_error("error opening source file: " + std::string(argv[1]));
     }
     auto& source = s.value();
-    auto out_ast = AstNode {};
+    
     try {
-        parse(source, out_ast);
-        if (check_arg("-A")) {
-            log("AST: ", out_ast.tostring());
-        }
-        
-        auto global = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
-        auto compiler = Compiler { .node = &global, .name = "(global)" };
-        auto program = CodeFragment {};
-        compiler.compile_func(&global, &program);
-
-        auto vm = Interpreter{};
-        if (check_arg("-D")) {
-            log("Program:\n" + program.str());
-        }
-
-        vm.execute(&program);
+        auto vm = Interpreter {};
+        vm.register_c_func("print", tack_print);
+        vm.register_c_func("random", tack_random);
+        vm.register_c_func("clock", tack_clock);
+        vm.execute(source);
     } catch (std::exception& e) {
         log(e.what());
     }

@@ -30,7 +30,7 @@ declare_type_bits(boxed,    0b1011) // 0xb // TODO: box won't be needed once we 
 declare_type_bits(array,    0b1010) // 0xa
 // Unused
 declare_type_bits(function, 0b1100)// 0xc
-declare_type_bits(______5,  0b1101)// 0xd
+declare_type_bits(cfunction,0b1101)// 0xd
 declare_type_bits(______4,  0b1110) // 0xe
 declare_type_bits(null,     0b1111) // 0xf // UINT64_MAX is null
 #undef declare_type_bits
@@ -56,6 +56,7 @@ enum class Type : uint64_t {
     Array = type_bits_array,
     Object = type_bits_object,
     Function = type_bits_function,
+    CFunction = type_bits_cfunction,
 
     /*
     other possibilities:
@@ -76,6 +77,7 @@ using FunctionType = struct {
     CodeFragment* bytecode;
     std::vector<Value> captures; // contains boxes
 };
+using CFunctionType = Value(int, Value*);
 struct vec2 { float x, y; };
 struct vec3 { float x, y, z; };
 struct vec4 { float x, y, z, w; };
@@ -104,6 +106,7 @@ inline Value value_from_boxed(BoxType* box)             { return { nan_bits | ty
 inline Value value_from_string(const StringType* str)   { return { nan_bits | type_bits_string | uint64_t(str) }; }
 inline Value value_from_object(ObjectType* obj)         { return { nan_bits | type_bits_object | uint64_t(obj) }; }
 inline Value value_from_array(ArrayType* arr)           { return { nan_bits | type_bits_array  | uint64_t(arr) }; }
+inline Value value_from_cfunction(CFunctionType* cfunc) { return { nan_bits | type_bits_cfunction | uint64_t(cfunc) }; }
 inline Value value_from_vec2(vec2* v2)                  { return { nan_bits | type_bits_vec2   | uint64_t(v2) }; }
 inline Value value_from_vec3(vec3* v3)                  { return { nan_bits | type_bits_vec3   | uint64_t(v3) }; }
 inline Value value_from_vec4(vec4* v4)                  { return { nan_bits | type_bits_vec4   | uint64_t(v4) }; }
@@ -117,7 +120,8 @@ inline bool value_is_integer(Value v)                   { return (v._i & type_bi
 inline bool value_is_number(Value v)                    { return !std::isnan(v._d); }
 inline bool value_is_pointer(Value v)                   { return (v._i & type_bits) == type_bits_pointer; }
 inline bool value_is_boxed(Value v)                     { return std::isnan(v._d) && (v._i & type_bits) == type_bits_boxed;   }
-inline bool value_is_closure(Value v)                   { return (v._i & type_bits) == type_bits_function; }
+inline bool value_is_function(Value v)                  { return (v._i & type_bits) == type_bits_function; }
+inline bool value_is_cfunction(Value v)                 { return (v._i & type_bits) == type_bits_cfunction; }
 inline bool value_is_string(Value v)                    { return (v._i & type_bits) == type_bits_string;  }
 inline bool value_is_object(Value v)                    { return (v._i & type_bits) == type_bits_object;  }
 inline bool value_is_array(Value v)                     { return (v._i & type_bits) == type_bits_array;   }
@@ -131,6 +135,7 @@ inline ArrayType* value_to_array(Value v)               { return (ArrayType*)(v.
 inline ObjectType* value_to_object(Value v)             { return (ObjectType*)(v._i & pointer_bits); }
 inline BoxType* value_to_boxed(Value v)                 { return (BoxType*)(v._i & pointer_bits); }
 inline FunctionType* value_to_function(Value v)         { return (FunctionType*)(v._i & pointer_bits); }
+inline CFunctionType* value_to_cfunction(Value v)       { return (CFunctionType*)(v._i & pointer_bits); }
 inline vec2* value_to_vec2(Value v)                     { return (vec2*)(v._i & pointer_bits); }
 inline vec3* value_to_vec3(Value v)                     { return (vec3*)(v._i & pointer_bits); }
 inline vec4* value_to_vec4(Value v)                     { return (vec4*)(v._i & pointer_bits); }
