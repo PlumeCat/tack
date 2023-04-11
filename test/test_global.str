@@ -1,9 +1,15 @@
 "test_global.str"
 
-let x = 1
-let y = 2
+fn foo() {
+    print("foo")
+}
+fn bar() {
+    print("bar")
+}
+fn baz() {
+    print("vaz")
+}
 
-fn () {
-    print(x)
-    "print(y)"
-}()
+foo()
+bar()
+baz()

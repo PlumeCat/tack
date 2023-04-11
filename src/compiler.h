@@ -35,7 +35,7 @@ struct CodeFragment {
     uint16_t store_number(double d);
     uint16_t store_string(const std::string& data);
     uint16_t store_function();
-    std::string str(const std::string& prefix = "");
+    std::string str();
 };
 
 struct Compiler {
@@ -77,8 +77,10 @@ struct Compiler {
     // get the register immediately after the highest non-free register
     uint8_t get_end_register();
 
-    // set a register as bound by a variable
-    VariableContext* bind_register(const std::string& binding, uint8_t reg, bool is_const = false);
+    // set a register or global as bound by a variable with given name
+    // NOTE: if it's global, make sure to emit WRITE_GLOBAL when relevant
+    // this method can't currently do it automatically - see FuncLiteral compiler
+    VariableContext* bind_name(const std::string& binding, uint8_t reg, bool is_const = false);
     
     // free a register if it's not bound
     void free_register(uint8_t reg);

@@ -36,9 +36,9 @@ uint16_t CodeFragment::store_function() {
     return storage.size() - 1;
 }
 
-std::string CodeFragment::str(const std::string & prefix) {
+std::string CodeFragment::str() {
     auto s = std::stringstream {};
-    s << "function: " << prefix + name << std::endl;
+    s << "function: " << name << std::endl;
     auto i = 0;
     for (auto bc : instructions) {
         s << "    " << i << ": " << ::to_string(bc.opcode) << ' ' << (uint32_t)bc.r0 << ' ' << (uint32_t)bc.r1 << ' ' << (uint32_t)bc.r2 << '\n';
@@ -52,15 +52,15 @@ std::string CodeFragment::str(const std::string & prefix) {
         i++;
     }
 
-    s << "  strings:\n";
-    i = 0;
-    for (auto& _s : strings) {
-        s << "    " << i << ": " << _s << '\n';
-        i++;
-    }
+    // s << "  strings:\n";
+    // i = 0;
+    // for (auto& _s : strings) {
+    //     s << "    " << i << ": " << _s << '\n';
+    //     i++;
+    // }
 
     for (auto& f : functions) {
-        s << f.str(prefix + name + "::");
+        s << f.str();
     }
     return s.str();
 }
@@ -93,10 +93,9 @@ uint8_t Compiler::get_end_register() {
 }
 
 // set a register as bound by a variable
-Compiler::VariableContext* Compiler::bind_register(const std::string& binding, uint8_t reg, bool is_const) {
+Compiler::VariableContext* Compiler::bind_name(const std::string& binding, uint8_t reg, bool is_const) {
     if (is_global) {
         auto var = scopes.back().bindings.insert(binding, { 0, is_const, true, num_globals });
-        emit_u(WRITE_GLOBAL, reg, var->second.g_id);
         num_globals++;
         return &(var->second);
     } else {
@@ -141,7 +140,8 @@ void Compiler::compile_func(const AstNode* node, CodeFragment* output, ScopeCont
     // emit bindings for the N arguments
     for (auto i = 0; i < nargs; i++) {
         auto& param = node->children[0].children[i]; // Identifier
-        bind_register(param.data_s, i, false); // TODO: could choose to make arguments const?
+        bind_name(param.data_s, i, false); // TODO: could choose to make arguments const?
+        // NOTE: impossible to be global
     }
     child(1);
     emit(RET, 0, 0, 0);
@@ -163,8 +163,9 @@ Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& nam
             }
             if (is_function_scope) { // handle capture scenario
                 // create a mirroring local variable
+                // NOTE: impossible to be global
                 auto mirror_reg = compiler->allocate_register();
-                auto mirror = compiler->bind_register(name, mirror_reg, var->is_const);
+                auto mirror = compiler->bind_name(name, mirror_reg, var->is_const);
 
                 // record necessary capture into mirror variable
                 compiler->output->capture_info.emplace_back(CaptureInfo { .source_register = var->reg, .dest_register = mirror_reg });
@@ -250,13 +251,19 @@ uint8_t Compiler::compile(const AstNode* node) {
         handle(VarDeclStat) {
             should_allocate(1);
             auto reg = child(1);
-            bind_register(node->children[0].data_s, reg);
+            auto var = bind_name(node->children[0].data_s, reg);
+            if (is_global) {
+                emit_u(WRITE_GLOBAL, reg, var->g_id);
+            }
             return 0xff;
         }
         handle(ConstDeclStat) {
             should_allocate(1);
             auto reg = child(1);
-            bind_register(node->children[0].data_s, reg, true);
+            auto var = bind_name(node->children[0].data_s, reg, true);
+            if (is_global) {
+                emit_u(WRITE_GLOBAL, reg, var->g_id);
+            }
             return 0xff;
         }
         handle(AssignStat) {
@@ -334,12 +341,13 @@ uint8_t Compiler::compile(const AstNode* node) {
             // note this may create some captures and emit READ_CAPTURE
             auto index = output->store_function();
             auto func = (CodeFragment*)value_to_pointer(output->storage[index]);
-            func->name = (node->children.size() == 3) ? node->children[2].data_s : "(anonymous)";
+            func->name = output->name + "::" + ((node->children.size() == 3) ? node->children[2].data_s : "(anonymous)");
 
             // add a const binding if it's a named function
             auto out = allocate_register();
+            auto var = (VariableContext*)nullptr;
             if (node->children.size() == 3) {
-                bind_register(node->children[2].data_s, out, true);
+                var = bind_name(node->children[2].data_s, out, true);
             }
             
             // compiler - must happen before ALLOC_FUNC because
@@ -349,6 +357,9 @@ uint8_t Compiler::compile(const AstNode* node) {
 
             // allocate new closure into new register
             emit_u(ALLOC_FUNC, out, index);
+            if (var && var->is_global) {
+                emit_u(WRITE_GLOBAL, out, var->g_id);
+            }
             
 
             return out;

@@ -32,7 +32,7 @@ void Interpreter::execute(const std::string& code, int argc, char* argv[]) {
 
     auto global = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
     auto compiler = Compiler { .interpreter = this, .is_global = true };
-    auto program = CodeFragment { .name = "GLOBAL" };
+    auto program = CodeFragment { .name = "[global]" };
     compiler.compile_func(&global, &program);
     if (check_arg("-D")) {
         log("Program:\n" + program.str());
@@ -63,7 +63,7 @@ void Interpreter::execute(CodeFragment* program) {
     _stack[0]._i = _pr->instructions.size(); // pseudo return address
     _stack[1]._p = (void*)program; // pseudo return program
     _stack[2]._i = 0; // reset stack base to 0, should not be reached
-    _stack[3] = value_null();
+    _stack[3] = value_null(); // captures array
 
     // heap
     auto _globals = std::vector<Value>{};
@@ -324,6 +324,10 @@ void Interpreter::execute(CodeFragment* program) {
     } catch (std::exception& e) {
         // TODO: stack unwind
         log("runtime error: ", e.what());
+        for (auto s = _stackbase; s != 0; s = _stack[s-2]._i) {
+            auto func = (CodeFragment*)_stack[s - 3]._p;
+            log(" in", func->name, "at", _stack[s-4]._i);
+        }
     }
 }
 
