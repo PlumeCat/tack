@@ -95,8 +95,8 @@ uint8_t Compiler::get_end_register() {
 // set a register as bound by a variable
 Compiler::VariableContext* Compiler::bind_name(const std::string& binding, uint8_t reg, bool is_const) {
     if (is_global) {
-        auto var = scopes.back().bindings.insert(binding, { 0, is_const, true, num_globals });
-        num_globals++;
+        auto var = scopes.back().bindings.insert(binding, { 0, is_const, true, interpreter->next_gid });
+        interpreter->next_gid++; // TODO: clumsy, try and improve this
         return &(var->second);
     } else {
         registers[reg] = RegisterState::BOUND;

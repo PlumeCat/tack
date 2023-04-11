@@ -13,6 +13,37 @@
 #include <chrono>
 #include <cstring>
 
+Interpreter::Interpreter() {
+    // root_compiler.interpreter = this;
+    // root_compiler.is_global = true;
+    global_scope.compiler = nullptr;
+    global_scope.parent_scope = nullptr;
+    global_scope.is_function_scope = false;
+}
+
+void Interpreter::set_global(const std::string& name, Value value) {
+    // lookup binding
+    auto* var = global_scope.lookup(name);
+
+    // create binding if not exist
+    if (!var) {
+        var = &global_scope.bindings.insert(name, {
+            .g_id = next_gid,
+            .is_const = false,
+            .is_global = true,
+            .reg = 0xff
+        })->second;
+        next_gid++;
+    }
+
+    // size check
+    if (globals.size() <= var->g_id) {
+        globals.resize(var->g_id + 1);
+    }
+
+    // write
+    globals[var->g_id] = value;
+}
 
 void Interpreter::execute(const std::string& code, int argc, char* argv[]) {
     auto check_arg = [&](const std::string& s) {
@@ -33,14 +64,12 @@ void Interpreter::execute(const std::string& code, int argc, char* argv[]) {
     auto global = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
     auto compiler = Compiler { .interpreter = this, .is_global = true };
     auto program = CodeFragment { .name = "[global]" };
-    compiler.compile_func(&global, &program);
+    compiler.compile_func(&global, &program, &global_scope);
     if (check_arg("-D")) {
         log("Program:\n" + program.str());
     }
     
     execute(&program);
-    
-
 }
 
 void Interpreter::execute(CodeFragment* program) {
@@ -54,8 +83,6 @@ void Interpreter::execute(CodeFragment* program) {
     auto _pc = 0u;
     auto _pe = _pr->instructions.size();
 
-    // globals
-
     // stack/registers
     auto _stack = std::array<Value, 4096> {};
     auto _stackbase = STACK_FRAME_OVERHEAD;
@@ -66,7 +93,6 @@ void Interpreter::execute(CodeFragment* program) {
     _stack[3] = value_null(); // captures array
 
     // heap
-    auto _globals = std::vector<Value>{};
     auto _arrays = std::list<ArrayType> {};
     auto _objects = std::list<ObjectType> {};
     auto _functions = std::list<FunctionType> {};
@@ -138,15 +164,15 @@ void Interpreter::execute(CodeFragment* program) {
                     REGISTER(i.r0) = REGISTER(i.r1);
                 }
                 handle(READ_GLOBAL) {
-                    REGISTER(i.r0) = _globals[i.u1];
+                    REGISTER(i.r0) = globals[i.u1];
                 }
                 handle(WRITE_GLOBAL) {
                     // resize globals if necessary
                     // invalidating pointers is fine since globals should never be boxed
-                    if (i.u1 >= _globals.size()) {
-                        _globals.resize(i.u1+1);
+                    if (i.u1 >= globals.size()) {
+                        globals.resize(i.u1+1);
                     }
-                    _globals[i.u1] = REGISTER(i.r0);
+                    globals[i.u1] = REGISTER(i.r0);
                 }
                 handle(CONDJUMP) {
                     auto val = REGISTER(i.r0);
@@ -270,18 +296,29 @@ void Interpreter::execute(CodeFragment* program) {
                     (*obj)[*value_to_string(key_val)] = REGISTER(i.r0);
                 }
                 handle(CALL) {
-                    auto func = value_to_function(REGISTER(i.r0));
-                    auto nargs = i.r1;
-                    auto new_base = i.r2 + STACK_FRAME_OVERHEAD;
-                    REGISTER_RAW(new_base - 4)._i = _pc; // push return addr
-                    REGISTER_RAW(new_base - 3)._p = (void*)_pr; // return program
-                    REGISTER_RAW(new_base - 2)._i = _stackbase; // push return frameptr
-                    REGISTER_RAW(new_base - 1) = value_from_array(&func->captures);
+                    auto r0 = REGISTER(i.r0);
+                    if (value_is_function(r0)) {
+                        auto func = value_to_function(r0);
+                        auto nargs = i.r1;
+                        auto new_base = i.r2 + STACK_FRAME_OVERHEAD;
+                        
+                        REGISTER_RAW(new_base - 4)._i = _pc; // push return addr
+                        REGISTER_RAW(new_base - 3)._p = (void*)_pr; // return program
+                        REGISTER_RAW(new_base - 2)._i = _stackbase; // push return frameptr
+                        REGISTER_RAW(new_base - 1) = value_from_array(&func->captures);
 
-                    _pr = func->bytecode;
-                    _pc = -1; // TODO: gather all instructions into one big chunk to avoid this
-                    _pe = _pr->instructions.size();
-                    _stackbase = _stackbase + new_base; // new stack frame
+                        _pr = func->bytecode;
+                        _pc = -1; // TODO: gather all instructions into one big chunk to avoid this
+                        _pe = _pr->instructions.size();
+                        _stackbase = _stackbase + new_base; // new stack frame
+                    } else if (value_is_cfunction(r0)) {
+                        auto cfunc = value_to_cfunction(r0);
+                        auto nargs = i.r1;
+                        auto new_base = i.r2 + STACK_FRAME_OVERHEAD;
+                        REGISTER_RAW(i.r2) = cfunc(nargs, &_stack[_stackbase + new_base]);
+                    } else {
+                        error("tried to call non-funct");
+                    }
                 }
                 handle(RANDOM) {
                     REGISTER(i.r0) = value_from_number(rand() % 10000);

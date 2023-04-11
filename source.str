@@ -77,3 +77,8 @@ if 1 {
 
     print(z + w)
 }
+
+
+print("test call cfunc")
+
+print2("HELLO WORLD", 1, 2, 3, "hello", [2, 3, 4 ], { x = 1, y = 2 })

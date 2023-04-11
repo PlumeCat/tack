@@ -55,13 +55,12 @@ struct Compiler {
         // if it lives in a parent function, code will be emitted to capture it
         VariableContext* lookup(const std::string& name);
     };
-    // AST node to compile
-    // TODO: make it not a parameter
-    const Interpreter* interpreter;
+    Interpreter* interpreter;
+    // root AST node from last compile_func() call
     const AstNode* node;
+    // current output as of last compile_func() call, included here for convenience
     CodeFragment* output;
     bool is_global = false; // variable bindings become global instead of stack
-    uint16_t num_globals = 0;
 
     // compiler state
     std::array<RegisterState, MAX_REGISTERS> registers;

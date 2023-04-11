@@ -25,6 +25,8 @@ make
 - [ ] algebraics
 - [ ] provision for error handling (note: lua has pcall(func) not true exceptions)
 - [x] initialization for array and object literals
+- [ ] module system or `export` or `dofile()` or otherwise 
+	- different files should be able to access each other's globals
 
 ### Other
 - [ ] replace CONDJUMP with something like CONDSKIP (see notes)

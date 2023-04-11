@@ -302,3 +302,12 @@ Notes:
 	we could do something like always put a function in its own registers
 	eg at position 0
 	
+
+Globals:
+	There are globals and there are globals.
+	Because of the way scoping works, variables at file-level scope are considered "globals"
+	from the point of view of the rest of the code in the same file - ie they are accessible everywhere
+	in that file; however they are not accessible outside the file (we will need "export let" 
+	or similar to make that possible)
+	True globals are the ones created/declared by the host with 'set_global' - these live in the proper
+	root scope and should be accessible everywhere.
