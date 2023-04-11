@@ -43,8 +43,6 @@ struct Compiler {
     struct VariableContext {
         uint8_t reg;
         bool is_const = false;
-        uint16_t g_id = 0;
-        bool is_global = false;
 
     };
     struct ScopeContext {

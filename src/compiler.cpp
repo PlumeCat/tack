@@ -69,10 +69,7 @@ Compiler::VariableContext* Compiler::lookup(const std::string& name) {
     if (auto var = scopes.back().lookup(name)) {
         return var;
     }
-
-    if (auto global = globals_map.find(name); global != globals_map.end()) {
-        return &globals[global];
-    }
+    return nullptr;
 }
 
 // get a free register
@@ -247,23 +244,13 @@ uint8_t Compiler::compile(const AstNode* node) {
         handle(VarDeclStat) {
             should_allocate(1);
             auto reg = child(1);
-
-            if (scopes.back().is_global_scope) {
-                // create global binding
-            } else {
-                bind_register(node->children[0].data_s, reg);
-            }
+            bind_register(node->children[0].data_s, reg);
             return reg;
         }
         handle(ConstDeclStat) {
             should_allocate(1);
             auto reg = child(1);
-
-            if (scopes.back().is_global_scope) {
-                interpreter->_globals = 
-            } else {
-                bind_register(node->children[0].data_s, reg, true);
-            }
+            bind_register(node->children[0].data_s, reg, true);
             return reg;
         }
         handle(AssignStat) {
@@ -272,10 +259,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             auto& lhs = node->children[0];
             if (lhs.type == AstType::Identifier) {
                 if (auto var = lookup(node->children[0].data_s)) {
-                    if (var->is_global) {
-                        emit_u(WRITE_GLOBAL, source_reg, var->g_id);
-                    }
-                    else if (var->is_const) {
+                    if (var->is_const) {
                         error("can't reassign const variable");
                     } else {
                         // TODO: try and elide this MOVE
@@ -309,13 +293,7 @@ uint8_t Compiler::compile(const AstNode* node) {
         handle(Identifier) {
             should_allocate(0);
             if (auto v = lookup(node->data_s)) {
-                if (v->is_global) {
-                    return v->reg;
-                } else {
-                    auto reg = allocate_register();
-                    emit_u(READ_GLOBAL, reg, v->g_id);
-                    return reg;
-                }
+                return v->reg;
             } else {
                 error("can't find variable: " + node->data_s);
             }

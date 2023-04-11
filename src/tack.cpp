@@ -50,9 +50,9 @@ int main(int argc, char* argv[]) {
     
     try {
         auto vm = Interpreter {};
-        vm.register_c_func("print", tack_print);
-        vm.register_c_func("random", tack_random);
-        vm.register_c_func("clock", tack_clock);
+        // vm.register_c_func("print", tack_print);
+        // vm.register_c_func("random", tack_random);
+        // vm.register_c_func("clock", tack_clock);
         vm.execute(source);
     } catch (std::exception& e) {
         log(e.what());
