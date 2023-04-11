@@ -3,9 +3,6 @@
 math.randomseed(os.time())
 
 alloc_count = 0
-do_random = true
-_G_old = {}
-for i, v in ipairs(_G) do _G_old[i] = v end
 
 function alloc_table()
     alloc_count = alloc_count + 1
@@ -87,9 +84,3 @@ local after = os.clock()
 -- table_print(B)
 
 print("Time taken: " .. tostring(after - before))
-print("data:")
-for i, v in pairs(_G) do
-    if _G_old[i] == nil then
-        print(i, v)
-    end
-end

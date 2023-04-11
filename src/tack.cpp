@@ -26,12 +26,13 @@ Value tack_print(int nargs, Value* args) {
         ss << args[i] << ' ';
     }
     log<true, false>(ss.str());
+    return value_null();
 }
 Value tack_random(int nargs, Value* args) {
-    return { 0 };
+    return value_from_number(rand());
 }
 Value tack_clock(int nargs, Value* args) {
-    return { 0 };
+    return value_from_number(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 1e6);
 }
 
 int main(int argc, char* argv[]) {
@@ -50,9 +51,9 @@ int main(int argc, char* argv[]) {
     
     try {
         auto vm = Interpreter {};
-        vm.set_global("print2", value_from_cfunction(tack_print));
-        // vm.register_c_func("random", tack_random);
-        // vm.register_c_func("clock", tack_clock);
+        vm.set_global("print", value_from_cfunction(tack_print));
+        vm.set_global("random", value_from_cfunction(tack_random));
+        vm.set_global("clock", value_from_cfunction(tack_clock));
         vm.execute(source, argc, argv);
     } catch (std::exception& e) {
         log(e.what());

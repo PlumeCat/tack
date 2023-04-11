@@ -248,18 +248,8 @@ DEFPARSER(literal, {
 	TRY(func_literal) SUCCESS(func_literal);
 	TRY(num_literal) SUCCESS(num_literal);
 });
-// TODO: remove
-DEFPARSER(clock_exp, {
-	EXPECT("clock") EXPECT('(') EXPECT(')')
-	SUCCESS(AstType::ClockExp)
-});
-DEFPARSER(random_exp, {
-	EXPECT("random") EXPECT('(') EXPECT(')')
-	SUCCESS(AstType::RandomExp)
-});
+
 DEFPARSER(primary_exp, {
-	TRY(random_exp) SUCCESS(random_exp)
-	TRY(clock_exp) SUCCESS(clock_exp)
 	TRY(literal) SUCCESS(literal)
 	TRY(identifier) SUCCESS(identifier)
 	TRYs('(') {
@@ -433,14 +423,6 @@ DEFPARSER(return_stat, {
 	}
 });
 
-// TODO: remove
-DEFPARSER(print_stat, {
-	EXPECT("print")
-	EXPECT('(')
-	TRY(exp) {}
-	EXPECT(')')
-	SUCCESS(AstType::PrintStat, exp)
-});
 DEFPARSER(if_stat, {
 	SUBPARSER(else_block, {
 		EXPECT("else")
@@ -479,7 +461,6 @@ DEFPARSER(stat_list, {
 			|| parse_assign_stat(code, n)
 			|| parse_if_stat(code, n)
 			|| parse_while_stat(code, n)
-			|| parse_print_stat(code, n)
 			|| parse_return_stat(code, n)
 			|| parse_exp(code, n)
 			) {

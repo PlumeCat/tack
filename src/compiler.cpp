@@ -387,22 +387,6 @@ uint8_t Compiler::compile(const AstNode* node) {
             registers[end_reg] = RegisterState::BUSY;
             return end_reg; // return value copied to end register
         }
-        handle(ClockExp) {
-            auto reg = allocate_register();
-            emit(CLOCK, reg, 0, 0);
-            return reg;
-        }
-        handle(RandomExp) {
-            auto reg = allocate_register();
-            emit(RANDOM, reg, 0, 0);
-            return reg;
-        }
-        handle(PrintStat) { // no output
-            auto in1 = child(0);
-            emit(PRINT, in1, 0, 0);
-            free_register(in1);
-            return 0xff;
-        }
         handle(ReturnStat) {
             if (node->children.size()) {
                 auto return_register = child(0);

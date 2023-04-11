@@ -8,7 +8,6 @@
     ast(ConstDeclStat)\
     ast(VarDeclStat)\
     ast(AssignStat)\
-    ast(PrintStat) \
     ast(IfStat)\
     ast(WhileStat)\
     ast(ReturnStat)\
@@ -26,9 +25,6 @@
     ast(CallExp) ast(ArgList)\
     ast(IndexExp)\
     ast(AccessExp)\
-    \
-    ast(ClockExp)\
-    ast(RandomExp)\
     \
     ast(FuncLiteral)\
     ast(ParamDef)\

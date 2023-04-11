@@ -320,12 +320,6 @@ void Interpreter::execute(CodeFragment* program) {
                         error("tried to call non-funct");
                     }
                 }
-                handle(RANDOM) {
-                    REGISTER(i.r0) = value_from_number(rand() % 10000);
-                }
-                handle(CLOCK) {
-                    REGISTER(i.r0) = value_from_number(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 1e6);
-                }
                 handle(RET) {
                     auto return_addr = REGISTER_RAW(-4);
                     auto return_func = REGISTER_RAW(-3);
@@ -350,9 +344,6 @@ void Interpreter::execute(CodeFragment* program) {
                         // end of program
                         _pc = _pe;
                     }
-                }
-                handle(PRINT) {
-                    log<true, false>(REGISTER(i.r0));
                 }
             break; default: error("unknown instruction: " + to_string(i.opcode));
             }
