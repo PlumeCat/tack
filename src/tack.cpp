@@ -31,15 +31,6 @@ Value tack_clock(int nargs, Value* args) {
 }
 
 int main(int argc, char* argv[]) {
-    auto check_arg = [&](const std::string& s) {
-        for (auto i = 0; i < argc; i++) {
-            if (argv[i] == s) {
-                return true;
-            }
-        }
-        return false;
-    };
-
     std::ios::sync_with_stdio(false);
     auto fname = (argc >= 2) ? argv[1] : "source.str";
     auto s = read_text_file(fname);
@@ -53,7 +44,7 @@ int main(int argc, char* argv[]) {
         // vm.register_c_func("print", tack_print);
         // vm.register_c_func("random", tack_random);
         // vm.register_c_func("clock", tack_clock);
-        vm.execute(source);
+        vm.execute(source, argc, argv);
     } catch (std::exception& e) {
         log(e.what());
     }

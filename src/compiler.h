@@ -14,7 +14,6 @@ enum class RegisterState {
     BOUND = 2
 };
 
-
 static const uint32_t MAX_REGISTERS = 256;
 static const uint32_t STACK_FRAME_OVERHEAD = 4;
 
@@ -41,15 +40,15 @@ struct CodeFragment {
 
 struct Compiler {
     struct VariableContext {
-        uint8_t reg;
+        uint8_t reg = 0;
         bool is_const = false;
-
+        bool is_global = false;
+        uint16_t g_id = 0;
     };
     struct ScopeContext {
         Compiler* compiler;
         ScopeContext* parent_scope = nullptr;
         bool is_function_scope = false;
-        bool is_global_scope = false;
         hash_map<std::string, VariableContext> bindings = hash_map<std::string, VariableContext>(1, 1); // variables
 
         // lookup a variable
@@ -61,6 +60,8 @@ struct Compiler {
     const Interpreter* interpreter;
     const AstNode* node;
     CodeFragment* output;
+    bool is_global = false; // variable bindings become global instead of stack
+    uint16_t num_globals = 0;
 
     // compiler state
     std::array<RegisterState, MAX_REGISTERS> registers;

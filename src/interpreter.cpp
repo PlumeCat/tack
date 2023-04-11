@@ -14,31 +14,36 @@
 #include <cstring>
 
 
+void Interpreter::execute(const std::string& code, int argc, char* argv[]) {
+    auto check_arg = [&](const std::string& s) {
+        for (auto i = 0; i < argc; i++) {
+            if (argv[i] == s) {
+                return true;
+            }
+        }
+        return false;
+    };
 
-void Interpreter::set_global(const std::string& name, Value value) {
-}
-
-void Interpreter::execute(const std::string& code) {
     auto out_ast = AstNode {};
     parse(code, out_ast);
-    /*if (check_arg("-A")) {
+    if (check_arg("-A")) {
         log("AST: ", out_ast.tostring());
-    }*/
+    }
 
     auto global = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
-    auto compiler = Compiler { .interpreter = this };
-    auto program = CodeFragment {};
+    auto compiler = Compiler { .interpreter = this, .is_global = true };
+    auto program = CodeFragment { .name = "GLOBAL" };
     compiler.compile_func(&global, &program);
+    if (check_arg("-D")) {
+        log("Program:\n" + program.str());
+    }
+    
     execute(&program);
     
-    /*if (check_arg("-D")) {
-        log("Program:\n" + program.str());
-    }*/
 
 }
 
 void Interpreter::execute(CodeFragment* program) {
-
     // TODO: likely super inefficient
     #define handle(opcode) break; case Opcode::opcode: //log("Opcode: ", to_string(Opcode::opcode));
     #define REGISTER_RAW(n) _stack[_stackbase+n]
@@ -48,6 +53,8 @@ void Interpreter::execute(CodeFragment* program) {
     auto _pr = program; // current program
     auto _pc = 0u;
     auto _pe = _pr->instructions.size();
+
+    // globals
 
     // stack/registers
     auto _stack = std::array<Value, 4096> {};
@@ -59,6 +66,7 @@ void Interpreter::execute(CodeFragment* program) {
     _stack[3] = value_null();
 
     // heap
+    auto _globals = std::vector<Value>{};
     auto _arrays = std::list<ArrayType> {};
     auto _objects = std::list<ObjectType> {};
     auto _functions = std::list<FunctionType> {};
@@ -70,11 +78,8 @@ void Interpreter::execute(CodeFragment* program) {
             auto i = _pr->instructions[_pc];
             switch (i.opcode) {
             case Opcode::UNKNOWN: break;
-                handle(LOAD_I) {
-                    REGISTER(i.r0) = value_from_integer(i.s1);
-                }
                 handle(LOAD_CONST) {
-                    REGISTER(i.r0) = _pr->storage[i.r1];
+                    REGISTER(i.r0) = _pr->storage[i.u1];
                 }
                 handle(ADD) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) + value_to_number(REGISTER(i.r2)));
@@ -129,7 +134,20 @@ void Interpreter::execute(CodeFragment* program) {
                         value_to_number(REGISTER(i.r2))
                     );
                 }
-                handle(MOVE) { REGISTER(i.r0) = REGISTER(i.r1); }
+                handle(MOVE) {
+                    REGISTER(i.r0) = REGISTER(i.r1);
+                }
+                handle(READ_GLOBAL) {
+                    REGISTER(i.r0) = _globals[i.u1];
+                }
+                handle(WRITE_GLOBAL) {
+                    // resize globals if necessary
+                    // invalidating pointers is fine since globals should never be boxed
+                    if (i.u1 >= _globals.size()) {
+                        _globals.resize(i.u1+1);
+                    }
+                    _globals[i.u1] = REGISTER(i.r0);
+                }
                 handle(CONDJUMP) {
                     auto val = REGISTER(i.r0);
                     if (!(

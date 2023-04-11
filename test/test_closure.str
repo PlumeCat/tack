@@ -15,8 +15,14 @@ fn madness() {
                     return i
                 }
             }
+            write()
+            return read
         }
     }
 }
 
-print(madness()()())
+let a = madness()
+print(a)
+let b = a()
+let c = b()
+print([ a, b, c ])

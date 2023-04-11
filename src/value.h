@@ -130,20 +130,22 @@ inline bool value_is_vec3(Value v)                      { return (v._i & type_bi
 inline bool value_is_vec4(Value v)                      { return (v._i & type_bits) == type_bits_vec4; }
 inline bool value_is_mat4(Value v)                      { return (v._i & type_bits) == type_bits_mat4; }
 
-inline StringType* value_to_string(Value v)             { return (StringType*)(v._i & pointer_bits); }
-inline ArrayType* value_to_array(Value v)               { return (ArrayType*)(v._i & pointer_bits); }
-inline ObjectType* value_to_object(Value v)             { return (ObjectType*)(v._i & pointer_bits); }
-inline BoxType* value_to_boxed(Value v)                 { return (BoxType*)(v._i & pointer_bits); }
-inline FunctionType* value_to_function(Value v)         { return (FunctionType*)(v._i & pointer_bits); }
-inline CFunctionType* value_to_cfunction(Value v)       { return (CFunctionType*)(v._i & pointer_bits); }
-inline vec2* value_to_vec2(Value v)                     { return (vec2*)(v._i & pointer_bits); }
-inline vec3* value_to_vec3(Value v)                     { return (vec3*)(v._i & pointer_bits); }
-inline vec4* value_to_vec4(Value v)                     { return (vec4*)(v._i & pointer_bits); }
-inline mat4* value_to_mat4(Value v)                     { return (mat4*)(v._i & pointer_bits); }
-inline uint64_t value_to_null(Value v)                  { return v._i; } // ???
-inline bool value_to_boolean(Value v)                   { return (bool)(v._i & boolean_bits); }
-inline int32_t value_to_integer(Value v)                { return (int32_t)(v._i & integer_bits); }
-inline double value_to_number(Value v)                  { return v._d; } // ???
-inline void* value_to_pointer(Value v)                  { return (void*)(v._i & pointer_bits); }
+#define check(ty) if (!value_is_##ty(v)) throw std::runtime_error("type error: not a " #ty);
+inline StringType* value_to_string(Value v)             { check(string);    return (StringType*)(v._i & pointer_bits); }
+inline ArrayType* value_to_array(Value v)               { check(array);     return (ArrayType*)(v._i & pointer_bits); }
+inline ObjectType* value_to_object(Value v)             { check(object);    return (ObjectType*)(v._i & pointer_bits); }
+inline BoxType* value_to_boxed(Value v)                 { check(boxed);     return (BoxType*)(v._i & pointer_bits); }
+inline FunctionType* value_to_function(Value v)         { check(function);  return (FunctionType*)(v._i & pointer_bits); }
+inline CFunctionType* value_to_cfunction(Value v)       { check(cfunction); return (CFunctionType*)(v._i & pointer_bits); }
+inline vec2* value_to_vec2(Value v)                     { check(vec2);      return (vec2*)(v._i & pointer_bits); }
+inline vec3* value_to_vec3(Value v)                     { check(vec3);      return (vec3*)(v._i & pointer_bits); }
+inline vec4* value_to_vec4(Value v)                     { check(vec4);      return (vec4*)(v._i & pointer_bits); }
+inline mat4* value_to_mat4(Value v)                     { check(mat4);      return (mat4*)(v._i & pointer_bits); }
+inline uint64_t value_to_null(Value v)                  { check(null);      return v._i; } // ???
+inline bool value_to_boolean(Value v)                   { check(boolean);   return (bool)(v._i & boolean_bits); }
+inline int32_t value_to_integer(Value v)                { check(integer);   return (int32_t)(v._i & integer_bits); }
+inline double value_to_number(Value v)                  { check(number);    return v._d; } // ???
+inline void* value_to_pointer(Value v)                  { check(pointer);   return (void*)(v._i & pointer_bits); }
+#undef check
 
 std::ostream& operator<<(std::ostream& o, const Value& v);

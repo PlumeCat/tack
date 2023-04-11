@@ -1,0 +1,9 @@
+"test_global.str"
+
+let x = 1
+let y = 2
+
+fn () {
+    print(x)
+    "print(y)"
+}()

@@ -66,10 +66,7 @@ std::string CodeFragment::str(const std::string & prefix) {
 }
 
 Compiler::VariableContext* Compiler::lookup(const std::string& name) {
-    if (auto var = scopes.back().lookup(name)) {
-        return var;
-    }
-    return nullptr;
+    return scopes.back().lookup(name);
 }
 
 // get a free register
@@ -97,8 +94,15 @@ uint8_t Compiler::get_end_register() {
 
 // set a register as bound by a variable
 Compiler::VariableContext* Compiler::bind_register(const std::string& binding, uint8_t reg, bool is_const) {
-    registers[reg] = RegisterState::BOUND;
-    return &scopes.back().bindings.insert(binding, { reg, is_const })->second;
+    if (is_global) {
+        auto var = scopes.back().bindings.insert(binding, { 0, is_const, true, num_globals });
+        emit_u(WRITE_GLOBAL, reg, var->second.g_id);
+        num_globals++;
+        return &(var->second);
+    } else {
+        registers[reg] = RegisterState::BOUND;
+        return &scopes.back().bindings.insert(binding, { reg, is_const })->second;
+    }
 }
 
 // free a register if it's not bound
@@ -139,7 +143,7 @@ void Compiler::compile_func(const AstNode* node, CodeFragment* output, ScopeCont
         auto& param = node->children[0].children[i]; // Identifier
         bind_register(param.data_s, i, false); // TODO: could choose to make arguments const?
     }
-    auto reg = child(1);
+    child(1);
     emit(RET, 0, 0, 0);
     pop_scope();
 }
@@ -153,8 +157,10 @@ Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& nam
 
     // lookup capture in parent scope
     if (parent_scope) {
-        // not found by parent scope
         if (auto var = parent_scope->lookup(name)) {
+            if (var->is_global) {
+                return var;
+            }
             if (is_function_scope) { // handle capture scenario
                 // create a mirroring local variable
                 auto mirror_reg = compiler->allocate_register();
@@ -245,13 +251,13 @@ uint8_t Compiler::compile(const AstNode* node) {
             should_allocate(1);
             auto reg = child(1);
             bind_register(node->children[0].data_s, reg);
-            return reg;
+            return 0xff;
         }
         handle(ConstDeclStat) {
             should_allocate(1);
             auto reg = child(1);
             bind_register(node->children[0].data_s, reg, true);
-            return reg;
+            return 0xff;
         }
         handle(AssignStat) {
             should_allocate(0);
@@ -266,7 +272,11 @@ uint8_t Compiler::compile(const AstNode* node) {
                         // if the moved-from register is "busy" but not "bound", then the value is not used again
                         // only need MOVE if assigning directly from another variable
                         // in which case MOVE is more like COPY
-                        emit(MOVE, var->reg, source_reg, 0);
+                        if (var->is_global) {
+                            emit_u(WRITE_GLOBAL, source_reg, var->g_id);
+                        } else {
+                            emit(MOVE, var->reg, source_reg, 0);
+                        }
                     }
                 } else {
                     error("can't find variable: " + node->children[0].data_s);
@@ -288,15 +298,20 @@ uint8_t Compiler::compile(const AstNode* node) {
                 free_register(key_reg);
             }
             free_register(source_reg);
-            return source_reg; // unused
+            return 0xff;
         }
         handle(Identifier) {
             should_allocate(0);
             if (auto v = lookup(node->data_s)) {
-                return v->reg;
-            } else {
-                error("can't find variable: " + node->data_s);
+                if (v->is_global) {
+                    auto reg = allocate_register();
+                    emit_u(READ_GLOBAL, reg, v->g_id);
+                    return reg;
+                } else {
+                    return v->reg;
+                }
             }
+            error("can't find variable: " + node->data_s);
             return 0xff;
         }
         handle(NumLiteral) {
