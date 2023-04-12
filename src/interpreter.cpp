@@ -110,6 +110,9 @@ void Interpreter::execute(CodeFragment* program) {
                 handle(ADD) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) + value_to_number(REGISTER(i.r2)));
                 }
+                handle(INCREMENT) {
+                    REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r0)) + 1);
+                }
                 handle(SUB) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) - value_to_number(REGISTER(i.r2)));
                 }
@@ -173,6 +176,13 @@ void Interpreter::execute(CodeFragment* program) {
                         globals.resize(i.u1+1);
                     }
                     globals[i.u1] = REGISTER(i.r0);
+                }
+                handle(FOR_INT) {
+                    auto var = value_to_number(REGISTER(i.r0));
+                    auto end = value_to_number(REGISTER(i.r1));
+                    if (var >= end) {
+                        _pc += (i.r2 - 1);
+                    }
                 }
                 handle(CONDJUMP) {
                     auto val = REGISTER(i.r0);

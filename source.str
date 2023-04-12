@@ -81,4 +81,13 @@ if 1 {
 
 print("test call cfunc")
 
-print2("HELLO WORLD", 1, 2, 3, "hello", [2, 3, 4 ], { x = 1, y = 2 })
+print("HELLO WORLD", 1, 2, 3, "hello", [2, 3, 4 ], { x = 1, y = 2 })
+
+
+print("test for loop")
+
+fn() {
+    for i in 0, 10 {
+        print(i)
+    }
+}()

@@ -441,14 +441,56 @@ DEFPARSER(if_stat, {
 		}
 		SUCCESS(AstType::IfStat, exp, block)
 	}
-	FAIL()
 });
 DEFPARSER(while_stat, {
 	EXPECT("while");
 	TRY2(exp, block) {
 		SUCCESS(AstType::WhileStat, exp, block)
 	}
-	FAIL()
+});
+DEFPARSER(for_stat, {
+	// "for i in array/object/func { ... }"
+	// "for i, v in object { ... }"
+	// "for i in 1, 10 { ... }"
+
+	EXPECT("for");
+	TRY(identifier) {
+		auto* i1 = &identifier;
+		auto* i2 = (AstNode*)nullptr;
+
+		// optional second identifier for object-style loop
+		TRYs(',') {
+			TRY(identifier) {
+				i2 = &identifier;
+			} else ERROR("expected identifier after ','");
+		}
+		TRYs("in") {
+			TRY(exp) {
+				auto* e1 = &exp;
+				auto* e2 = (AstNode*)nullptr;
+				TRYs(',') {
+					TRY(exp) {
+						e2 = &exp;
+					} else ERROR("expected expression after ',' after 'in'");
+				}
+				// exp must evaluate to array, object or function
+				TRY(block) {
+					if (i2) {
+						if (e2) {
+							ERROR("2-ary for must only have one loop expression");
+						}
+						SUCCESS(AstType::ForStat2, *i1, *i2, exp, block)
+					} else {
+						if (e2) {
+							SUCCESS(AstType::ForStatInt, *i1, *e1, *e2, block);
+						} else {
+							SUCCESS(AstType::ForStat, *i1, exp, block);
+						}
+					}
+				} else ERROR("expected block");
+			} else ERROR("expected expression");
+		} else ERROR("expected 'in' keyword");
+	} else ERROR("expected identifier");
 });
 DEFPARSER(stat_list, {
 	out.type = AstType::StatList;
@@ -461,6 +503,7 @@ DEFPARSER(stat_list, {
 			|| parse_assign_stat(code, n)
 			|| parse_if_stat(code, n)
 			|| parse_while_stat(code, n)
+			|| parse_for_stat(code, n)
 			|| parse_return_stat(code, n)
 			|| parse_exp(code, n)
 			) {

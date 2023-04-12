@@ -9,7 +9,7 @@
     ast(VarDeclStat)\
     ast(AssignStat)\
     ast(IfStat)\
-    ast(WhileStat)\
+    ast(WhileStat) ast(ForStat) ast(ForStat2) ast(ForStatInt)\
     ast(ReturnStat)\
     \
     ast(TernaryExp)\

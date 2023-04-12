@@ -5,6 +5,7 @@
 #define opcodes() \
     opcode(UNKNOWN)\
     /* binary operations:*/\
+    opcode(INCREMENT) opcode(DECREMENT) \
     opcode(EQUAL) opcode(NEQUAL) opcode(GREATER) opcode(LESS) opcode(GREATEREQ) opcode(LESSEQ)\
     opcode(EQUAL0) opcode(EQUALI) opcode(NEQUALI) opcode(GREATERI) opcode(LESSI) opcode(GREATEREQI) opcode(LESSEQI)\
     opcode(ADD) opcode(SUB) opcode(DIV) opcode(MUL) opcode(MOD) opcode(POW)\
@@ -21,6 +22,7 @@
     \
     /* lua allows 200 local variables; safet*/\
     /* lua can jump 1<<24 instructions */\
+    opcode(FOR_INT) \
     opcode(JUMPF) opcode(JUMPB) opcode(CONDJUMP)\
     opcode(ALLOC_FUNC)\
     opcode(ALLOC_BOX) opcode(READ_BOX) opcode(WRITE_BOX)\

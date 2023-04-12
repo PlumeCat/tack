@@ -232,20 +232,51 @@ uint8_t Compiler::compile(const AstNode* node) {
         handle(WhileStat) {
             label(condeval);
             auto cond_reg = child(0);
+            
             label(condjump);
             emit(CONDJUMP, cond_reg, 0, 0);
             free_register(cond_reg);
-            child(1);
+            
+            child(1); // block
+
             label(jumpback);
-            if (jumpback - condeval > 0xff) {
-                error("jump too much");
-            }
+            if (jumpback - condeval > 0xff) { error("jump too much"); }
             emit(JUMPB, uint8_t(jumpback - condeval), 0, 0);
             label(endwhile);
-            if (endwhile - condjump > 0xff) {
-                error("jump too much");
-            }
+            if (endwhile - condjump > 0xff) { error("jump too much"); }
             rewrite(condjump, CONDJUMP, cond_reg, uint8_t(endwhile - condjump), 0);
+            return 0xff;
+        }
+        handle(ForStat) {
+            // for i in iterable { ... }
+            error("for loop not supported");
+        }
+        handle(ForStat2) {
+            // for k, v in obj { ... }
+            error("2-ary for loop not supported");
+        }
+        handle(ForStatInt) {
+            // for i in a, b { ... }
+            if (is_global) {
+                error("for loop not supported at global scope");
+            }
+            auto& ident = node->children[0].data_s;
+            auto reg_a = child(1);
+            auto reg_b = child(2);
+
+            // new scope - only contains the loop variable, block will get own scope
+            push_scope(&scopes.back());
+            // loop variable
+            bind_name(ident, reg_a, false); // TODO: find better approach for globals
+            label(forloop);
+            emit(FOR_INT, reg_a, reg_b, 0);
+            child(3); // block
+            label(loop_bottom);
+            emit(INCREMENT, reg_a, 0, 0); // TODO: messy
+            emit(JUMPB, uint8_t((loop_bottom + 1) - forloop), 0, 0);
+            rewrite(forloop, FOR_INT, reg_a, reg_b, uint8_t((loop_bottom + 2) - forloop));
+            
+            pop_scope();
             return 0xff;
         }
         handle(VarDeclStat) {
