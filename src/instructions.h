@@ -23,7 +23,7 @@
     /* lua allows 200 local variables; safet*/\
     /* lua can jump 1<<24 instructions */\
     opcode(FOR_INT) \
-    opcode(JUMPF) opcode(JUMPB) opcode(CONDJUMP)\
+    opcode(JUMPF) opcode(JUMPB) opcode(CONDSKIP)\
     opcode(ALLOC_FUNC)\
     opcode(ALLOC_BOX) opcode(READ_BOX) opcode(WRITE_BOX)\
     opcode(ALLOC_ARRAY) opcode(LOAD_ARRAY) opcode(STORE_ARRAY) \
@@ -45,17 +45,19 @@ inline std::string to_string(Opcode opcode) {
 #undef opcode
 
 struct Instruction {
+    Opcode opcode;
+    uint8_t r0;
     union {
-        struct { Opcode opcode; uint8_t r0, r1, r2; };
-        struct { int16_t s0; int16_t s1; };
-        struct { uint16_t u0; uint16_t u1; };
+        struct { uint8_t r1, r2; };
+        int16_t s1;
+        uint16_t u1;;
     };
 
-    Instruction(): opcode(Opcode::UNKNOWN), r0(0), r1(0), r2(0) {}
-    Instruction(const Instruction&) = default;
-    Instruction(Instruction&&) = default;
-    Instruction& operator=(const Instruction&) = default;
-    Instruction& operator=(Instruction&&) = default;
-    Instruction(Opcode op, uint8_t r0 = 0, uint8_t r1 = 0, uint8_t r2 = 0)
-        : opcode(op), r0(r0), r1(r1), r2(r2) {}
+    // Instruction(): opcode(Opcode::UNKNOWN), r0(0), r1(0), r2(0) {}
+    // Instruction(const Instruction&) = default;
+    // Instruction(Instruction&&) = default;
+    // Instruction& operator=(const Instruction&) = default;
+    // Instruction& operator=(Instruction&&) = default;
+    // Instruction(Opcode op, uint8_t r0 = 0, uint8_t r1 = 0, uint8_t r2 = 0)
+    //     : opcode(op), r0(r0), r1(r1), r2(r2) {}
 };

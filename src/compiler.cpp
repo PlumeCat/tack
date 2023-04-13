@@ -5,13 +5,17 @@
 #include <sstream>
 
 // emit an instruction with 3 8 bit operands
-#define emit(op, r0, r1, r2)            output->instructions.emplace_back(Opcode::op, r0, r1, r2)
+#define emit(op, r0, r1, r2)            output->instructions.emplace_back(Instruction { Opcode::op, r0, { r1, r2 } });
 
 // emit an instruction with 1 u8 operand r and 1 u16 operand u
-#define emit_u(op, r, u)                auto ins = Instruction{}; ins.opcode = Opcode::op; ins.r0 = r; ins.u1 = u; output->instructions.emplace_back(ins);
+#define emit_u(op, r, u)                output->instructions.emplace_back(Instruction { Opcode::op, .r0 = r, .u1 = u });
 
 // rewrite an instruction with 3 8-bit operands
-#define rewrite(pos, type, r0, r1, r2)  output->instructions[pos] = { Opcode::type, r0, r1, r2 };
+#define rewrite(pos, type, r0, r1, r2)  output->instructions[pos] = Instruction { Opcode::type, r0, r1, r2 };
+
+// rewrite an instruction with 1 u8 operand r and 1 u16 operand u
+#define rewrite_u(pos, type, r, u)      output->instructions[pos] = Instruction { Opcode::type, .r0 = r, .u1 = u };
+
 #define label(name)                     auto name = output->instructions.size();
 #define should_allocate(n)
 #define handle(x)                       break; case AstType::x:
@@ -171,7 +175,7 @@ Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& nam
                 compiler->output->capture_info.emplace_back(CaptureInfo { .source_register = var->reg, .dest_register = mirror_reg });
 
                 // emit code to read into mirror variable
-                compiler->emit(READ_CAPTURE, mirror_reg, compiler->output->capture_info.size() - 1, 0);
+                compiler->emit(READ_CAPTURE, mirror_reg, uint8_t(compiler->output->capture_info.size() - 1), 0);
 
                 // return the MIRROR variable not the original!
                 return mirror;
@@ -202,58 +206,55 @@ uint8_t Compiler::compile(const AstNode* node) {
         handle(IfStat) {
             auto has_else = node->children.size() == 3;
             auto cond_reg = child(0); // evaluate the expressi, outputon
-            label(condjump);
-            emit(CONDJUMP, cond_reg, 0, 0); // PLACEHOLDER
+            emit(CONDSKIP, cond_reg, 0, 0);
             free_register(cond_reg); // can be reused
-            child(1); // compile the if body
+            
+            label(skip_if);
+            emit(JUMPF, 0, 0, 0); // jump over if body
+            child(1); // if body
             label(endif);
 
             if (has_else) {
-                emit(JUMPF, 0, 0, 0); // PLACEHODLER
-                label(startelse);
-                child(2);
+                label(skip_else);
+                emit(JUMPF, 0, 0, 0); // jump over else body
+                child(2); // else body
                 label(endelse);
-                if (endelse - endif > 0xff) {
-                    error("jump too much");
-                }
-                rewrite(endif, JUMPF, uint8_t(endelse - endif), 0, 0);
-                if (startelse - condjump > 0xff) {
-                    error("jump too much");
-                }
-                rewrite(condjump, CONDJUMP, cond_reg, uint8_t(startelse - condjump), 0);
+
+                rewrite_u(skip_if,   JUMPF, 0, uint16_t((skip_else+1) - skip_if));
+                rewrite_u(skip_else, JUMPF, 0, uint16_t(endelse - skip_else));
             } else {
-                if (endif - condjump > 0xff) {
-                    error("jump too much");
-                }
-                rewrite(condjump, CONDJUMP, cond_reg, uint8_t(endif - condjump), 0);
+                rewrite_u(skip_if, JUMPF, 0, uint16_t(endif - skip_if));
             }
             return 0xff;
         }
         handle(WhileStat) {
             label(condeval);
             auto cond_reg = child(0);
-            
-            label(condjump);
-            emit(CONDJUMP, cond_reg, 0, 0);
+            emit(CONDSKIP, cond_reg, 0, 0);
             free_register(cond_reg);
-            
+            label(skip_loop);
+            emit(JUMPF, 0, 0, 0);
             child(1); // block
-
             label(jumpback);
-            if (jumpback - condeval > 0xff) { error("jump too much"); }
-            emit(JUMPB, uint8_t(jumpback - condeval), 0, 0);
-            label(endwhile);
-            if (endwhile - condjump > 0xff) { error("jump too much"); }
-            rewrite(condjump, CONDJUMP, cond_reg, uint8_t(endwhile - condjump), 0);
+            emit_u(JUMPB, 0, uint16_t(jumpback - condeval));
+            rewrite_u(skip_loop, JUMPF, 0, uint16_t((jumpback + 1) - skip_loop));
             return 0xff;
         }
         handle(ForStat) {
-            // for i in iterable { ... }
-            error("for loop not supported");
+            // if (is_global) {
+                error("for loop not supported at global scope");
+            // }
+
+            // auto& ident = node->children[0].data_s;
+            // auto reg_a = allocate_register();
+            // auto reg_b = child(1);
+            // push_scope(&scopes.back());
+            // bind_name(ident, reg_a, false);
+            // pop_scope();
         }
         handle(ForStat2) {
             // for k, v in obj { ... }
-            error("2-ary for loop not supported");
+            error("2-ary for loop not supported at global scope");
         }
         handle(ForStatInt) {
             // for i in a, b { ... }
@@ -261,22 +262,22 @@ uint8_t Compiler::compile(const AstNode* node) {
                 error("for loop not supported at global scope");
             }
             auto& ident = node->children[0].data_s;
-            auto reg_a = child(1);
-            auto reg_b = child(2);
-
-            // new scope - only contains the loop variable, block will get own scope
-            push_scope(&scopes.back());
-            // loop variable
+            push_scope(&scopes.back()); // new scope - only contains the loop variable, block will get own scope
+            auto reg_a = child(1); // start value
+            auto reg_b = child(2); // end value
+            registers[reg_b] = RegisterState::BOUND; // HACK: the block might try and free this register
             bind_name(ident, reg_a, false); // TODO: find better approach for globals
             label(forloop);
             emit(FOR_INT, reg_a, reg_b, 0);
+            label(skip_loop);
+            emit(JUMPF, 0, 0, 0);
             child(3); // block
             label(loop_bottom);
             emit(INCREMENT, reg_a, 0, 0); // TODO: messy
-            emit(JUMPB, uint8_t((loop_bottom + 1) - forloop), 0, 0);
-            rewrite(forloop, FOR_INT, reg_a, reg_b, uint8_t((loop_bottom + 2) - forloop));
-            
+            emit_u(JUMPB, 0, uint16_t((loop_bottom + 1) - forloop));
+            rewrite_u(skip_loop, JUMPF, 0, uint16_t((loop_bottom + 2) - skip_loop));
             pop_scope();
+            registers[reg_b] = RegisterState::FREE; // HACK
             return 0xff;
         }
         handle(VarDeclStat) {
@@ -397,7 +398,7 @@ uint8_t Compiler::compile(const AstNode* node) {
         }
         handle(CallExp) {
             should_allocate(1);
-            auto nargs = node->children[1].children.size();
+            auto nargs = (uint8_t)node->children[1].children.size();
 
             // compile the arguments first and remember which registers they are in
             auto arg_regs = std::vector<uint8_t> {};
@@ -409,7 +410,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             // copy arguments to top of stack in sequence
             auto end_reg = get_end_register();
             for (auto i = 0; i < nargs; i++) {
-                emit(MOVE, end_reg + i + STACK_FRAME_OVERHEAD, arg_regs[i], 0);
+                emit(MOVE, uint8_t(end_reg + i + STACK_FRAME_OVERHEAD), arg_regs[i], 0);
             }
 
             emit(CALL, func_reg, nargs, end_reg);
@@ -536,11 +537,21 @@ uint8_t Compiler::compile(const AstNode* node) {
             free_register(in2);
             return out;
         }
+        handle(ModExp) {
+            auto in1 = child(0);
+            auto in2 = child(1);
+            auto out = allocate_register();
+            emit(MOD, out, in1, in2);
+            free_register(in1);
+            free_register(in2);
+            return out;
+        }
         handle(ArrayLiteral) {
             auto array_reg = allocate_register();
 
             // TODO: inefficient stack usage, try and elide some of these MOVEs, also with function calls
-            auto n_elems = node->children.size();
+            // TODO: allow more than 256 elements?
+            auto n_elems = (uint8_t)node->children.size();
             auto elem_regs = std::vector<uint8_t>{};
             for (auto n = 0; n < n_elems; n++) {
                 auto r = child(n);
@@ -549,7 +560,7 @@ uint8_t Compiler::compile(const AstNode* node) {
 
             auto end_reg = get_end_register();
             for (auto n = 0; n < n_elems; n++) {
-                emit(MOVE, end_reg + n, elem_regs[n], 0);
+                emit(MOVE, uint8_t(end_reg + n), elem_regs[n], 0);
             }
 
             emit(ALLOC_ARRAY, array_reg, n_elems, end_reg);
@@ -559,7 +570,8 @@ uint8_t Compiler::compile(const AstNode* node) {
             auto obj_reg = allocate_register();
 
             // TODO: key loading / stack usage a bit inefficient here as well
-            auto n_elems = node->children.size();
+            // TODO: allow more than 256 elements?
+            auto n_elems = (uint8_t)node->children.size();
             auto key_indices = std::vector<uint8_t>{};
             auto val_regs = std::vector<uint8_t>{};
             for (auto n = 0; n < n_elems; n++) {
@@ -572,8 +584,8 @@ uint8_t Compiler::compile(const AstNode* node) {
 
             auto end_reg = get_end_register();
             for (auto n = 0; n < n_elems; n++) {
-                emit_u(LOAD_CONST, end_reg + n * 2, key_indices[n]);
-                emit(MOVE, end_reg + n * 2 + 1, val_regs[n], 0);
+                emit_u(LOAD_CONST, uint8_t(end_reg + n * 2), key_indices[n]);
+                emit(MOVE, uint8_t(end_reg + n * 2 + 1), val_regs[n], 0);
             }
 
             emit(ALLOC_OBJECT, obj_reg, n_elems, end_reg);

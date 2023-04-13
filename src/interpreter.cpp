@@ -113,6 +113,11 @@ void Interpreter::execute(CodeFragment* program) {
                 handle(INCREMENT) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r0)) + 1);
                 }
+                handle(MOD) {
+                    auto x = value_to_number(REGISTER(i.r1));
+                    auto y = value_to_number(REGISTER(i.r2));
+                    REGISTER(i.r0) = value_from_number(fmod(x, y));
+                }
                 handle(SUB) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) - value_to_number(REGISTER(i.r2)));
                 }
@@ -180,22 +185,22 @@ void Interpreter::execute(CodeFragment* program) {
                 handle(FOR_INT) {
                     auto var = value_to_number(REGISTER(i.r0));
                     auto end = value_to_number(REGISTER(i.r1));
-                    if (var >= end) {
-                        _pc += (i.r2 - 1);
+                    if (var < end) {
+                        _pc++;
                     }
                 }
-                handle(CONDJUMP) {
+                handle(CONDSKIP) {
                     auto val = REGISTER(i.r0);
-                    if (!(
+                    if ((
                         (value_get_type(val) == Type::Boolean && value_to_boolean(val)) ||
                         (value_get_type(val) == Type::Integer && value_to_integer(val)) ||
                         (value_get_type(val) == Type::Number && value_to_number(val))
                         )) {
-                        _pc += i.r1 - 1;
+                        _pc++;
                     }
                 }
-                handle(JUMPF) { _pc += i.r0 - 1; }
-                handle(JUMPB) { _pc -= i.r0 + 1; }
+                handle(JUMPF) { _pc += i.u1 - 1; }
+                handle(JUMPB) { _pc -= i.u1 + 1; }
                 handle(LEN) {
                     auto* arr = value_to_array(REGISTER(i.r1));
                     REGISTER(i.r0) = value_from_number(arr->size());
