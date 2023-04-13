@@ -241,20 +241,41 @@ uint8_t Compiler::compile(const AstNode* node) {
             return 0xff;
         }
         handle(ForStat) {
-            // if (is_global) {
+            // for i in iterable { ... }
+            // i, iterable, block
+            if (is_global) {
                 error("for loop not supported at global scope");
-            // }
+            }
 
-            // auto& ident = node->children[0].data_s;
-            // auto reg_a = allocate_register();
-            // auto reg_b = child(1);
-            // push_scope(&scopes.back());
-            // bind_name(ident, reg_a, false);
-            // pop_scope();
+            auto& ident = node->children[0].data_s;
+            push_scope(&scopes.back());
+            auto reg_v = allocate_register(); // loop variable
+            auto reg_b = child(1); // iterable
+            auto reg_i = allocate_register(); // index: must start at 0
+            auto reg_b_state = registers[reg_b]; // remember old register state
+            auto reg_i_state = registers[reg_i];
+            registers[reg_b] = RegisterState::BOUND; // HACK:
+            registers[reg_i] = RegisterState::BOUND; // HACK:
+            bind_name(ident, reg_v, false);
+            emit_u(LOAD_I, reg_i, 0);
+            label(forloop);
+            emit(FOR_ITER, reg_v, reg_b, reg_i);
+            label(skip_loop);
+            emit(JUMPF, 0, 0, 0);
+            child(2); // block
+            label(loop_bottom);
+            emit(INCREMENT, reg_i, 0, 0);
+            emit_u(JUMPB, 0, uint16_t((loop_bottom + 1) - forloop));
+            rewrite_u(skip_loop, JUMPF, 0, uint16_t((loop_bottom + 2) - skip_loop));
+            pop_scope();
+            registers[reg_b] = reg_b_state;
+            registers[reg_i] = reg_i_state;
+            return 0xff;
         }
         handle(ForStat2) {
             // for k, v in obj { ... }
             error("2-ary for loop not supported at global scope");
+            return 0xff;
         }
         handle(ForStatInt) {
             // for i in a, b { ... }
@@ -265,6 +286,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             push_scope(&scopes.back()); // new scope - only contains the loop variable, block will get own scope
             auto reg_a = child(1); // start value
             auto reg_b = child(2); // end value
+            auto reg_b_state = registers[reg_b];
             registers[reg_b] = RegisterState::BOUND; // HACK: the block might try and free this register
             bind_name(ident, reg_a, false); // TODO: find better approach for globals
             label(forloop);
@@ -277,7 +299,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             emit_u(JUMPB, 0, uint16_t((loop_bottom + 1) - forloop));
             rewrite_u(skip_loop, JUMPF, 0, uint16_t((loop_bottom + 2) - skip_loop));
             pop_scope();
-            registers[reg_b] = RegisterState::FREE; // HACK
+            registers[reg_b] = reg_b_state; // HACK
             return 0xff;
         }
         handle(VarDeclStat) {

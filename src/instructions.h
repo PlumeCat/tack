@@ -22,7 +22,7 @@
     \
     /* lua allows 200 local variables; safet*/\
     /* lua can jump 1<<24 instructions */\
-    opcode(FOR_INT) \
+    opcode(FOR_INT) opcode(FOR_ITER) \
     opcode(JUMPF) opcode(JUMPB) opcode(CONDSKIP)\
     opcode(ALLOC_FUNC)\
     opcode(ALLOC_BOX) opcode(READ_BOX) opcode(WRITE_BOX)\
@@ -50,14 +50,6 @@ struct Instruction {
     union {
         struct { uint8_t r1, r2; };
         int16_t s1;
-        uint16_t u1;;
+        uint16_t u1;
     };
-
-    // Instruction(): opcode(Opcode::UNKNOWN), r0(0), r1(0), r2(0) {}
-    // Instruction(const Instruction&) = default;
-    // Instruction(Instruction&&) = default;
-    // Instruction& operator=(const Instruction&) = default;
-    // Instruction& operator=(Instruction&&) = default;
-    // Instruction(Opcode op, uint8_t r0 = 0, uint8_t r1 = 0, uint8_t r2 = 0)
-    //     : opcode(op), r0(r0), r1(r1), r2(r2) {}
 };

@@ -104,6 +104,9 @@ void Interpreter::execute(CodeFragment* program) {
             auto i = _pr->instructions[_pc];
             switch (i.opcode) {
             case Opcode::UNKNOWN: break;
+                handle(LOAD_I) {
+                    REGISTER(i.r0) = value_from_number(i.u1);
+                }
                 handle(LOAD_CONST) {
                     REGISTER(i.r0) = _pr->storage[i.u1];
                 }
@@ -188,6 +191,14 @@ void Interpreter::execute(CodeFragment* program) {
                     if (var < end) {
                         _pc++;
                     }
+                }
+                handle(FOR_ITER) {
+                    auto arr = value_to_array(REGISTER(i.r1));
+                    auto ind = value_to_number(REGISTER(i.r2));
+                    if (ind < arr->size()) {
+                        _pc++;
+                    }
+                    REGISTER(i.r0) = (*arr)[ind];
                 }
                 handle(CONDSKIP) {
                     auto val = REGISTER(i.r0);
