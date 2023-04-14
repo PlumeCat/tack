@@ -133,6 +133,20 @@ Objects, arrays, closures
 	this is assumed to be running as part of a game engine
 	so make sure the garbage collector can be done in parallel slices multi threaded and deterministic time limits
 
+Insert/remove while iterating
+	From code:
+		Needs to be predictable
+		EG throw an obvious comprehensible error instead of segfaulting or silently continuing with corrupted memory
+		Lua:
+			manual 5.4: "You should not assign any value to a non-existent field in a table during its traversal. You may however modify existing fields. In particular, you may set existing fields to nil."
+			presumably this includes appending to the 'array' part
+		javascript:
+			length is always accurate for arrays seemingly, so array splice/remove for a classic for loop should work as expected
+			EG array.forEach processes the range in advance, so won't handle appended elements
+			objects 
+		python:
+			Discouraged for lists, unclear for dict or other mutable collections
+
 Exceptions / error handling
 	The interpreter loop is stackless - maintains its own stack
 	This means we don't need exceptions, longjmp, goto or anything

@@ -15,3 +15,9 @@ file(GLOB_RECURSE source_files src/*.cpp)
 add_executable(${PROJECT_NAME} ${source_files})
 string(REGEX REPLACE "([\\/\\-]O)3" "\\12" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
 
+# turn warnings up
+# if(MSVC)
+#   target_compile_options(tack PRIVATE /W4 /WX)
+# else()
+#   target_compile_options(tack PRIVATE -Wall -Wextra -Wpedantic)
+# endif()

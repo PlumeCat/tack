@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <vector>
 #include <iostream>
 
 static constexpr uint64_t operator ""_u64(unsigned long long t) { return t; }
@@ -66,14 +67,22 @@ enum class Type : uint64_t {
     */
 };
 
-struct Value;
+struct Value {
+    union {
+        uint64_t _i;
+        double _d;
+        void* _p;
+    };
+};
+
 struct CodeFragment;
 using BoxType = Value;
 using NullType = nullptr_t;
 using StringType = std::string;
+
 #include "object_type.h"
 using ArrayType = std::vector<Value>;
-using FunctionType = struct {
+struct FunctionType {
     CodeFragment* bytecode;
     std::vector<Value> captures; // contains boxes
 };
@@ -83,13 +92,6 @@ struct vec3 { float x, y, z; };
 struct vec4 { float x, y, z, w; };
 struct mat4 { float m[16]; };
 
-struct Value {
-    union {
-        uint64_t _i;
-        double _d;
-        void* _p;
-    };
-};
 
 // create value
 inline constexpr Value value_null()                     { return { UINT64_MAX }; }

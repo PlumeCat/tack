@@ -75,6 +75,7 @@
         "variant": "cpp",
         "__functional_base": "cpp",
         "algorithm": "cpp",
-        "iterator": "cpp"
+        "iterator": "cpp",
+        "filesystem": "cpp"
     }
 }

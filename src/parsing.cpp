@@ -479,7 +479,6 @@ DEFPARSER(for_stat, {
 				// exp must evaluate to array, object or function
 
 				TRY(block) {
-					cout << "block: " << block.tostring() << endl;
 					if (has_i2) {
 						if (has_e2) {
 							ERROR("2-ary for must only have one loop expression");

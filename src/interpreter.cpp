@@ -16,6 +16,7 @@
 Interpreter::Interpreter() {
     // root_compiler.interpreter = this;
     // root_compiler.is_global = true;
+    next_gid = 0;
     global_scope.compiler = nullptr;
     global_scope.parent_scope = nullptr;
     global_scope.is_function_scope = false;
@@ -192,13 +193,43 @@ void Interpreter::execute(CodeFragment* program) {
                         _pc++;
                     }
                 }
-                handle(FOR_ITER) {
-                    auto arr = value_to_array(REGISTER(i.r1));
-                    auto ind = value_to_number(REGISTER(i.r2));
-                    if (ind < arr->size()) {
-                        _pc++;
+                handle(FOR_ITER_INIT) {
+                    auto iter_type = value_get_type(REGISTER(i.r1));
+                    if (iter_type == Type::Array) {
+                        REGISTER(i.r0) = value_from_number(0);
+                    } else if (iter_type == Type::Object) {
+
+                    // } else if (iter_type == Type::Function) {
+
+                    } else {
+                        error("For loop expected array or object");
                     }
-                    REGISTER(i.r0) = (*arr)[ind];
+                }
+                handle(FOR_ITER) {
+                    auto iter_type = value_get_type(REGISTER(i.r1));
+                    if (iter_type == Type::Array) {
+                        auto ind = value_to_number(REGISTER(i.r0));
+                        auto arr = value_to_array(REGISTER(i.r1));
+                        if (ind < arr->size()) {
+                            REGISTER(i.r2) = (*arr)[ind];
+                            _pc++;
+                        }
+                    } else if (iter_type == Type::Object) {
+
+                    // } else if (iter_type == Type::Function) {
+
+                    }
+                }
+                handle(FOR_ITER_NEXT) {
+                    auto iter_type = value_get_type(REGISTER(i.r1));
+                    if (iter_type == Type::Array) {
+                        // increment index
+                        REGISTER(i.r0) = value_from_number(
+                            value_to_number(REGISTER(i.r0)) + 1
+                        );
+                    } else if (iter_type == Type::Object) {
+                        // next key
+                    }
                 }
                 handle(CONDSKIP) {
                     auto val = REGISTER(i.r0);
@@ -254,12 +285,15 @@ void Interpreter::execute(CodeFragment* program) {
                     REGISTER(i.r0) = value_from_array(&_arrays.back());
                 }
                 handle(ALLOC_OBJECT) {
+
+                    // auto h = kh_init(StringToValue);
                     _objects.emplace_back(ObjectType {});
+
                     // emplace child elements
                     for (auto e = 0; e < i.r1; e++) {
                         auto key = value_to_string(REGISTER(i.r2 + e * 2));
                         auto val = REGISTER(i.r2 + e * 2 + 1);
-                        _objects.back()[*key] = val;
+                        _objects.back().set(key->c_str(), val);
                     }
                     REGISTER(i.r0) = value_from_object(&_objects.back());
                 }
@@ -306,11 +340,13 @@ void Interpreter::execute(CodeFragment* program) {
                     if (value_get_type(key_val) != Type::String) {
                         error("expected string key");
                     }
-                    auto iter = obj->find(*value_to_string(key_val));
-                    if (iter == obj->end()) {
+                    auto key = value_to_string(key_val)->c_str();
+                    auto found = false;
+                    auto val = obj->get(key, found);
+                    if (!found) {
                         error("key not found");
                     }
-                    REGISTER(i.r0) = iter->second;
+                    REGISTER(i.r0) = val;
                 }
                 handle(STORE_OBJECT) {
                     auto obj_val = REGISTER(i.r1);
@@ -319,7 +355,8 @@ void Interpreter::execute(CodeFragment* program) {
                     if (value_get_type(key_val) != Type::String) {
                         error("expected string key");
                     }
-                    (*obj)[*value_to_string(key_val)] = REGISTER(i.r0);
+                    auto key = value_to_string(key_val)->c_str();
+                    obj->set(key, REGISTER(i.r0));
                 }
                 handle(CALL) {
                     auto r0 = REGISTER(i.r0);
@@ -343,7 +380,7 @@ void Interpreter::execute(CodeFragment* program) {
                         auto new_base = i.r2 + STACK_FRAME_OVERHEAD;
                         REGISTER_RAW(i.r2) = cfunc(nargs, &_stack[_stackbase + new_base]);
                     } else {
-                        error("tried to call non-funct");
+                        error("tried to call non-function");
                     }
                 }
                 handle(RET) {

@@ -3,14 +3,28 @@
 #include <vector>
 #include <string>
 
-// struct ObjectType {
-//     struct node {
-//         uint32_t hash;
-//         std::string key;
-//         Value value;
-//     };
-// };
+// HACK:
+struct kh_SV_s;
 
-#include <jlib/hash_map.h>
-using ObjectType = hash_map<std::string, Value>;
+struct ObjectType {
+    kh_SV_s* hash; // HACK:
+    using iter = unsigned int; // HACK:
+    
+    ObjectType();
+    ObjectType(const ObjectType&) = delete;
+    ObjectType& operator=(const ObjectType&) = delete;
+    ObjectType(ObjectType&& from);
+    ObjectType& operator=(ObjectType&& from);
+    ~ObjectType();
+
+    void set(const char* key, Value val);
+    Value get(const char* key, bool& found);
+    iter begin();
+    iter end();
+    iter next(iter i);
+    
+    const char* key(iter i);
+    Value value(iter i);
+
+};
 

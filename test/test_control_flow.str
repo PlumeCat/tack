@@ -1,3 +1,5 @@
+
+
 fn() {
     print("fizzbuzz test")
     for i in 0, 31 {
@@ -16,9 +18,27 @@ fn() {
 }()
 
 fn() {
-
-    for i in [ 1, 2, 3, 4, 5 ] {
+    "testing capture of the iterable"
+    let arr = [ 1, 2, 3, 4, 5 ]
+    for i in arr {
         print(i)
+        fn() {
+            arr
+        }
     }
 
+}()
+
+fn() {
+    "testing capture of the loop variable"
+    for x in [ "hello", "world", "this", "is", "a", "tack", "program" ] {
+        fn() {
+            print(x)
+        }()
+    }
+}()
+
+fn() {
+    let obj = { x = 1, y = 2 }
+    print(obj)
 }()

@@ -259,14 +259,14 @@ uint8_t Compiler::compile(const AstNode* node) {
             registers[reg_iter] = RegisterState::BOUND; // HACK:
             bind_name(ident, reg_var, false);
 
-            emit_u(LOAD_I, reg_ptr, 0);
+            emit(FOR_ITER_INIT, reg_ptr, reg_iter, 0);
             label(forloop);
-            emit(FOR_ITER, reg_var, reg_iter, reg_ptr);
+            emit(FOR_ITER, reg_ptr, reg_iter, reg_var);
             label(skip_loop);
             emit(JUMPF, 0, 0, 0);
             child(2); // block
             label(loop_bottom);
-            emit(INCREMENT, reg_ptr, 0, 0);
+            emit(FOR_ITER_NEXT, reg_ptr, reg_iter, 0);
             emit_u(JUMPB, 0, uint16_t((loop_bottom + 1) - forloop));
             rewrite_u(skip_loop, JUMPF, 0, uint16_t((loop_bottom + 2) - skip_loop));
             pop_scope();

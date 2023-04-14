@@ -24,6 +24,7 @@ make
 - [x] closures
 - [x] consts
 - [x] calling C functions from tack
+- [ ] comments
 - [ ] calling tack functions from C
 - [ ] garbage collector. must be allowed to retain pointers in C world
 - [ ] algebraics
