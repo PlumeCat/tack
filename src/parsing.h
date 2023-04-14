@@ -1,6 +1,8 @@
 #pragma once
 
-#include <jlib/hash_map.h>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 #define ast_type() ast(Unknown)\
     ast(StatList)\
@@ -37,8 +39,8 @@ enum class AstType { ast_type() };
 #undef ast
 #define ast(x) { AstType::x, #x },
 inline std::string to_string(AstType type) {
-    static const hash_map<AstType, std::string> type_to_string = { ast_type() };
-    return type_to_string[type];
+    static const std::unordered_map<AstType, std::string> type_to_string = { ast_type() };
+    return type_to_string.at(type);
 }
 #undef ast
 

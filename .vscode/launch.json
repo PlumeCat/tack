@@ -6,7 +6,7 @@
             "name": "Launch Debug",
             "program": "${workspaceFolder}/build/Debug/tack",
             // "args": [ "source.str", "-A", "-D" ],
-            "args": [ "test/test_control_flow.str", "-A", "-D" ],
+            "args": [ "test/test_control_flow.str" ],
             // "args": [ "test/test_sort.str", "-A", "-D" ],
             // "args": [ "test/test_closure.str", "-A", "-D" ],
             // "args": [ "test/test_global.str", "-D" ],

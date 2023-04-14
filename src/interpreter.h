@@ -3,8 +3,6 @@
 #include "compiler.h"
 #include "value.h"
 
-#include <jlib/hash_map.h>
-
 struct Interpreter {
 private:
     // Compiler root_compiler;

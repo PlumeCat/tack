@@ -1,6 +1,6 @@
 #pragma once
 
-#include <jlib/hash_map.h>
+#include <unordered_map>
 
 #define opcodes() \
     opcode(UNKNOWN)\
@@ -39,8 +39,8 @@ enum class Opcode : uint8_t { opcodes() };
 #undef opcode
 #define opcode(x) { Opcode::x, #x },
 inline std::string to_string(Opcode opcode) {
-    static const hash_map<Opcode, std::string> opcode_to_string = { opcodes() };
-    return opcode_to_string[opcode];
+    static const std::unordered_map<Opcode, std::string> opcode_to_string = { opcodes() };
+    return opcode_to_string.at(opcode);
 }
 #undef opcode
 

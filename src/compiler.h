@@ -49,7 +49,7 @@ struct Compiler {
         Compiler* compiler;
         ScopeContext* parent_scope = nullptr;
         bool is_function_scope = false;
-        hash_map<std::string, VariableContext> bindings = hash_map<std::string, VariableContext>(1, 1); // variables
+        std::unordered_map<std::string, VariableContext> bindings; // variables
 
         // lookup a variable
         // if it lives in a parent function, code will be emitted to capture it

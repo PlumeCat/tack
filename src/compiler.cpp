@@ -99,12 +99,13 @@ uint8_t Compiler::get_end_register() {
 // set a register as bound by a variable
 Compiler::VariableContext* Compiler::bind_name(const std::string& binding, uint8_t reg, bool is_const) {
     if (is_global) {
-        auto var = scopes.back().bindings.insert(binding, { 0, is_const, true, interpreter->next_gid });
+        // auto var = scopes.back().bindings.insert(binding, { 0, is_const, true, interpreter->next_gid });
+        auto var = &scopes.back().bindings.try_emplace(binding, VariableContext { 0, is_const, true, interpreter->next_gid }).first->second;
         interpreter->next_gid++; // TODO: clumsy, try and improve this
-        return &(var->second);
+        return var;
     } else {
         registers[reg] = RegisterState::BOUND;
-        return &scopes.back().bindings.insert(binding, { reg, is_const })->second;
+        return &scopes.back().bindings.try_emplace(binding, VariableContext { reg, is_const }).first->second;
     }
 }
 
@@ -249,27 +250,28 @@ uint8_t Compiler::compile(const AstNode* node) {
 
             auto& ident = node->children[0].data_s;
             push_scope(&scopes.back());
-            auto reg_v = allocate_register(); // loop variable
-            auto reg_b = child(1); // iterable
-            auto reg_i = allocate_register(); // index: must start at 0
-            auto reg_b_state = registers[reg_b]; // remember old register state
-            auto reg_i_state = registers[reg_i];
-            registers[reg_b] = RegisterState::BOUND; // HACK:
-            registers[reg_i] = RegisterState::BOUND; // HACK:
-            bind_name(ident, reg_v, false);
-            emit_u(LOAD_I, reg_i, 0);
+            auto reg_var = allocate_register(); // loop variable
+            auto reg_iter = child(1); // iterable
+            auto reg_ptr = allocate_register(); // index / loop state (pointer for object, )
+            auto reg_ptr_state = registers[reg_ptr]; // remember old register state
+            auto reg_iter_state = registers[reg_iter];
+            registers[reg_ptr] = RegisterState::BOUND; // HACK:
+            registers[reg_iter] = RegisterState::BOUND; // HACK:
+            bind_name(ident, reg_var, false);
+
+            emit_u(LOAD_I, reg_ptr, 0);
             label(forloop);
-            emit(FOR_ITER, reg_v, reg_b, reg_i);
+            emit(FOR_ITER, reg_var, reg_iter, reg_ptr);
             label(skip_loop);
             emit(JUMPF, 0, 0, 0);
             child(2); // block
             label(loop_bottom);
-            emit(INCREMENT, reg_i, 0, 0);
+            emit(INCREMENT, reg_ptr, 0, 0);
             emit_u(JUMPB, 0, uint16_t((loop_bottom + 1) - forloop));
             rewrite_u(skip_loop, JUMPF, 0, uint16_t((loop_bottom + 2) - skip_loop));
             pop_scope();
-            registers[reg_b] = reg_b_state;
-            registers[reg_i] = reg_i_state;
+            registers[reg_iter] = reg_iter_state;
+            registers[reg_ptr] = reg_ptr_state;
             return 0xff;
         }
         handle(ForStat2) {
@@ -372,7 +374,7 @@ uint8_t Compiler::compile(const AstNode* node) {
                     return v->reg;
                 }
             }
-            error("can't find variable: " + node->data_s);
+            error("identifier: can't find variable: " + node->data_s);
             return 0xff;
         }
         handle(NumLiteral) {

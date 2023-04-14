@@ -188,11 +188,9 @@ DEFPARSER(literal, {
 
 			while (true) {
 				TRY(identifier) {
-					cout << identifier.data_s << endl;
 					TRYs('=') {
 						TRY(exp) {
 							res.children.emplace_back(AstType::AssignStat, identifier, exp);
-							cout << exp.data_d << endl;
 							TRYs(',') {} else break;
 						} else ERROR("expected expression after '=' (object)")
 					} else ERROR("expected '=' after key (object)")
@@ -448,6 +446,7 @@ DEFPARSER(while_stat, {
 		SUCCESS(AstType::WhileStat, exp, block)
 	}
 });
+
 DEFPARSER(for_stat, {
 	// "for i in array/object/func { ... }"
 	// "for i, v in object { ... }"
@@ -455,36 +454,42 @@ DEFPARSER(for_stat, {
 
 	EXPECT("for");
 	TRY(identifier) {
-		auto* i1 = &identifier;
-		auto* i2 = (AstNode*)nullptr;
+		auto i1 = identifier;
+		auto i2 = AstNode{};
+		auto has_i2 = false;
 
 		// optional second identifier for object-style loop
 		TRYs(',') {
 			TRY(identifier) {
-				i2 = &identifier;
+				i2 = identifier;
+				has_i2 = true;
 			} else ERROR("expected identifier after ','");
 		}
 		TRYs("in") {
 			TRY(exp) {
-				auto* e1 = &exp;
-				auto* e2 = (AstNode*)nullptr;
+				auto e1 = exp;
+				auto e2 = AstNode{};
+				auto has_e2 = false;
 				TRYs(',') {
 					TRY(exp) {
-						e2 = &exp;
+						has_e2 = true;
+						e2 = exp;
 					} else ERROR("expected expression after ',' after 'in'");
 				}
 				// exp must evaluate to array, object or function
+
 				TRY(block) {
-					if (i2) {
-						if (e2) {
+					cout << "block: " << block.tostring() << endl;
+					if (has_i2) {
+						if (has_e2) {
 							ERROR("2-ary for must only have one loop expression");
 						}
-						SUCCESS(AstType::ForStat2, *i1, *i2, exp, block)
+						SUCCESS(AstType::ForStat2, i1, i2, exp, block)
 					} else {
-						if (e2) {
-							SUCCESS(AstType::ForStatInt, *i1, *e1, *e2, block);
+						if (has_e2) {
+							SUCCESS(AstType::ForStatInt, i1, e1, e2, block);
 						} else {
-							SUCCESS(AstType::ForStat, *i1, exp, block);
+							SUCCESS(AstType::ForStat, i1, exp, block);
 						}
 					}
 				} else ERROR("expected block");

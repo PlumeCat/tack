@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cmath>
-#include <jlib/hash_map.h>
+#include <iostream>
 
 static constexpr uint64_t operator ""_u64(unsigned long long t) { return t; }
 static constexpr auto nan_bits = (0x7ff0_u64 << 48);
@@ -71,7 +71,7 @@ struct CodeFragment;
 using BoxType = Value;
 using NullType = nullptr_t;
 using StringType = std::string;
-using ObjectType = hash_map<std::string, Value>;
+#include "object_type.h"
 using ArrayType = std::vector<Value>;
 using FunctionType = struct {
     CodeFragment* bytecode;

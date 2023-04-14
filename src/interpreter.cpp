@@ -27,12 +27,12 @@ void Interpreter::set_global(const std::string& name, Value value) {
 
     // create binding if not exist
     if (!var) {
-        var = &global_scope.bindings.insert(name, {
+        var = &global_scope.bindings.try_emplace(name, Compiler::VariableContext {
             .g_id = next_gid,
             .is_const = false,
             .is_global = true,
             .reg = 0xff
-        })->second;
+        }).first->second;
         next_gid++;
     }
 
