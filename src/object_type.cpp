@@ -21,9 +21,13 @@ ObjectType::~ObjectType() {
     }
 }
 
+uint32_t ObjectType::length() {
+    return len;
+}
 void ObjectType::set(const char* key, Value val) {
     auto ret = 0;
     auto n = kh_put(SV, hash, key, &ret);
+    len += (ret >= 1) ? 1 : 0;
     kh_val(hash, n) = val;
 }
 Value ObjectType::get(const char* key, bool& found) {

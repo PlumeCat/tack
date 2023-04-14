@@ -42,18 +42,14 @@ std::ostream& operator<<(std::ostream& o, const ArrayType& arr) {
 }
 std::ostream& operator<<(std::ostream& o, ObjectType& obj) {
     o << "object {";
-    // if (obj.size()) {
-    //     auto i = obj.begin();
-    //     o << ' ' << i->first << " = " << i->second;
-    //     for (auto e = (i++, obj.end()); i != e; i++) {
-    //         o << ", " << i->first << " = " << i->second;
-    //     }
-    //     o << ' ';
-    // }
-    for (auto i = obj.begin(); i != obj.end(); i = obj.next(i)) {
-        auto key = obj.key(i);
-        auto val = obj.value(i);
-        o << key << " = " << val << ", ";
+    if (obj.length()) {
+        auto i = obj.begin();
+        o << ' ' << obj.key(i) << " = " << obj.value(i);
+        i = obj.next(i);
+        for (auto e = obj.end(); i != e; i = obj.next(i)) {
+            o << ", " << obj.key(i) << " = " << obj.value(i);
+        }
+        o << ' ';
     }
 
     // HACK: Not using the first/next methods here, reserve those

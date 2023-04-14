@@ -287,13 +287,13 @@ void Interpreter::execute(CodeFragment* program) {
                 handle(ALLOC_OBJECT) {
 
                     // auto h = kh_init(StringToValue);
-                    _objects.emplace_back(ObjectType {});
+                    auto& obj = _objects.emplace_back(ObjectType {});
 
                     // emplace child elements
                     for (auto e = 0; e < i.r1; e++) {
                         auto key = value_to_string(REGISTER(i.r2 + e * 2));
                         auto val = REGISTER(i.r2 + e * 2 + 1);
-                        _objects.back().set(key->c_str(), val);
+                        obj.set(key->c_str(), val);
                     }
                     REGISTER(i.r0) = value_from_object(&_objects.back());
                 }

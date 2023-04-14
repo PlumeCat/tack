@@ -8,6 +8,7 @@ struct kh_SV_s;
 
 struct ObjectType {
     kh_SV_s* hash; // HACK:
+    uint32_t len = 0;
     using iter = unsigned int; // HACK:
     
     ObjectType();
@@ -22,6 +23,7 @@ struct ObjectType {
     iter begin();
     iter end();
     iter next(iter i);
+    uint32_t length();
     
     const char* key(iter i);
     Value value(iter i);

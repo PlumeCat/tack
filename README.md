@@ -36,9 +36,12 @@ make
 - [x] allow more than 256 constants
 - [ ] language standard library, doesn't have to be massive
 - [ ] write a small game / opengl binding to test
-- [ ] need to think about comparisons; '==' vs python style 'is'
-- [ ] need to think about coercions
-- [ ] need to think about are 32 bit signed integers worth it?
+
+### Undecided
+- [ ] comparisons; '==' vs python style 'is'
+- [ ] type coercions
+- [ ] separate type for integers worth it? complicates number handling and can only do 32 or 48 bit
+- [ ] deleting keys from objects (currently impossible have to generate a new object)
 
 
 ### improvement & optimization
