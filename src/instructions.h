@@ -22,7 +22,7 @@
     \
     /* lua allows 200 local variables; safet*/\
     /* lua can jump 1<<24 instructions */\
-    opcode(FOR_INT) opcode(FOR_ITER) opcode(FOR_ITER_INIT) opcode(FOR_ITER_NEXT) \
+    opcode(FOR_INT) opcode(FOR_ITER) opcode(FOR_ITER2) opcode(FOR_ITER_INIT) opcode(FOR_ITER_NEXT) \
     opcode(JUMPF) opcode(JUMPB) opcode(CONDSKIP)\
     opcode(ALLOC_FUNC)\
     opcode(ALLOC_BOX) opcode(READ_BOX) opcode(WRITE_BOX)\

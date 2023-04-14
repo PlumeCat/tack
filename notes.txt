@@ -133,6 +133,12 @@ Objects, arrays, closures
 	this is assumed to be running as part of a game engine
 	so make sure the garbage collector can be done in parallel slices multi threaded and deterministic time limits
 
+	Identifier accesses:
+	Currently, access expressions push the identifier as a key to the stack,
+	then goes to the object. Requires a box-check and type-check for the object and the key.
+	This is supremely wasteful as we know that the identifier is an unboxed string at compile time
+	There should be a faster way that goes straight to the object (eg intern identifiers separately)
+
 Insert/remove while iterating
 	From code:
 		Needs to be predictable

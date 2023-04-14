@@ -43,4 +43,10 @@ fn() {
     for k in obj {
         print(k, obj[k])
     }
+
+    print("object 2 iter")
+
+    for k, v in obj {
+        print(k, v)
+    }
 }()

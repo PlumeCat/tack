@@ -72,6 +72,8 @@ struct Compiler {
 
     // get a free register
     uint8_t allocate_register();
+    // get 2 free registers; returns the first one
+    uint8_t allocate_register2();
 
     // get the register immediately after the highest non-free register
     uint8_t get_end_register();

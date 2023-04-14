@@ -228,6 +228,20 @@ void Interpreter::execute(CodeFragment* program) {
                     // } else if (iter_type == Type::Function) {
                     }
                 }
+                handle(FOR_ITER2) {
+                    auto iter_val = REGISTER(i.r1);
+                    if (value_get_type(iter_val) == Type::Object) {
+                        auto it = REGISTER_RAW(i.r0)._i;
+                        auto obj = value_to_object(iter_val);
+                        if (it != obj->end()) {
+                            // TODO: stop allocating string here!
+                            _strings.emplace_back(obj->key(it));
+                            REGISTER(i.r2) = value_from_string(&_strings.back());
+                            REGISTER(i.r2 + 1) = obj->value(it);
+                            _pc++;
+                        }
+                    }
+                }
                 handle(FOR_ITER_NEXT) {
                     auto iter_val = REGISTER(i.r1);
                     auto iter_type = value_get_type(iter_val);
@@ -297,8 +311,6 @@ void Interpreter::execute(CodeFragment* program) {
                     REGISTER(i.r0) = value_from_array(&_arrays.back());
                 }
                 handle(ALLOC_OBJECT) {
-
-                    // auto h = kh_init(StringToValue);
                     auto& obj = _objects.emplace_back(ObjectType {});
 
                     // emplace child elements

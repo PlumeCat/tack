@@ -86,6 +86,19 @@ uint8_t Compiler::allocate_register() {
     error("Ran out of registers!");
 }
 
+// get 2 registers next to each other
+uint8_t Compiler::allocate_register2() {
+    for (auto i = 0; i < MAX_REGISTERS - 1; i++) {
+        if (registers[i] == RegisterState::FREE &&
+            registers[i+1] == RegisterState::FREE) {
+            registers[i] = RegisterState::BUSY;
+            registers[i+1] = RegisterState::BUSY;
+            return i;
+        }
+    }
+    error("Ran out of registers!");
+}
+
 // get the register immediately after the highest non-free register
 uint8_t Compiler::get_end_register() {
     for (auto i = 255; i > 0; i--) {
@@ -276,7 +289,37 @@ uint8_t Compiler::compile(const AstNode* node) {
         }
         handle(ForStat2) {
             // for k, v in obj { ... }
-            error("2-ary for loop not supported at global scope");
+            if (is_global) {
+                error("2-ary for loop not supported at global scope");
+            }
+            
+            auto& i1 = node->children[0].data_s;
+            auto& i2 = node->children[1].data_s;
+            push_scope(&scopes.back());
+            auto r1 = allocate_register2(); // loop variables
+            auto r2 = r1 + 1;
+            auto reg_iter = child(2);
+            auto reg_ptr = allocate_register();
+            auto reg_ptr_state = registers[reg_ptr];
+            auto reg_iter_state = registers[reg_iter];
+            registers[reg_ptr] = RegisterState::BOUND; // HACK:
+            registers[reg_iter] = RegisterState::BOUND;
+            bind_name(i1, r1, false);
+            bind_name(i2, r2, false);
+
+            emit(FOR_ITER_INIT, reg_ptr, reg_iter, 0);
+            label(forloop);
+            emit(FOR_ITER2, reg_ptr, reg_iter, r1);
+            label(skip_loop);
+            emit(JUMPF, 0, 0, 0);
+            child(3);
+            label(loop_bottom);
+            emit(FOR_ITER_NEXT, reg_ptr, reg_iter, 0);
+            emit_u(JUMPB, 0, uint16_t((loop_bottom + 1) - forloop));
+            rewrite_u(skip_loop, JUMPF, 0, uint16_t((loop_bottom + 2) - skip_loop));
+            pop_scope();
+            registers[reg_iter] = reg_iter_state;
+            registers[reg_ptr] = reg_ptr_state;
             return 0xff;
         }
         handle(ForStatInt) {
