@@ -36,6 +36,7 @@ Value ObjectType::get(const char* key, bool& found) {
         found = false;
         return value_null();
     }
+    found = true;
     return kh_val(hash, n);
 }
 

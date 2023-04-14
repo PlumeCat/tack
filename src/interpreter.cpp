@@ -98,6 +98,7 @@ void Interpreter::execute(CodeFragment* program) {
     auto _objects = std::list<ObjectType> {};
     auto _functions = std::list<FunctionType> {};
     auto _boxes = std::list<Value> {};
+    auto _strings = std::list<std::string>{};
     auto error = [&](auto err) { throw std::runtime_error(err); return value_null(); };
 
     try {
@@ -194,41 +195,52 @@ void Interpreter::execute(CodeFragment* program) {
                     }
                 }
                 handle(FOR_ITER_INIT) {
-                    auto iter_type = value_get_type(REGISTER(i.r1));
+                    auto iter_val = REGISTER(i.r1);
+                    auto iter_type = value_get_type(iter_val);
                     if (iter_type == Type::Array) {
-                        REGISTER(i.r0) = value_from_number(0);
+                        REGISTER_RAW(i.r0)._i = 0;
                     } else if (iter_type == Type::Object) {
-
+                        REGISTER_RAW(i.r0)._i = value_to_object(iter_val)->begin();
                     // } else if (iter_type == Type::Function) {
-
                     } else {
-                        error("For loop expected array or object");
+                        error("for loop expected array or object");
                     }
                 }
                 handle(FOR_ITER) {
-                    auto iter_type = value_get_type(REGISTER(i.r1));
+                    auto iter_val = REGISTER(i.r1);
+                    auto iter_type = value_get_type(iter_val);
                     if (iter_type == Type::Array) {
-                        auto ind = value_to_number(REGISTER(i.r0));
-                        auto arr = value_to_array(REGISTER(i.r1));
+                        auto ind = REGISTER_RAW(i.r0)._i;
+                        auto arr = value_to_array(iter_val);
                         if (ind < arr->size()) {
                             REGISTER(i.r2) = (*arr)[ind];
                             _pc++;
                         }
                     } else if (iter_type == Type::Object) {
-
+                        auto it = REGISTER_RAW(i.r0)._i;
+                        auto obj = value_to_object(iter_val);
+                        if (it != obj->end()) {
+                            // TODO: stop allocating string here
+                            _strings.emplace_back(obj->key(it));
+                            REGISTER(i.r2) = value_from_string(&_strings.back());
+                            _pc++;
+                        }
                     // } else if (iter_type == Type::Function) {
-
                     }
                 }
                 handle(FOR_ITER_NEXT) {
-                    auto iter_type = value_get_type(REGISTER(i.r1));
+                    auto iter_val = REGISTER(i.r1);
+                    auto iter_type = value_get_type(iter_val);
                     if (iter_type == Type::Array) {
                         // increment index
-                        REGISTER(i.r0) = value_from_number(
-                            value_to_number(REGISTER(i.r0)) + 1
-                        );
+                        REGISTER_RAW(i.r0)._i += 1;
+                        // REGISTER(i.r0) = value_from_number(
+                        //     value_to_number(REGISTER(i.r0)) + 1
+                        // );
                     } else if (iter_type == Type::Object) {
                         // next key
+                        auto obj = value_to_object(iter_val);
+                        REGISTER_RAW(i.r0)._i = obj->next(REGISTER_RAW(i.r0)._i);
                     }
                 }
                 handle(CONDSKIP) {
@@ -298,20 +310,27 @@ void Interpreter::execute(CodeFragment* program) {
                     REGISTER(i.r0) = value_from_object(&_objects.back());
                 }
                 handle(LOAD_ARRAY) {
+                    // TODO: rename this instr if it's going to be for objects as well
                     auto arr_val = REGISTER(i.r1);
                     auto ind_val = REGISTER(i.r2);
-                    auto* arr = value_to_array(arr_val);
-                    auto ind_type = value_get_type(ind_val);
-                    auto ind = (ind_type == Type::Integer)
-                        ? value_to_integer(ind_val)
-                        : (ind_type == Type::Number)
-                        ? (int)value_to_number(ind_val)
-                        : error("expected number")._i;
-
-                    if (ind >= arr->size()) {
-                        error("outof range index");
+                    auto arr_type = value_get_type(arr_val);
+                    if (arr_type == Type::Array) {
+                        auto* arr = value_to_array(arr_val);
+                        auto ind = value_to_number(ind_val);
+                        if (ind >= arr->size()) {
+                            error("outof range index");
+                        }
+                        REGISTER(i.r0) = (*arr)[ind];
+                    } else if (arr_type == Type::Object) {
+                        auto* obj = value_to_object(arr_val);
+                        auto key = value_to_string(ind_val);
+                        auto found = false;
+                        auto val = obj->get(key->c_str(), found);
+                        if (!found) {
+                            error("key not found");
+                        }
+                        REGISTER(i.r0) = val;
                     }
-                    REGISTER(i.r0) = (*arr)[ind];
                 }
                 handle(STORE_ARRAY) {
                     auto arr_val = REGISTER(i.r1);
