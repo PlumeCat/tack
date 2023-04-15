@@ -15,8 +15,8 @@ std::ostream& operator<<(std::ostream& o, const Value& v) {
     switch (v._i & type_bits) {
         case (uint64_t)Type::Null:      return o << "null";
         case (uint64_t)Type::Boolean:   return o << (value_to_boolean(v) ? "true" : "false");
-        case (uint64_t)Type::Integer:   return o << value_to_integer(v);
-        case (uint64_t)Type::String:    return o << *value_to_string(v);
+        // case (uint64_t)Type::Integer:   return o << value_to_integer(v);
+        case (uint64_t)Type::String:    return o << value_to_string(v);
         case (uint64_t)Type::Pointer:   return o << value_to_pointer(v);
         case (uint64_t)Type::Object:    return o << *value_to_object(v);
         case (uint64_t)Type::Array:     return o << *value_to_array(v);
@@ -24,17 +24,18 @@ std::ostream& operator<<(std::ostream& o, const Value& v) {
         case (uint64_t)Type::Vec2:      return o << *value_to_vec2(v);
         case (uint64_t)Type::Vec3:      return o << *value_to_vec3(v);
         case (uint64_t)Type::Vec4:      return o << *value_to_vec4(v);
-        case (uint64_t)Type::Function:  return o << "function: "<< std::hex << v._p;
-        case type_bits_boxed:           return o << "box: "     << std::hex << v._p << "(" << std::hex << value_to_boxed(v)->_p << ")";
-        default:                        return o << "(unknown)" << std::hex << v._i;
+        case (uint64_t)Type::Function:  return o << "function: " << std::hex << v._p;
+        case (uint64_t)Type::CFunction: return o << "c-func:   " << std::hex << v._p;
+        case type_bits_boxed:           return o << "box:      " << std::hex << v._p << "(" << std::hex << value_to_boxed(v)->value._p << ")";
+        default:                        return o << "(unknown) " << std::hex << v._i;
     }
 }
 std::ostream& operator<<(std::ostream& o, const ArrayType& arr) {
     o << "array [";
-    if (arr.size()) {
-        o << ' ' << arr[0];
-        for (auto i = 1; i < arr.size(); i++) {
-            o << ", " << arr[i];
+    if (arr.values.size()) {
+        o << ' ' << arr.values[0];
+        for (auto i = 1; i < arr.values.size(); i++) {
+            o << ", " << arr.values[i];
         }
         o << ' ';
     }

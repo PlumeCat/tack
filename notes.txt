@@ -331,3 +331,7 @@ Globals:
 	or similar to make that possible)
 	True globals are the ones created/declared by the host with 'set_global' - these live in the proper
 	root scope and should be accessible everywhere.
+
+Closures don't need ArrayType for captures, and it complicates GC a bit
+A plain vector will do fine.
+Also don't need to put the capture list in the stack frame, because we can get it from _pr

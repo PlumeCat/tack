@@ -25,6 +25,8 @@ make
 - [x] consts
 - [x] calling C functions from tack
 - [ ] comments
+- [ ] boolean literals and operations (do as number?)
+- [ ] string operations
 - [ ] calling tack functions from C
 - [ ] garbage collector. must be allowed to retain pointers in C world
 - [ ] algebraics
@@ -45,6 +47,9 @@ make
 
 
 ### improvement & optimization
+- [ ] growable stack / configurable stack size
+- [ ] automatically detect infinite loops / infinite recursion
+- [ ] tail calls
 - [ ] for loops over functions (null to terminate)
 - [ ] compile time boxing and move elission
 - [x] ensure const is respected for captures
@@ -58,6 +63,7 @@ make
 - [ ] poor man's JIT: loop over instructions and emit machine code corresponding to a direct function call per opcode
 	- believe this is called a templating JIT, performance might be OK
 	- for extra points, write/disassembly the ASM for each opcode and emit it inline, elide the calls
+
 
 
 ### developer qol

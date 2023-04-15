@@ -6,7 +6,7 @@
 // HACK:
 struct kh_SV_s;
 
-struct ObjectType {
+struct ObjectType : GCType {
     kh_SV_s* hash; // HACK:
     uint32_t len = 0;
     using iter = unsigned int; // HACK:

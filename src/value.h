@@ -17,7 +17,7 @@ static constexpr auto pointer_bits = 0x0000ffffffffffff_u64;
 static const auto type_bits_number = nan_bits;
 declare_type_bits(pointer,  0b0000) // 0x0 // unmanaged user pointer - pass by value
 declare_type_bits(boolean,  0b0001) // 0x1
-declare_type_bits(integer,  0b0011) // 0x3
+declare_type_bits(______2,  0b0011) // 0x3
 declare_type_bits(______1,  0b0010) // 0x2
 // "Algebraic"
 declare_type_bits(vec2,     0b0100) // 0x4
@@ -30,8 +30,8 @@ declare_type_bits(object,   0b1001) // 0x9 // TODO: decide about interning/hashi
 declare_type_bits(boxed,    0b1011) // 0xb // TODO: box won't be needed once we have labelled registers
 declare_type_bits(array,    0b1010) // 0xa
 // Unused
-declare_type_bits(function, 0b1100)// 0xc
-declare_type_bits(cfunction,0b1101)// 0xd
+declare_type_bits(function, 0b1100) // 0xc
+declare_type_bits(cfunction,0b1101) // 0xd
 declare_type_bits(______4,  0b1110) // 0xe
 declare_type_bits(null,     0b1111) // 0xf // UINT64_MAX is null
 #undef declare_type_bits
@@ -42,7 +42,7 @@ enum class Type : uint64_t {
     // scalars
     Null = type_bits_null,
     Boolean = type_bits_boolean,
-    Integer = type_bits_integer,
+    // Integer = type_bits_integer,
     Number = type_bits_number,
     String = type_bits_string,
     Pointer = type_bits_pointer,
@@ -67,6 +67,7 @@ enum class Type : uint64_t {
     */
 };
 
+struct CodeFragment;
 struct Value {
     union {
         uint64_t _i;
@@ -74,19 +75,29 @@ struct Value {
         void* _p;
     };
 };
+struct GCType {
+    bool marker = false;
+    uint32_t refcount = 0; // for retaining in host
+};
 
-struct CodeFragment;
-using BoxType = Value;
 using NullType = nullptr_t;
 using StringType = const char;
 
 #include "object_type.h"
-using ArrayType = std::vector<Value>;
-struct FunctionType {
-    CodeFragment* bytecode;
-    std::vector<Value> captures; // contains boxes
+
+struct BoxType : GCType {
+    Value value;
 };
+struct ArrayType : GCType {
+    std::vector<Value> values;
+};
+struct FunctionType : GCType {
+    CodeFragment* bytecode;
+    ArrayType* captures; // contains boxes
+};
+
 using CFunctionType = Value(int, Value*);
+
 struct vec2 { float x, y; };
 struct vec3 { float x, y, z; };
 struct vec4 { float x, y, z, w; };
@@ -100,7 +111,7 @@ inline constexpr Value value_true()                     { return { nan_bits | ty
 
 // create value
 inline Value value_from_boolean(bool b)                 { return { nan_bits | type_bits_boolean | b }; }
-inline Value value_from_integer(int32_t i)              { return { nan_bits | type_bits_integer | i }; }
+// inline Value value_from_integer(int32_t i)              { return { nan_bits | type_bits_integer | i }; }
 inline Value value_from_number(double d)                { return { ._d = d }; /* TODO: check for nan and mask off? */}
 inline Value value_from_pointer(void* ptr)              { return { nan_bits | type_bits_pointer | ((uint64_t)ptr & pointer_bits) }; }
 inline Value value_from_function(FunctionType* func)    { return { nan_bits | type_bits_function | uint64_t(func) }; }
@@ -118,7 +129,7 @@ inline Value value_from_mat4(mat4* m4)                  { return { nan_bits | ty
 inline Type value_get_type(Value v)                     { return std::isnan(v._d) ? (Type)(v._i & type_bits) : Type::Number; }
 inline bool value_is_null(Value v)                      { return v._i == UINT64_MAX; }
 inline bool value_is_boolean(Value v)                   { return (v._i & type_bits) == type_bits_boolean; }
-inline bool value_is_integer(Value v)                   { return (v._i & type_bits) == type_bits_integer; }
+// inline bool value_is_integer(Value v)                   { return (v._i & type_bits) == type_bits_integer; }
 inline bool value_is_number(Value v)                    { return !std::isnan(v._d); }
 inline bool value_is_pointer(Value v)                   { return (v._i & type_bits) == type_bits_pointer; }
 inline bool value_is_boxed(Value v)                     { return std::isnan(v._d) && (v._i & type_bits) == type_bits_boxed;   }
@@ -153,7 +164,7 @@ inline vec4* value_to_vec4(Value v)                     { check(vec4);      retu
 inline mat4* value_to_mat4(Value v)                     { check(mat4);      return (mat4*)(v._i & pointer_bits); }
 inline uint64_t value_to_null(Value v)                  { check(null);      return v._i; } // ???
 inline bool value_to_boolean(Value v)                   { check(boolean);   return (bool)(v._i & boolean_bits); }
-inline int32_t value_to_integer(Value v)                { check(integer);   return (int32_t)(v._i & integer_bits); }
+// inline int32_t value_to_integer(Value v)                { check(integer);   return (int32_t)(v._i & integer_bits); }
 inline double value_to_number(Value v)                  { check(number);    return v._d; } // ???
 inline void* value_to_pointer(Value v)                  { check(pointer);   return (void*)(v._i & pointer_bits); }
 #undef check

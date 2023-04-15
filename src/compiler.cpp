@@ -56,13 +56,6 @@ std::string CodeFragment::str() {
         i++;
     }
 
-    // s << "  strings:\n";
-    // i = 0;
-    // for (auto& _s : strings) {
-    //     s << "    " << i << ": " << _s << '\n';
-    //     i++;
-    // }
-
     for (auto& f : functions) {
         s << f.str();
     }
@@ -113,8 +106,7 @@ uint8_t Compiler::get_end_register() {
 Compiler::VariableContext* Compiler::bind_name(const std::string& binding, uint8_t reg, bool is_const) {
     if (is_global) {
         // auto var = scopes.back().bindings.insert(binding, { 0, is_const, true, interpreter->next_gid });
-        auto var = &scopes.back().bindings.try_emplace(binding, VariableContext { 0, is_const, true, interpreter->next_gid }).first->second;
-        interpreter->next_gid++; // TODO: clumsy, try and improve this
+        auto var = &scopes.back().bindings.try_emplace(binding, VariableContext { 0, is_const, true, interpreter->next_gid() }).first->second;
         return var;
     } else {
         registers[reg] = RegisterState::BOUND;
@@ -437,19 +429,20 @@ uint8_t Compiler::compile(const AstNode* node) {
         }
         handle(FuncLiteral) {
             should_allocate(1);
-            // note this may create some captures and emit READ_CAPTURE
             auto index = output->store_function();
             auto func = (CodeFragment*)value_to_pointer(output->storage[index]);
             func->name = output->name + "::" + ((node->children.size() == 3) ? node->children[2].data_s : "(anonymous)");
 
             // add a const binding if it's a named function
+            // TODO: move this to the parser (should be a form of VarDeclStat/ConstDeclStat instead)
+            // this will make 'export' easier
             auto out = allocate_register();
             auto var = (VariableContext*)nullptr;
             if (node->children.size() == 3) {
                 var = bind_name(node->children[2].data_s, out, true);
             }
             
-            // compiler - must happen before ALLOC_FUNC because
+            // compile - must happen before ALLOC_FUNC because
             // child compiler can emit READ_CAPTURE into current scope
             auto compiler = Compiler { .interpreter = interpreter };
             compiler.compile_func(node, func, &scopes.back());

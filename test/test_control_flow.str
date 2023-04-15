@@ -19,17 +19,18 @@ fn factorial() {
     
 }
 
-fn() {
+fn foo() {
     "testing capture of the iterable"
     let arr = [ 1, 2, 3, 4, 5 ]
     for i in arr {
         print(i)
-        fn() {
-            arr
+        fn bar() {
+            arr[6]
         }
+        bar()
     }
-
-}()
+}
+foo()
 
 fn() {
     "testing capture of the loop variable"

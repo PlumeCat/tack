@@ -4,6 +4,8 @@
 KHASH_MAP_INIT_STR(SV, Value)
 
 ObjectType::ObjectType() {
+    refcount = 0;
+    marker = false;
     hash = kh_init(SV);
 }
 ObjectType::ObjectType(ObjectType&& from) {
