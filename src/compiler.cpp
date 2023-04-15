@@ -31,7 +31,7 @@ uint16_t CodeFragment::store_number(double d) {
 
 uint16_t CodeFragment::store_string(const std::string & data) {
     strings.emplace_back(data);
-    storage.emplace_back(value_from_string(&strings.back()));
+    storage.emplace_back(value_from_string(strings.back().c_str()));
     return storage.size() - 1;
 }
 uint16_t CodeFragment::store_function() {

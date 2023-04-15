@@ -78,7 +78,7 @@ struct Value {
 struct CodeFragment;
 using BoxType = Value;
 using NullType = nullptr_t;
-using StringType = std::string;
+using StringType = const char;
 
 #include "object_type.h"
 using ArrayType = std::vector<Value>;

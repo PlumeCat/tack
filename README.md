@@ -16,7 +16,7 @@ make
 
 ### Features
 - [x] variadic print
-- [ ] a more usable looping construct
+- [x] a more usable looping construct
 - [ ] break and continue? labelled break?
 - [x] arrays
 - [x] objects
@@ -45,6 +45,7 @@ make
 
 
 ### improvement & optimization
+- [ ] for loops over functions (null to terminate)
 - [ ] compile time boxing and move elission
 - [x] ensure const is respected for captures
 - [ ] deduplicate consts

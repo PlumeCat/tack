@@ -98,7 +98,6 @@ void Interpreter::execute(CodeFragment* program) {
     auto _objects = std::list<ObjectType> {};
     auto _functions = std::list<FunctionType> {};
     auto _boxes = std::list<Value> {};
-    auto _strings = std::list<std::string>{};
     auto error = [&](auto err) { throw std::runtime_error(err); return value_null(); };
 
     try {
@@ -220,9 +219,7 @@ void Interpreter::execute(CodeFragment* program) {
                         auto it = REGISTER_RAW(i.r0)._i;
                         auto obj = value_to_object(iter_val);
                         if (it != obj->end()) {
-                            // TODO: stop allocating string here
-                            _strings.emplace_back(obj->key(it));
-                            REGISTER(i.r2) = value_from_string(&_strings.back());
+                            REGISTER(i.r2) = value_from_string(obj->key(it));
                             _pc++;
                         }
                     // } else if (iter_type == Type::Function) {
@@ -230,16 +227,12 @@ void Interpreter::execute(CodeFragment* program) {
                 }
                 handle(FOR_ITER2) {
                     auto iter_val = REGISTER(i.r1);
-                    if (value_get_type(iter_val) == Type::Object) {
-                        auto it = REGISTER_RAW(i.r0)._i;
-                        auto obj = value_to_object(iter_val);
-                        if (it != obj->end()) {
-                            // TODO: stop allocating string here!
-                            _strings.emplace_back(obj->key(it));
-                            REGISTER(i.r2) = value_from_string(&_strings.back());
-                            REGISTER(i.r2 + 1) = obj->value(it);
-                            _pc++;
-                        }
+                    auto obj = value_to_object(iter_val);
+                    auto it = REGISTER_RAW(i.r0)._i;
+                    if (it != obj->end()) {
+                        REGISTER(i.r2) = value_from_string(obj->key(it));
+                        REGISTER(i.r2 + 1) = obj->value(it);
+                        _pc++;
                     }
                 }
                 handle(FOR_ITER_NEXT) {
@@ -248,9 +241,6 @@ void Interpreter::execute(CodeFragment* program) {
                     if (iter_type == Type::Array) {
                         // increment index
                         REGISTER_RAW(i.r0)._i += 1;
-                        // REGISTER(i.r0) = value_from_number(
-                        //     value_to_number(REGISTER(i.r0)) + 1
-                        // );
                     } else if (iter_type == Type::Object) {
                         // next key
                         auto obj = value_to_object(iter_val);
@@ -317,7 +307,7 @@ void Interpreter::execute(CodeFragment* program) {
                     for (auto e = 0; e < i.r1; e++) {
                         auto key = value_to_string(REGISTER(i.r2 + e * 2));
                         auto val = REGISTER(i.r2 + e * 2 + 1);
-                        obj.set(key->c_str(), val);
+                        obj.set(key, val);
                     }
                     REGISTER(i.r0) = value_from_object(&_objects.back());
                 }
@@ -337,7 +327,7 @@ void Interpreter::execute(CodeFragment* program) {
                         auto* obj = value_to_object(arr_val);
                         auto key = value_to_string(ind_val);
                         auto found = false;
-                        auto val = obj->get(key->c_str(), found);
+                        auto val = obj->get(key, found);
                         if (!found) {
                             error("key not found");
                         }
@@ -371,7 +361,7 @@ void Interpreter::execute(CodeFragment* program) {
                     if (value_get_type(key_val) != Type::String) {
                         error("expected string key");
                     }
-                    auto key = value_to_string(key_val)->c_str();
+                    auto key = value_to_string(key_val);
                     auto found = false;
                     auto val = obj->get(key, found);
                     if (!found) {
@@ -386,7 +376,7 @@ void Interpreter::execute(CodeFragment* program) {
                     if (value_get_type(key_val) != Type::String) {
                         error("expected string key");
                     }
-                    auto key = value_to_string(key_val)->c_str();
+                    auto key = value_to_string(key_val);
                     obj->set(key, REGISTER(i.r0));
                 }
                 handle(CALL) {
