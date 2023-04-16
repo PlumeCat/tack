@@ -169,6 +169,47 @@ DEFPARSER(identifier, {
 		SUCCESS(AstType::Identifier, identifier);
 	}
 });
+DEFPARSER(param_def, {
+	auto p = AstNode(AstType::ParamDef);
+	while (true) {
+		TRY(identifier) {
+			p.children.emplace_back(identifier);
+			TRYs(',') {} else break; // TODO: disallow trailing comma
+		} else break;
+	}
+	SUCCESS(p);
+});
+DEFPARSER(func_literal, {
+	EXPECT("fn")
+	// TRY(identifier) {}
+	TRYs('(') {} else ERROR("expected parameter definition after 'fn'");
+	TRY(param_def) {
+		TRYs(')') {} else ERROR("expected ')' after parameter definition");
+		TRY(block) {
+			// if (identifier.type == AstType::Identifier) {
+			// 	SUCCESS(AstType::FuncLiteral, param_def, block, identifier);
+			// } else {
+				SUCCESS(AstType::FuncLiteral, param_def, block);
+			// }
+		} else ERROR("expected block after parameter definition");
+	}
+});
+DEFPARSER(func_decl_stat, {
+	EXPECT("fn")
+	TRY(identifier) {} else { FAIL(); } // parsing failure not an error - could be a freestanding anonymous fn
+	TRYs('(') {} else ERROR("expected parameter definition after identifier");
+	TRY(param_def) {
+		TRYs(')') {} else ERROR("expected ')' after parameter definition");
+		TRY(block) {
+			SUCCESS(AstType::FuncDeclStat, identifier,
+				AstNode(AstType::FuncLiteral, param_def, block)
+			);
+		}
+	}
+
+});
+
+
 DEFPARSER(literal, {
 	SUBPARSER(num_literal, {
 		auto num = 0.0;
@@ -213,31 +254,6 @@ DEFPARSER(literal, {
 
 			EXPECT(']');
 			SUCCESS(res);
-		}
-	});
-	SUBPARSER(func_literal, {
-		SUBPARSER(param_def, {
-			auto p = AstNode(AstType::ParamDef);
-			while (true) {
-				TRY(identifier) {
-					p.children.emplace_back(identifier);
-					TRYs(',') {} else break; // TODO: disallow trailing comma
-				} else break;
-			}
-			SUCCESS(p);
-		});
-		EXPECT("fn")
-		TRY(identifier) {}
-		TRYs('(') {} else ERROR("expected parameter definition after 'fn'");
-		TRY(param_def) {
-			TRYs(')') {} else ERROR("expected ')' after parameter definition");
-			TRY(block) {
-				if (identifier.type == AstType::Identifier) {
-					SUCCESS(AstType::FuncLiteral, param_def, block, identifier);
-				} else {
-					SUCCESS(AstType::FuncLiteral, param_def, block);
-				}
-			} else ERROR("expected block after parameter definition");
 		}
 	});
 	TRY(string_literal) SUCCESS(string_literal);
@@ -504,6 +520,7 @@ DEFPARSER(stat_list, {
 		if (0
 			|| parse_const_decl_stat(code, n)
 			|| parse_var_decl_stat(code, n)
+			|| parse_func_decl_stat(code, n)
 			|| parse_assign_stat(code, n)
 			|| parse_if_stat(code, n)
 			|| parse_while_stat(code, n)

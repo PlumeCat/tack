@@ -9,6 +9,7 @@
     \
     ast(ConstDeclStat)\
     ast(VarDeclStat)\
+    ast(FuncDeclStat)\
     ast(AssignStat)\
     ast(IfStat)\
     ast(WhileStat) ast(ForStat) ast(ForStat2) ast(ForStatInt)\

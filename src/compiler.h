@@ -71,9 +71,9 @@ struct Compiler {
     // lookup a variable in the current scope stack
     VariableContext* lookup(const std::string& name);
 
-    // get a free register
+    // get a free register and mark as busy
     uint8_t allocate_register();
-    // get 2 free registers; returns the first one
+    // get 2 free registers; returns the first one; mark both as busy
     uint8_t allocate_register2();
 
     // get the register immediately after the highest non-free register

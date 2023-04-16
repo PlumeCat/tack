@@ -105,9 +105,7 @@ uint8_t Compiler::get_end_register() {
 // set a register as bound by a variable
 Compiler::VariableContext* Compiler::bind_name(const std::string& binding, uint8_t reg, bool is_const) {
     if (is_global) {
-        // auto var = scopes.back().bindings.insert(binding, { 0, is_const, true, interpreter->next_gid });
-        auto var = &scopes.back().bindings.try_emplace(binding, VariableContext { 0, is_const, true, interpreter->next_gid() }).first->second;
-        return var;
+        return &scopes.back().bindings.try_emplace(binding, VariableContext { 0, is_const, true, interpreter->next_gid() }).first->second;
     } else {
         registers[reg] = RegisterState::BOUND;
         return &scopes.back().bindings.try_emplace(binding, VariableContext { reg, is_const }).first->second;
@@ -199,6 +197,7 @@ Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& nam
 uint8_t Compiler::compile(const AstNode* node) {
     switch (node->type) {
     case AstType::Unknown: {} break;
+        // statements
         handle(StatList) {
             should_allocate(0);
             push_scope(&scopes.back());
@@ -350,13 +349,39 @@ uint8_t Compiler::compile(const AstNode* node) {
         }
         handle(ConstDeclStat) {
             should_allocate(1);
-            auto reg = child(1);
+            auto reg = child(1); // TODO: doesn't work with recursive named functions
             auto var = bind_name(node->children[0].data_s, reg, true);
             if (is_global) {
                 emit_u(WRITE_GLOBAL, reg, var->g_id);
             }
             return 0xff;
         }
+        handle(FuncDeclStat) {
+            // HACK: This is an amalgam of ConstDeclStat and FuncLiteral
+            // Currently it has to be specially interleaved because recursive functions need to be
+            // able to capture themselves by name, which is impossible with bind_name("recursive", compile(...))
+
+            auto index = output->store_function();
+            auto func = (CodeFragment*)value_to_pointer(output->storage[index]);
+            auto& ident = node->children[0].data_s;
+            func->name = output->name + "::" + ident;
+            auto out = allocate_register();
+            
+            /* interleaved from ConstDeclStat */
+            /* interleaved from ConstDeclStat */ auto var = bind_name(ident, out, true);
+            /* interleaved from ConstDeclStat */
+            
+            auto compiler = Compiler { .interpreter = interpreter };
+            compiler.compile_func(&node->children[1], func, &scopes.back());
+            emit_u(ALLOC_FUNC, out, index);
+            
+            /* interleaved from ConstDeclStat */ if (is_global) {
+            /* interleaved from ConstDeclStat */    emit_u(WRITE_GLOBAL, out, var->g_id);
+            /* interleaved from ConstDeclStat */ }
+
+            return 0xff;
+        }
+
         handle(AssignStat) {
             should_allocate(0);
             auto source_reg = child(1);
@@ -398,6 +423,21 @@ uint8_t Compiler::compile(const AstNode* node) {
             free_register(source_reg);
             return 0xff;
         }
+        handle(ReturnStat) {
+            if (node->children.size()) {
+                auto return_register = child(0);
+                if (return_register == 0xff) {
+                    error("return value incorrect register");
+                    // emit(RET, 0, 0, 0);
+                }
+                emit(RET, 1, return_register, 0);
+            } else {
+                emit(RET, 0, 0, 0);
+            }
+            return 0xff; // it's irrelevant
+        }
+        
+        // expressions
         handle(Identifier) {
             should_allocate(0);
             if (auto v = lookup(node->data_s)) {
@@ -431,28 +471,16 @@ uint8_t Compiler::compile(const AstNode* node) {
             should_allocate(1);
             auto index = output->store_function();
             auto func = (CodeFragment*)value_to_pointer(output->storage[index]);
-            func->name = output->name + "::" + ((node->children.size() == 3) ? node->children[2].data_s : "(anonymous)");
+            func->name = output->name + "::(anonymous)";
 
-            // add a const binding if it's a named function
-            // TODO: move this to the parser (should be a form of VarDeclStat/ConstDeclStat instead)
-            // this will make 'export' easier
-            auto out = allocate_register();
-            auto var = (VariableContext*)nullptr;
-            if (node->children.size() == 3) {
-                var = bind_name(node->children[2].data_s, out, true);
-            }
-            
-            // compile - must happen before ALLOC_FUNC because
+            auto out = allocate_register();            
+            // compile must happen before ALLOC_FUNC because
             // child compiler can emit READ_CAPTURE into current scope
             auto compiler = Compiler { .interpreter = interpreter };
             compiler.compile_func(node, func, &scopes.back());
 
             // allocate new closure into new register
             emit_u(ALLOC_FUNC, out, index);
-            if (var && var->is_global) {
-                emit_u(WRITE_GLOBAL, out, var->g_id);
-            }
-            
 
             return out;
         }
@@ -478,19 +506,6 @@ uint8_t Compiler::compile(const AstNode* node) {
             // return value goes in end-reg so mark it as used
             registers[end_reg] = RegisterState::BUSY;
             return end_reg; // return value copied to end register
-        }
-        handle(ReturnStat) {
-            if (node->children.size()) {
-                auto return_register = child(0);
-                if (return_register == 0xff) {
-                    error("return value incorrect register");
-                    // emit(RET, 0, 0, 0);
-                }
-                emit(RET, 1, return_register, 0);
-            } else {
-                emit(RET, 0, 0, 0);
-            }
-            return 0xff; // it's irrelevant
         }
         handle(LenExp) {
             auto in = child(0);
