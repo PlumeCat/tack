@@ -1,8 +1,6 @@
 fn array_random(M) {
-    let i = 0
     const arr = []
-    while i < M {
-        i = i + 1
+    for i in 0, M {
         arr << random()
     }
     return arr
@@ -11,18 +9,12 @@ fn array_random(M) {
 fn join(a, b) {
     const c = []
 
-    let i = 0
-    const na = #a
-    while i < na {
+    for i in 0, #a {
         c << a[i]
-        i = i + 1
     }
 
-    let j = 0
-    const nb = #b
-    while j < nb {
-        c << b[j]
-        j = j + 1
+    for i in 0, #b {
+        c << b[i]
     }
 
     return c
@@ -33,15 +25,12 @@ fn quicksort(arr) {
     if n <= 1 { return arr }
 
     " min and max "
-
     let min = arr[0]
     let max = arr[0]
-    let i = 1
-    while i < n {
+    for i in 1, n {
         let ai = arr[i]
         if ai > max { max = ai }
         if ai < min { min = ai }
-        i = i + 1
     }
 
     " midpoint "
@@ -51,13 +40,10 @@ fn quicksort(arr) {
     const lower = []
 
     " pivot "
-    i = 0
-    while i < n {
+    for i in 0, n {
         const e = arr[i]
-
         if e < mid { lower << e }
         else { upper << e }
-        i = i + 1
     }
 
     return join(quicksort(lower), quicksort(upper))
@@ -66,9 +52,7 @@ fn quicksort(arr) {
 const N = 1000
 const A = []
 
-let i = 0
-while i < N {
-    i = i + 1
+for i in 0, N {
     A << i
 }
 
