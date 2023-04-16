@@ -32,14 +32,18 @@ private:
     uint16_t next_globalid; // TODO: bit clumsy, try and improve it
 
     std::vector<Value> globals;
-    void execute(CodeFragment* program);
+    std::list<CodeFragment> fragments;
+
+    void execute(CodeFragment* fragment);
 
 public:
     Interpreter();
 
+    // used by Compiler
+    CodeFragment* create_fragment();
     // equivalent to "export name = value"
-    void set_global(const std::string& name, Value value);
+    Compiler::VariableContext* set_global(const std::string& name, bool is_const, Value value);
     Value get_global(const std::string& name);
     uint16_t next_gid();
-    void execute(const std::string& code, int argc = 0, char* argv[] = nullptr);
+    void execute(const std::string& code, bool log_ast, bool log_bytecode);
 };

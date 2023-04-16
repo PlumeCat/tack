@@ -36,25 +36,42 @@ Value tack_clock(int nargs, Value* args) {
 }
 
 int main(int argc, char* argv[]) {
+    auto log_ast = false;
+    auto log_bytecode = false;
+    auto files = std::vector<std::string>{};
+    for (auto i = 1; i < argc; i++) {
+        auto arg = std::string(argv[i]);
+        if (arg == "-A") {
+            log_ast = true;
+        } else if  (arg == "-D") {
+            log_bytecode = true;
+        } else {
+            files.emplace_back(std::move(arg));
+        }
+    }
+
     std::ios::sync_with_stdio(false);
-    auto fname = (argc >= 2) ? argv[1] : "source.str";
-    if (argc < 2) {
+    if (!files.size()) {
         log("error: no source file provided (repl not supported yet)");
         return 1;
     }
-    auto s = read_text_file(fname);
-    if (!s.has_value()) {
-        log("error opening source file: " + std::string(fname));
-        return 2;
-    }
-    auto& source = s.value();
-    
+
     try {
         auto vm = Interpreter {};
-        vm.set_global("print", value_from_cfunction(tack_print));
-        vm.set_global("random", value_from_cfunction(tack_random));
-        vm.set_global("clock", value_from_cfunction(tack_clock));
-        vm.execute(source, argc, argv);
+        vm.set_global("print", true, value_from_cfunction(tack_print));
+        vm.set_global("random", true, value_from_cfunction(tack_random));
+        vm.set_global("clock", true, value_from_cfunction(tack_clock));
+
+        for (auto& f: files) {
+            log("executing source file:", f);
+            auto s = read_text_file(f);
+            if (!s.has_value()) {
+                log("error opening source file:", f);
+                return 2;
+            }
+            auto& source = s.value();
+            vm.execute(source, log_ast, log_bytecode);
+        }
     } catch (std::exception& e) {
         log(e.what());
     }

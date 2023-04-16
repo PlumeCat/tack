@@ -30,12 +30,12 @@ struct CodeFragment {
     std::vector<Instruction> instructions;
     std::vector<Value> storage; // program constant storage goes at the bottom of the stack for now
     std::list<std::string> strings; // string constants and literals storage - includes identifiers for objects
-    std::list<CodeFragment> functions; // local functions (everything is a local function from the POV of the global context)
+    std::list<CodeFragment*> fragments; // local functions (everything is a local function from the POV of the global context)
     std::vector<CaptureInfo> capture_info;
 
     uint16_t store_number(double d);
     uint16_t store_string(const std::string& data);
-    uint16_t store_function();
+    uint16_t store_fragment(CodeFragment* ptr);
     std::string str();
 };
 
@@ -61,7 +61,7 @@ struct Compiler {
     const AstNode* node;
     // current output as of last compile_func() call, included here for convenience
     CodeFragment* output;
-    bool is_global = false; // variable bindings become global instead of stack
+    // bool is_global = false; // variable bindings become global instead of stack
 
     // compiler state
     std::array<RegisterState, MAX_REGISTERS> registers;
@@ -82,7 +82,7 @@ struct Compiler {
     // set a register or global as bound by a variable with given name
     // NOTE: if it's global, make sure to emit WRITE_GLOBAL when relevant
     // this method can't currently do it automatically - see FuncLiteral compiler
-    VariableContext* bind_name(const std::string& binding, uint8_t reg, bool is_const = false);
+    VariableContext* bind_name(const std::string& binding, uint8_t reg, bool is_const = false, bool is_export = false);
     
     // free a register if it's not bound
     void free_register(uint8_t reg);

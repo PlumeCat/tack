@@ -36,7 +36,17 @@ Value Interpreter::get_global(const std::string& name) {
     return globals[var->g_id];
 }
 
-void Interpreter::set_global(const std::string& name, Value value) {
+/*
+ return &scopes.back().bindings.try_emplace(
+    binding,
+    VariableContext {
+        0,
+        is_const,
+        true,
+        interpreter->next_gid()
+    }).first->second;
+*/
+Compiler::VariableContext* Interpreter::set_global(const std::string& name, bool is_const, Value value) {
     // lookup binding
     auto* var = global_scope.lookup(name);
 
@@ -45,7 +55,7 @@ void Interpreter::set_global(const std::string& name, Value value) {
         // HACK:
         var = &global_scope.bindings.try_emplace(name, Compiler::VariableContext {
             .g_id = next_gid(),
-            .is_const = false,
+            .is_const = is_const,
             .is_global = true,
             .reg = 0xff
         }).first->second;
@@ -56,35 +66,37 @@ void Interpreter::set_global(const std::string& name, Value value) {
         globals.resize(var->g_id + 1);
     }
 
-    // write
+    // write initial value (useful for C; when a compiler does this, it will emit WRITE_GLOBAL with the true value)
     globals[var->g_id] = value;
+
+    return var;
 }
 
-void Interpreter::execute(const std::string& code, int argc, char* argv[]) {
-    auto check_arg = [&](const std::string& s) {
-        for (auto i = 0; i < argc; i++) {
-            if (argv[i] == s) {
-                return true;
-            }
-        }
-        return false;
-    };
+CodeFragment* Interpreter::create_fragment() {
+    return &fragments.emplace_back();
+}
 
+void Interpreter::execute(const std::string& code, bool log_ast, bool log_bytecode) {
     auto out_ast = AstNode {};
     parse(code, out_ast);
-    if (check_arg("-A")) {
+    
+    if (log_ast) {
         log("AST: ", out_ast.tostring());
     }
 
     auto global = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
     auto compiler = Compiler { .interpreter = this };
-    auto program = CodeFragment { .name = "[global]" };
-    compiler.compile_func(&global, &program, &global_scope);
-    if (check_arg("-D")) {
-        log("Program:\n" + program.str());
+
+    // creates the root fragment
+    auto* fragment = create_fragment();
+    fragment->name = "[global]";
+    compiler.compile_func(&global, fragment, &global_scope);
+    
+    if (log_bytecode) {
+        log("Program:\n" + fragment->str());
     }
     
-    execute(&program);
+    execute(fragment);
 }
 
 // TODO: unify this with CALL
@@ -152,7 +164,6 @@ void Interpreter::execute(CodeFragment* program) {
                 handle(DIV) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) / value_to_number(REGISTER(i.r2)));
                 }
-                // TODO: Bin ops need type checking
                 handle(SHL) {
                     auto* arr = value_to_array(REGISTER(i.r0));
                     arr->values.emplace_back(REGISTER(i.r1));
@@ -200,11 +211,7 @@ void Interpreter::execute(CodeFragment* program) {
                     REGISTER(i.r0) = globals[i.u1];
                 }
                 handle(WRITE_GLOBAL) {
-                    // resize globals if necessary
-                    // invalidating pointers is fine since globals should never be boxed
-                    if (i.u1 >= globals.size()) {
-                        globals.resize(i.u1+1);
-                    }
+                    // should never need to resize
                     globals[i.u1] = REGISTER(i.r0);
                 }
                 handle(FOR_INT) {

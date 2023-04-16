@@ -1,6 +1,8 @@
-"test_global.str"
+export let quz = 3
 
-fn foo() {
+print(quz)
+
+export fn foo() {
     print("foo")
 }
 fn bar() {

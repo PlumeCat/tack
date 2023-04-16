@@ -194,21 +194,6 @@ DEFPARSER(func_literal, {
 		} else ERROR("expected block after parameter definition");
 	}
 });
-DEFPARSER(func_decl_stat, {
-	EXPECT("fn")
-	TRY(identifier) {} else { FAIL(); } // parsing failure not an error - could be a freestanding anonymous fn
-	TRYs('(') {} else ERROR("expected parameter definition after identifier");
-	TRY(param_def) {
-		TRYs(')') {} else ERROR("expected ')' after parameter definition");
-		TRY(block) {
-			SUCCESS(AstType::FuncDeclStat, identifier,
-				AstNode(AstType::FuncLiteral, param_def, block)
-			);
-		}
-	}
-
-});
-
 
 DEFPARSER(literal, {
 	SUBPARSER(num_literal, {
@@ -397,21 +382,40 @@ DEFPARSER(ternary_exp, {
 DEFPARSER(exp, { TRY(ternary_exp) SUCCESS(ternary_exp); });
 
 DEFPARSER(const_decl_stat, {
+	auto is_export = parse_raw_string(code, "export");
 	EXPECT("const")
 	TRY(identifier) {
+		identifier.data_d = is_export;
 		EXPECT('=')
 		TRY(exp) { SUCCESS(AstType::ConstDeclStat, identifier, exp) }
 	}
 });
 DEFPARSER(var_decl_stat, {
+	auto is_export = parse_raw_string(code, "export");
 	EXPECT("let")
 	TRY(identifier) {
+		identifier.data_d = is_export;
 		EXPECT('=')
 		TRY(exp) {
 			SUCCESS(AstType::VarDeclStat, identifier, exp)
 		}
 	}
 });
+DEFPARSER(func_decl_stat, {
+	auto is_export = parse_raw_string(code, "export");
+	EXPECT("fn")
+	TRY(identifier) { identifier.data_d = is_export; } else { FAIL(); } // parsing failure not an error - could be a freestanding anonymous fn
+	TRYs('(') {} else ERROR("expected parameter definition after identifier");
+	TRY(param_def) {
+		TRYs(')') {} else ERROR("expected ')' after parameter definition");
+		TRY(block) {
+			SUCCESS(AstType::FuncDeclStat, identifier,
+				AstNode(AstType::FuncLiteral, param_def, block)
+			);
+		}
+	}
+});
+
 DEFPARSER(assign_stat, {
 	TRY(postfix_exp) {
 		TRYs('=') {

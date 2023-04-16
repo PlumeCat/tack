@@ -34,9 +34,8 @@ uint16_t CodeFragment::store_string(const std::string & data) {
     storage.emplace_back(value_from_string(strings.back().c_str()));
     return storage.size() - 1;
 }
-uint16_t CodeFragment::store_function() {
-    functions.emplace_back();
-    storage.emplace_back(value_from_pointer(&functions.back()));
+uint16_t CodeFragment::store_fragment(CodeFragment* fragment) {
+    storage.emplace_back(value_from_pointer(fragment));
     return storage.size() - 1;
 }
 
@@ -56,8 +55,8 @@ std::string CodeFragment::str() {
         i++;
     }
 
-    for (auto& f : functions) {
-        s << f.str();
+    for (auto& f : fragments) {
+        s << f->str();
     }
     return s.str();
 }
@@ -103,9 +102,9 @@ uint8_t Compiler::get_end_register() {
 }
 
 // set a register as bound by a variable
-Compiler::VariableContext* Compiler::bind_name(const std::string& binding, uint8_t reg, bool is_const) {
-    if (is_global) {
-        return &scopes.back().bindings.try_emplace(binding, VariableContext { 0, is_const, true, interpreter->next_gid() }).first->second;
+Compiler::VariableContext* Compiler::bind_name(const std::string& binding, uint8_t reg, bool is_const, bool is_export) {
+    if (is_export) {
+        return interpreter->set_global(binding, is_const, value_null());
     } else {
         registers[reg] = RegisterState::BOUND;
         return &scopes.back().bindings.try_emplace(binding, VariableContext { reg, is_const }).first->second;
@@ -248,9 +247,9 @@ uint8_t Compiler::compile(const AstNode* node) {
         handle(ForStat) {
             // for i in iterable { ... }
             // i, iterable, block
-            if (is_global) {
-                error("for loop not supported at global scope");
-            }
+            // if (is_global) {
+                // error("for loop not supported at global scope");
+            // }
 
             auto& ident = node->children[0].data_s;
             push_scope(&scopes.back());
@@ -280,9 +279,9 @@ uint8_t Compiler::compile(const AstNode* node) {
         }
         handle(ForStat2) {
             // for k, v in obj { ... }
-            if (is_global) {
-                error("2-ary for loop not supported at global scope");
-            }
+            // if (is_global) {
+            //     error("2-ary for loop not supported at global scope");
+            // }
             
             auto& i1 = node->children[0].data_s;
             auto& i2 = node->children[1].data_s;
@@ -315,9 +314,9 @@ uint8_t Compiler::compile(const AstNode* node) {
         }
         handle(ForStatInt) {
             // for i in a, b { ... }
-            if (is_global) {
-                error("for loop not supported at global scope");
-            }
+            // if (is_global) {
+            //     error("for loop not supported at global scope");
+            // }
             auto& ident = node->children[0].data_s;
             push_scope(&scopes.back()); // new scope - only contains the loop variable, block will get own scope
             auto reg_a = child(1); // start value
@@ -341,8 +340,10 @@ uint8_t Compiler::compile(const AstNode* node) {
         handle(VarDeclStat) {
             should_allocate(1);
             auto reg = child(1);
-            auto var = bind_name(node->children[0].data_s, reg);
-            if (is_global) {
+            
+            auto is_export = node->children[0].data_d;
+            auto var = bind_name(node->children[0].data_s, reg, false, is_export);
+            if (is_export) {
                 emit_u(WRITE_GLOBAL, reg, var->g_id);
             }
             return 0xff;
@@ -350,8 +351,10 @@ uint8_t Compiler::compile(const AstNode* node) {
         handle(ConstDeclStat) {
             should_allocate(1);
             auto reg = child(1); // TODO: doesn't work with recursive named functions
-            auto var = bind_name(node->children[0].data_s, reg, true);
-            if (is_global) {
+
+            auto is_export = node->children[0].data_d;
+            auto var = bind_name(node->children[0].data_s, reg, true, is_export);
+            if (is_export) {
                 emit_u(WRITE_GLOBAL, reg, var->g_id);
             }
             return 0xff;
@@ -361,21 +364,21 @@ uint8_t Compiler::compile(const AstNode* node) {
             // Currently it has to be specially interleaved because recursive functions need to be
             // able to capture themselves by name, which is impossible with bind_name("recursive", compile(...))
 
-            auto index = output->store_function();
-            auto func = (CodeFragment*)value_to_pointer(output->storage[index]);
+            auto func = interpreter->create_fragment();
+            auto index = output->store_fragment(func);
+
             auto& ident = node->children[0].data_s;
             func->name = output->name + "::" + ident;
             auto out = allocate_register();
             
-            /* interleaved from ConstDeclStat */
-            /* interleaved from ConstDeclStat */ auto var = bind_name(ident, out, true);
-            /* interleaved from ConstDeclStat */
+            /* interleaved from ConstDeclStat */ auto is_export = node->children[0].data_d;
+            /* interleaved from ConstDeclStat */ auto var = bind_name(ident, out, true, is_export);
             
             auto compiler = Compiler { .interpreter = interpreter };
             compiler.compile_func(&node->children[1], func, &scopes.back());
             emit_u(ALLOC_FUNC, out, index);
             
-            /* interleaved from ConstDeclStat */ if (is_global) {
+            /* interleaved from ConstDeclStat */ if (is_export) {
             /* interleaved from ConstDeclStat */    emit_u(WRITE_GLOBAL, out, var->g_id);
             /* interleaved from ConstDeclStat */ }
 
@@ -469,8 +472,8 @@ uint8_t Compiler::compile(const AstNode* node) {
         }
         handle(FuncLiteral) {
             should_allocate(1);
-            auto index = output->store_function();
-            auto func = (CodeFragment*)value_to_pointer(output->storage[index]);
+            auto func = interpreter->create_fragment();
+            auto index = output->store_fragment(func);
             func->name = output->name + "::(anonymous)";
 
             auto out = allocate_register();            
@@ -496,16 +499,16 @@ uint8_t Compiler::compile(const AstNode* node) {
             auto func_reg = child(0); // LHS evaluates to function
 
             // copy arguments to top of stack in sequence
-            auto end_reg = get_end_register();
+            auto return_reg = get_end_register();
             for (auto i = 0; i < nargs; i++) {
-                emit(MOVE, uint8_t(end_reg + i + STACK_FRAME_OVERHEAD), arg_regs[i], 0);
+                emit(MOVE, uint8_t(return_reg + i + STACK_FRAME_OVERHEAD), arg_regs[i], 0);
             }
 
-            emit(CALL, func_reg, nargs, end_reg);
+            emit(CALL, func_reg, nargs, return_reg);
 
             // return value goes in end-reg so mark it as used
-            registers[end_reg] = RegisterState::BUSY;
-            return end_reg; // return value copied to end register
+            registers[return_reg] = RegisterState::BUSY;
+            return return_reg; // return value copied to end register
         }
         handle(LenExp) {
             auto in = child(0);

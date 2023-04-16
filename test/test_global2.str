@@ -1,0 +1,2 @@
+foo()
+print("quz: ", quz)
