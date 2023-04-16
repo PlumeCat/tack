@@ -14,8 +14,6 @@
 #include <cstring>
 
 Interpreter::Interpreter() {
-    // root_compiler.interpreter = this;
-    // root_compiler.is_global = true;
     next_globalid = 0;
     global_scope.compiler = nullptr;
     global_scope.parent_scope = nullptr;
@@ -27,6 +25,15 @@ uint16_t Interpreter::next_gid() {
         throw std::runtime_error("too many globals");
     }
     return next_globalid++;
+}
+
+Value Interpreter::get_global(const std::string& name) {
+    auto* var = global_scope.lookup(name);
+    if (!var) {
+        return value_null();
+    }
+
+    return globals[var->g_id];
 }
 
 void Interpreter::set_global(const std::string& name, Value value) {
@@ -69,7 +76,7 @@ void Interpreter::execute(const std::string& code, int argc, char* argv[]) {
     }
 
     auto global = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
-    auto compiler = Compiler { .interpreter = this, .is_global = true };
+    auto compiler = Compiler { .interpreter = this };
     auto program = CodeFragment { .name = "[global]" };
     compiler.compile_func(&global, &program, &global_scope);
     if (check_arg("-D")) {

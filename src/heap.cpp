@@ -70,6 +70,13 @@ void Heap::gc(std::vector<Value>& globals, const StackType &stack, uint32_t stac
     // Basic mark-n-sweep garbage collector
     // Doesn't handle strings just yet
 
+    // TODO: have a look at incremental GC
+    // TODO: long way down the line, mark phase should be parallelizable
+    // https://www.lua.org/wshop18/Ierusalimschy.pdf
+
+    // TODO: look into generational hypothesis
+    // TODO: general speed ups
+
     // gc every 1ms
     auto now = std::chrono::steady_clock::now();
     if (1000 > std::chrono::duration_cast<std::chrono::microseconds>(now - last_gc).count()) {
@@ -81,6 +88,12 @@ void Heap::gc(std::vector<Value>& globals, const StackType &stack, uint32_t stac
     for (const auto& v: globals) {
         gc_visit(v);
     }
+
+    // TODO:
+    // need to consider refcounted stuff as GC roots, so the C-side can keep stuff alive
+    // Lua solves this with the registry, maybe that's faster? separate pool for 
+    // objects referenced from C: remove from tack side when refcounted, return to tack-side when released
+    // iterate over all allocations, and visit when there's a nonzero refcount
 
     // mark stack
     gc_visit(stack[stackbase-4]); // special case: s-4 contains the return value (unique to the current stack frame) // TODO: remove this

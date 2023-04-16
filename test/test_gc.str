@@ -14,7 +14,8 @@ fn () {
         fn bar() {
             fn baz() {
                 let arr = [ 1, 2, 3 ]
-                fn quz() {}
+                fn quz() {
+                }
                 quz()
             }
             baz()

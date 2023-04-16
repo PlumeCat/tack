@@ -28,7 +28,7 @@ make
 - [ ] boolean literals and operations (do as number?)
 - [ ] string operations
 - [ ] calling tack functions from C
-- [ ] garbage collector. must be allowed to retain pointers in C world
+- [x] garbage collector. must be allowed to retain pointers in C world
 - [ ] algebraics
 - [ ] some kind of error handling (note: lua has pcall(func) not true exceptions)
 - [x] initialization for array and object literals
