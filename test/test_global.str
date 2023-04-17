@@ -1,9 +1,8 @@
 export let quz = 3
-
-print(quz)
+let qux = 4
 
 export fn foo() {
-    print("foo")
+    print("foo", quz, qux)
 }
 fn bar() {
     print("bar")

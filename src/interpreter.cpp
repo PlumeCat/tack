@@ -36,16 +36,6 @@ Value Interpreter::get_global(const std::string& name) {
     return globals[var->g_id];
 }
 
-/*
- return &scopes.back().bindings.try_emplace(
-    binding,
-    VariableContext {
-        0,
-        is_const,
-        true,
-        interpreter->next_gid()
-    }).first->second;
-*/
 Compiler::VariableContext* Interpreter::set_global(const std::string& name, bool is_const, Value value) {
     // lookup binding
     auto* var = global_scope.lookup(name);
@@ -76,38 +66,46 @@ CodeFragment* Interpreter::create_fragment() {
     return &fragments.emplace_back();
 }
 
-void Interpreter::execute(const std::string& code, bool log_ast, bool log_bytecode) {
+// void Interpreter::execute(const std::string& code, bool log_ast, bool log_bytecode) {
+Value Interpreter::load(const std::string& source) {
     auto out_ast = AstNode {};
-    parse(code, out_ast);
+    parse(source, out_ast);
     
-    if (log_ast) {
-        log("AST: ", out_ast.tostring());
-    }
+    // if (log_ast) {
+    //     log("AST: ", out_ast.tostring());
+    // }
 
-    auto global = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
-    auto compiler = Compiler { .interpreter = this };
+    auto ast = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
 
     // creates the root fragment
+    auto compiler = Compiler { .interpreter = this };
     auto* fragment = create_fragment();
     fragment->name = "[global]";
-    compiler.compile_func(&global, fragment, &global_scope);
-    
-    if (log_bytecode) {
-        log("Program:\n" + fragment->str());
-    }
-    
-    execute(fragment);
+    compiler.compile_func(&ast, fragment, &global_scope);
+
+    // create fragment
+    // compile fragment
+
+    auto* func = heap.alloc_function(fragment);
+    // func is unreachable - addref it so it won't get deleted
+    func->refcount = 1;
+    return value_from_function(func);
 }
 
-// TODO: unify this with CALL
-// externally appears as if modules are loaded as functions and called immediately
-void Interpreter::execute(CodeFragment* program) {
-    #define handle(opcode) break; case Opcode::opcode:
-    #define REGISTER_RAW(n) _stack[_stackbase+n]
-    #define REGISTER(n)     (value_is_boxed(REGISTER_RAW(n)) ? value_to_boxed(REGISTER_RAW(n))->value : REGISTER_RAW(n))
+#define handle(opcode) break; case Opcode::opcode:
+#define REGISTER_RAW(n) _stack[_stackbase+n]
+#define REGISTER(n)     (value_is_boxed(REGISTER_RAW(n)) ? value_to_boxed(REGISTER_RAW(n))->value : REGISTER_RAW(n))
+#define error(err) ({ throw std::runtime_error(err), value_null(); });
+
+Value Interpreter::call(Value func, Value* args, int nargs) {
+    auto* f = value_to_function(func);
+    execute(f->bytecode, f->captures.data());
+}
+
+void Interpreter::execute(CodeFragment* func, Value* captures) {
 
     // program counter
-    auto _pr = program; // current program
+    auto _pr = func; // current program
     auto _pc = 0u;
     auto _pe = _pr->instructions.size();
 
@@ -116,11 +114,10 @@ void Interpreter::execute(CodeFragment* program) {
     auto _stackbase = STACK_FRAME_OVERHEAD;
     _stack.fill(value_null());
     _stack[0]._i = _pr->instructions.size(); // pseudo return address
-    _stack[1]._p = (void*)program; // pseudo return program
+    _stack[1]._p = (void*)func; // pseudo return program
     _stack[2]._i = 0; // reset stack base to 0, should not be reached
-    _stack[3] = value_null(); // captures array
+    _stack[3]._p = captures; // captures array
 
-    #define error(err) ({ throw std::runtime_error(err), value_null(); });
     auto dumpstack = [&]() {
         log("in", _pr->name);
 
@@ -302,11 +299,11 @@ void Interpreter::execute(CodeFragment* program) {
                         auto val = REGISTER_RAW(c.source_register);
                         if (!value_is_boxed(val)) {
                             auto box = value_from_boxed(heap.alloc_box(val));
-                            func->captures->values.emplace_back(box);
+                            func->captures.emplace_back(box);
                             // box existing variable inplace
                             REGISTER_RAW(c.source_register) = box;
                         } else {
-                            func->captures->values.emplace_back(val);
+                            func->captures.emplace_back(val);
                         }
                     }
 
@@ -314,7 +311,8 @@ void Interpreter::execute(CodeFragment* program) {
                     REGISTER(i.r0) = value_from_function(func);
                 }
                 handle(READ_CAPTURE) {
-                    REGISTER_RAW(i.r0) = value_to_array(REGISTER_RAW(-1))->values.at(i.r1);
+                    REGISTER_RAW(i.r0) = ((Value*)(REGISTER_RAW(-1)._p))[i.r1];
+                    // value_to_array(REGISTER_RAW(-1))->values.at(i.r1);
                 }
                 handle(ALLOC_ARRAY) {
                     auto* arr = heap.alloc_array();
@@ -409,7 +407,7 @@ void Interpreter::execute(CodeFragment* program) {
                         REGISTER_RAW(new_base - 4)._i = _pc; // push return addr
                         REGISTER_RAW(new_base - 3)._p = (void*)_pr; // return program
                         REGISTER_RAW(new_base - 2)._i = _stackbase; // push return frameptr
-                        REGISTER_RAW(new_base - 1) = value_from_array(func->captures);
+                        REGISTER_RAW(new_base - 1)._p = func->captures.data();
 
                         _pr = func->bytecode;
                         _pc = -1; // TODO: gather all instructions into one big chunk to avoid this
@@ -462,6 +460,9 @@ void Interpreter::execute(CodeFragment* program) {
         dumpstack();
     }
 
-    #undef error
 }
 
+#undef error
+#undef handle
+#undef REGISTER
+#undef REGISTER_RAW

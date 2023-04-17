@@ -364,12 +364,12 @@ uint8_t Compiler::compile(const AstNode* node) {
             // Currently it has to be specially interleaved because recursive functions need to be
             // able to capture themselves by name, which is impossible with bind_name("recursive", compile(...))
 
-            auto func = interpreter->create_fragment();
-            auto index = output->store_fragment(func);
-
             auto& ident = node->children[0].data_s;
+            auto func = interpreter->create_fragment();
             func->name = output->name + "::" + ident;
+
             auto out = allocate_register();
+            auto index = output->store_fragment(func);
             
             /* interleaved from ConstDeclStat */ auto is_export = node->children[0].data_d;
             /* interleaved from ConstDeclStat */ auto var = bind_name(ident, out, true, is_export);

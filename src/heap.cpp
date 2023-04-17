@@ -12,7 +12,7 @@ ObjectType* Heap::alloc_object() {
 FunctionType* Heap::alloc_function(CodeFragment* code) {
     return &_functions.emplace_back(FunctionType {
         .bytecode = code,
-        .captures = alloc_array()
+        .captures = {}
     });
 }
 
@@ -56,8 +56,7 @@ void gc_visit(Value value) {
             auto f = value_to_function(value);
             if (!f->marker) {
                 f->marker = true;
-                f->captures->marker = true;
-                for (auto v: f->captures->values) {
+                for (auto v: f->captures) {
                     gc_visit(v);
                 }
             }
@@ -83,6 +82,7 @@ void Heap::gc(std::vector<Value>& globals, const StackType &stack, uint32_t stac
         return;
     }
     last_gc = now;
+    std::cout << "===== GC =====" << std::endl;
 
     // mark globals
     for (const auto& v: globals) {
@@ -107,7 +107,7 @@ void Heap::gc(std::vector<Value>& globals, const StackType &stack, uint32_t stac
     auto i = _objects.begin();
     while (i != _objects.end()) {
         if (!i->marker && i->refcount == 0) {
-            // std::cout << "collected " << value_from_object(&(*i)) << std::endl;
+            std::cout << "collected " << value_from_object(&(*i)) << std::endl;
             i = _objects.erase(i);
         } else {
             i->marker = false;
@@ -119,7 +119,7 @@ void Heap::gc(std::vector<Value>& globals, const StackType &stack, uint32_t stac
     auto j = _arrays.begin();
     while (j != _arrays.end()) {
         if (!j->marker && j->refcount == 0) {
-            // std::cout << "collected " << value_from_array(&(*j)) << std::endl;
+            std::cout << "collected " << value_from_array(&(*j)) << std::endl;
             j = _arrays.erase(j);
         } else {
             j->marker = false;
@@ -131,7 +131,7 @@ void Heap::gc(std::vector<Value>& globals, const StackType &stack, uint32_t stac
     auto k = _boxes.begin();
     while (k != _boxes.end()) {
         if (!k->marker && k->refcount == 0) {
-            // std::cout << "collected " << value_from_boxed(&(*k)) << std::endl;
+            std::cout << "collected " << value_from_boxed(&(*k)) << std::endl;
             k = _boxes.erase(k);
         } else {
             k->marker = false;
@@ -143,7 +143,7 @@ void Heap::gc(std::vector<Value>& globals, const StackType &stack, uint32_t stac
     auto f = _functions.begin();
     while (f != _functions.end()) {
         if (!f->marker && f->refcount == 0) {
-            // std::cout << "collected " << value_from_function(&(*f)) << std::endl;
+            std::cout << "collected " << value_from_function(&(*f)) << std::endl;
             f = _functions.erase(f);
         } else {
             f->marker = false;

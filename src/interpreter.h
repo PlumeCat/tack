@@ -30,11 +30,10 @@ private:
     Heap heap;
     Compiler::ScopeContext global_scope; // c-provided globals go here
     uint16_t next_globalid; // TODO: bit clumsy, try and improve it
-
     std::vector<Value> globals;
     std::list<CodeFragment> fragments;
 
-    void execute(CodeFragment* fragment);
+    void execute(CodeFragment* fragment, Value* captures);
 
 public:
     Interpreter();
@@ -45,5 +44,10 @@ public:
     Compiler::VariableContext* set_global(const std::string& name, bool is_const, Value value);
     Value get_global(const std::string& name);
     uint16_t next_gid();
-    void execute(const std::string& code, bool log_ast, bool log_bytecode);
+    
+    // void execute(const std::string& code, bool log_ast, bool log_bytecode);
+
+    // returns the file-level scope as a callable function
+    Value load(const std::string& source);
+    Value call(Value func, Value* args, int nargs);
 };

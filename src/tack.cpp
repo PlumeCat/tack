@@ -70,7 +70,8 @@ int main(int argc, char* argv[]) {
                 return 2;
             }
             auto& source = s.value();
-            vm.execute(source, log_ast, log_bytecode);
+            vm.call(vm.load(source), nullptr, 0);
+            vm.call(vm.get_global("foo"), nullptr, 0);
         }
     } catch (std::exception& e) {
         log(e.what());
