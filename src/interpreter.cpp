@@ -15,6 +15,7 @@
 
 Interpreter::Interpreter() {
     next_globalid = 0;
+    stackbase = 0;
     global_scope.compiler = nullptr;
     global_scope.parent_scope = nullptr;
     global_scope.is_function_scope = false;
@@ -88,8 +89,8 @@ Value Interpreter::load(const std::string& source) {
 }
 
 #define handle(opcode) break; case Opcode::opcode:
-#define REGISTER_RAW(n) _stack[_stackbase+n]
-#define REGISTER(n)     (value_is_boxed(REGISTER_RAW(n)) ? value_to_boxed(REGISTER_RAW(n))->value : REGISTER_RAW(n))
+#define REGISTER_RAW(n) stack[stackbase+n]
+#define REGISTER(n)     *(value_is_boxed(REGISTER_RAW(n)) ? &value_to_boxed(REGISTER_RAW(n))->value : &REGISTER_RAW(n))
 #define error(err) ({ throw std::runtime_error(err), value_null(); });
 
 Value Interpreter::call(Value fn, Value* args, int nargs) {
@@ -101,23 +102,23 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
     auto _pe = _pr->bytecode->instructions.size();
 
     // stack/registers
-    auto _stack = Stack {};
-    auto _stackbase = STACK_FRAME_OVERHEAD;
-    _stack.fill(value_null());
-    _stack[0]._i = _pr->bytecode->instructions.size(); // pseudo return address
-    _stack[1]._p = (void*)func; // pseudo return program
-    _stack[2]._i = 0; // reset stack base to 0, should not be reached
-    // _stack[3]._p = _pr->bytecode->captures; // captures array
+    // auto _stack = Stack {};
+    stackbase = STACK_FRAME_OVERHEAD;
+    stack.fill(value_null());
+    stack[0]._i = _pr->bytecode->instructions.size(); // pseudo return address
+    stack[1]._p = (void*)func; // pseudo return program
+    stack[2]._i = 0; // reset stack base to 0, should not be reached
+    // stack[3]._p = _pr->bytecode->captures; // captures array
 
     auto dumpstack = [&]() {
         log("in", _pr->bytecode->name);
 
-        auto s = _stackbase;
-        auto ret_s = _stack[s-2]._i;
-        while (_stack[s-2]._i != 0) {
-            auto func = (CodeFragment*)_stack[s-3]._p;
+        auto s = stackbase;
+        auto ret_s = stack[s-2]._i;
+        while (stack[s-2]._i != 0) {
+            auto func = (CodeFragment*)stack[s-3]._p;
             log(" -", func->name);
-            s = _stack[s-2]._i;
+            s = stack[s-2]._i;
         }
     };
 
@@ -396,18 +397,18 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                         
                         REGISTER_RAW(new_base - 3)._i = _pc; // push return addr
                         REGISTER_RAW(new_base - 2)._p = (void*)_pr; // return program
-                        REGISTER_RAW(new_base - 1)._i = _stackbase; // push return frameptr
+                        REGISTER_RAW(new_base - 1)._i = stackbase; // push return frameptr
                         // REGISTER_RAW(new_base - 1)._p = func->captures.data();
 
                         _pr = func;
                         _pc = -1; // TODO: gather all instructions into one big chunk to avoid this
                         _pe = _pr->bytecode->instructions.size();
-                        _stackbase = _stackbase + new_base; // new stack frame
+                        stackbase = stackbase + new_base; // new stack frame
                     } else if (value_is_cfunction(r0)) {
                         auto cfunc = value_to_cfunction(r0);
                         auto nargs = i.r1;
                         auto new_base = i.r2 + STACK_FRAME_OVERHEAD;
-                        REGISTER_RAW(i.r2) = cfunc(nargs, &_stack[_stackbase + new_base]);
+                        REGISTER_RAW(i.r2) = cfunc(nargs, &stack[stackbase + new_base]);
                     } else {
                         error("tried to call non-function");
                     }
@@ -424,17 +425,17 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     // TODO: try and elide this, or make more efficient
                     REGISTER_RAW(-3) = i.r0 ? REGISTER_RAW(i.r1) : value_null();
                     // std::cout << "### GC after func: " << _pr->bytecode->name << std::endl;
-                    std::memset(_stack.data() + _stackbase, 0xffffffff, MAX_REGISTERS * sizeof(Value));
-                    heap.gc(globals, _stack, _stackbase);
+                    std::memset(stack.data() + stackbase, 0xffffffff, MAX_REGISTERS * sizeof(Value));
+                    heap.gc(globals, stack, stackbase);
                     REGISTER_RAW(-2) = value_null();
                     REGISTER_RAW(-1) = value_null();
 
                     _pc = return_addr._i;
                     _pr = (FunctionType*)return_func._p;
                     _pe = _pr->bytecode->instructions.size();
-                    _stackbase = return_stack._i;
+                    stackbase = return_stack._i;
 
-                    if (_stackbase == 0) {
+                    if (stackbase == 0) {
                         // end of program
                         _pc = _pe;
                     }

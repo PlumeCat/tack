@@ -5,6 +5,7 @@ let qux = 4
 export fn foo() {
     print([ 1, 2, 3 ])
     print("foo", quz, qux)
+    quz = 400
 }
 fn bar() {
     print("bar")
