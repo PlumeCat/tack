@@ -35,6 +35,10 @@ Value tack_clock(int nargs, Value* args) {
     return value_from_number(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 1e6);
 }
 
+Value tack_pong(int nargs, Value* args) {
+    auto func = value_to_function(args[0]);
+}
+
 int main(int argc, char* argv[]) {
     auto log_ast = false;
     auto log_bytecode = false;

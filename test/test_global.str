@@ -1,7 +1,9 @@
 export let quz = 3
 let qux = 4
 
+
 export fn foo() {
+    print([ 1, 2, 3 ])
     print("foo", quz, qux)
 }
 fn bar() {

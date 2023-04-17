@@ -42,7 +42,6 @@ enum class Type : uint64_t {
     // scalars
     Null = type_bits_null,
     Boolean = type_bits_boolean,
-    // Integer = type_bits_integer,
     Number = type_bits_number,
     String = type_bits_string,
     Pointer = type_bits_pointer,
@@ -62,6 +61,7 @@ enum class Type : uint64_t {
     /*
     other possibilities:
         C_function - might need its own type?
+        int32 or uint32 - removed it once already
         color (byte4 aka uint32)
         "class" - some kind of special class object with copydown inheritance
     */
@@ -111,7 +111,6 @@ inline constexpr Value value_true()                     { return { nan_bits | ty
 
 // create value
 inline Value value_from_boolean(bool b)                 { return { nan_bits | type_bits_boolean | b }; }
-// inline Value value_from_integer(int32_t i)              { return { nan_bits | type_bits_integer | i }; }
 inline Value value_from_number(double d)                { return { ._d = d }; /* TODO: check for nan and mask off? */}
 inline Value value_from_pointer(void* ptr)              { return { nan_bits | type_bits_pointer | ((uint64_t)ptr & pointer_bits) }; }
 inline Value value_from_function(FunctionType* func)    { return { nan_bits | type_bits_function | uint64_t(func) }; }
@@ -129,7 +128,6 @@ inline Value value_from_mat4(mat4* m4)                  { return { nan_bits | ty
 inline Type value_get_type(Value v)                     { return std::isnan(v._d) ? (Type)(v._i & type_bits) : Type::Number; }
 inline bool value_is_null(Value v)                      { return v._i == UINT64_MAX; }
 inline bool value_is_boolean(Value v)                   { return (v._i & type_bits) == type_bits_boolean; }
-// inline bool value_is_integer(Value v)                   { return (v._i & type_bits) == type_bits_integer; }
 inline bool value_is_number(Value v)                    { return !std::isnan(v._d); }
 inline bool value_is_pointer(Value v)                   { return (v._i & type_bits) == type_bits_pointer; }
 inline bool value_is_boxed(Value v)                     { return std::isnan(v._d) && (v._i & type_bits) == type_bits_boxed;   }
@@ -143,15 +141,7 @@ inline bool value_is_vec3(Value v)                      { return (v._i & type_bi
 inline bool value_is_vec4(Value v)                      { return (v._i & type_bits) == type_bits_vec4; }
 inline bool value_is_mat4(Value v)                      { return (v._i & type_bits) == type_bits_mat4; }
 
-// inline void check_type(Value v, bool (*checker)(Value), const std::string& msg) {
-//     if (!checker(v)) {
-//         throw std::runtime_error("type error: not a " + msg);
-//     }
-// }
-// #define check(ty) check_type(v, value_is_##ty, #ty);
-
 #define check(ty) if (!value_is_##ty(v)) throw std::runtime_error("type error: expected " #ty);
-
 inline StringType* value_to_string(Value v)             { check(string);    return (StringType*)(v._i & pointer_bits); }
 inline ArrayType* value_to_array(Value v)               { check(array);     return (ArrayType*)(v._i & pointer_bits); }
 inline ObjectType* value_to_object(Value v)             { check(object);    return (ObjectType*)(v._i & pointer_bits); }
@@ -164,7 +154,6 @@ inline vec4* value_to_vec4(Value v)                     { check(vec4);      retu
 inline mat4* value_to_mat4(Value v)                     { check(mat4);      return (mat4*)(v._i & pointer_bits); }
 inline uint64_t value_to_null(Value v)                  { check(null);      return v._i; } // ???
 inline bool value_to_boolean(Value v)                   { check(boolean);   return (bool)(v._i & boolean_bits); }
-// inline int32_t value_to_integer(Value v)                { check(integer);   return (int32_t)(v._i & integer_bits); }
 inline double value_to_number(Value v)                  { check(number);    return v._d; } // ???
 inline void* value_to_pointer(Value v)                  { check(pointer);   return (void*)(v._i & pointer_bits); }
 #undef check

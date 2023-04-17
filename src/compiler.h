@@ -9,7 +9,7 @@
 #include "value.h"
 
 static const uint32_t MAX_REGISTERS = 256;
-static const uint32_t STACK_FRAME_OVERHEAD = 4; // TODO: make this 3, can load captures through _pr
+static const uint32_t STACK_FRAME_OVERHEAD = 3; // TODO: make this 3, can load captures through _pr
 static const uint32_t MAX_STACK = 4096;
 
 enum class RegisterState {

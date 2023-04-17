@@ -1,0 +1,23 @@
+"Basic test of multiple Tack stacks, "
+
+export let counter = 0
+
+export fn ping4() {
+    counter = counter + 1
+    print("ping 4")
+}
+export fn ping3() {
+    counter = counter + 1
+    print("ping 3")
+    pong(ping4)
+}
+export fn ping2() {
+    counter = counter + 1
+    print("ping 2")
+    pong(ping3)
+}
+export fn ping1() {
+    counter = counter + 1
+    pring("ping")
+    pong(ping2)
+}

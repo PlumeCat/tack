@@ -66,7 +66,6 @@ CodeFragment* Interpreter::create_fragment() {
     return &fragments.emplace_back();
 }
 
-// void Interpreter::execute(const std::string& code, bool log_ast, bool log_bytecode) {
 Value Interpreter::load(const std::string& source) {
     auto out_ast = AstNode {};
     parse(source, out_ast);
@@ -82,10 +81,6 @@ Value Interpreter::load(const std::string& source) {
     auto* fragment = create_fragment();
     fragment->name = "[global]";
     compiler.compile_func(&ast, fragment, &global_scope);
-
-    // create fragment
-    // compile fragment
-
     auto* func = heap.alloc_function(fragment);
     // func is unreachable - addref it so it won't get deleted
     func->refcount = 1;
@@ -97,29 +92,25 @@ Value Interpreter::load(const std::string& source) {
 #define REGISTER(n)     (value_is_boxed(REGISTER_RAW(n)) ? value_to_boxed(REGISTER_RAW(n))->value : REGISTER_RAW(n))
 #define error(err) ({ throw std::runtime_error(err), value_null(); });
 
-Value Interpreter::call(Value func, Value* args, int nargs) {
-    auto* f = value_to_function(func);
-    execute(f->bytecode, f->captures.data());
-}
-
-void Interpreter::execute(CodeFragment* func, Value* captures) {
+Value Interpreter::call(Value fn, Value* args, int nargs) {
+    auto* func = value_to_function(fn);
 
     // program counter
     auto _pr = func; // current program
     auto _pc = 0u;
-    auto _pe = _pr->instructions.size();
+    auto _pe = _pr->bytecode->instructions.size();
 
     // stack/registers
-    auto _stack = StackType {};
+    auto _stack = Stack {};
     auto _stackbase = STACK_FRAME_OVERHEAD;
     _stack.fill(value_null());
-    _stack[0]._i = _pr->instructions.size(); // pseudo return address
+    _stack[0]._i = _pr->bytecode->instructions.size(); // pseudo return address
     _stack[1]._p = (void*)func; // pseudo return program
     _stack[2]._i = 0; // reset stack base to 0, should not be reached
-    _stack[3]._p = captures; // captures array
+    // _stack[3]._p = _pr->bytecode->captures; // captures array
 
     auto dumpstack = [&]() {
-        log("in", _pr->name);
+        log("in", _pr->bytecode->name);
 
         auto s = _stackbase;
         auto ret_s = _stack[s-2]._i;
@@ -132,14 +123,14 @@ void Interpreter::execute(CodeFragment* func, Value* captures) {
 
     try {
         while (_pc < _pe) {
-            auto i = _pr->instructions[_pc];
+            auto i = _pr->bytecode->instructions[_pc];
             switch (i.opcode) {
             case Opcode::UNKNOWN: break;
                 handle(LOAD_I) {
                     REGISTER(i.r0) = value_from_number(i.u1);
                 }
                 handle(LOAD_CONST) {
-                    REGISTER(i.r0) = _pr->storage[i.u1];
+                    REGISTER(i.r0) = _pr->bytecode->storage[i.u1];
                 }
                 handle(ADD) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r1)) + value_to_number(REGISTER(i.r2)));
@@ -205,11 +196,10 @@ void Interpreter::execute(CodeFragment* func, Value* captures) {
                     REGISTER(i.r0) = REGISTER(i.r1);
                 }
                 handle(READ_GLOBAL) {
-                    REGISTER(i.r0) = globals[i.u1];
+                    REGISTER(i.r0) = globals[i.u1]; // i.u1 will never be out of range
                 }
                 handle(WRITE_GLOBAL) {
-                    // should never need to resize
-                    globals[i.u1] = REGISTER(i.r0);
+                    globals[i.u1] = REGISTER(i.r0); // i.u1 will never be out of range
                 }
                 handle(FOR_INT) {
                     auto var = value_to_number(REGISTER(i.r0));
@@ -288,9 +278,13 @@ void Interpreter::execute(CodeFragment* func, Value* captures) {
                     auto* arr = value_to_array(REGISTER(i.r1));
                     REGISTER(i.r0) = value_from_number(arr->values.size());
                 }
+                handle(READ_CAPTURE) {
+                    REGISTER_RAW(i.r0) = _pr->captures[i.r1];//((Value*)(REGISTER_RAW(-1)._p))[i.r1];
+                    // value_to_array(REGISTER_RAW(-1))->values.at(i.r1);
+                }
                 handle(ALLOC_FUNC) {
                     // create closure
-                    auto code = (CodeFragment*)value_to_pointer(_pr->storage[i.u1]);
+                    auto code = (CodeFragment*)value_to_pointer(_pr->bytecode->storage[i.u1]);
                     auto* func = heap.alloc_function(code);
 
                     // capture captures
@@ -309,10 +303,6 @@ void Interpreter::execute(CodeFragment* func, Value* captures) {
 
                     // done
                     REGISTER(i.r0) = value_from_function(func);
-                }
-                handle(READ_CAPTURE) {
-                    REGISTER_RAW(i.r0) = ((Value*)(REGISTER_RAW(-1)._p))[i.r1];
-                    // value_to_array(REGISTER_RAW(-1))->values.at(i.r1);
                 }
                 handle(ALLOC_ARRAY) {
                     auto* arr = heap.alloc_array();
@@ -404,14 +394,14 @@ void Interpreter::execute(CodeFragment* func, Value* captures) {
                         auto nargs = i.r1;
                         auto new_base = i.r2 + STACK_FRAME_OVERHEAD;
                         
-                        REGISTER_RAW(new_base - 4)._i = _pc; // push return addr
-                        REGISTER_RAW(new_base - 3)._p = (void*)_pr; // return program
-                        REGISTER_RAW(new_base - 2)._i = _stackbase; // push return frameptr
-                        REGISTER_RAW(new_base - 1)._p = func->captures.data();
+                        REGISTER_RAW(new_base - 3)._i = _pc; // push return addr
+                        REGISTER_RAW(new_base - 2)._p = (void*)_pr; // return program
+                        REGISTER_RAW(new_base - 1)._i = _stackbase; // push return frameptr
+                        // REGISTER_RAW(new_base - 1)._p = func->captures.data();
 
-                        _pr = func->bytecode;
+                        _pr = func;
                         _pc = -1; // TODO: gather all instructions into one big chunk to avoid this
-                        _pe = _pr->instructions.size();
+                        _pe = _pr->bytecode->instructions.size();
                         _stackbase = _stackbase + new_base; // new stack frame
                     } else if (value_is_cfunction(r0)) {
                         auto cfunc = value_to_cfunction(r0);
@@ -423,26 +413,25 @@ void Interpreter::execute(CodeFragment* func, Value* captures) {
                     }
                 }
                 handle(RET) {
-                    auto return_addr = REGISTER_RAW(-4);
-                    auto return_func = REGISTER_RAW(-3);
-                    auto return_stack = REGISTER_RAW(-2);
+                    auto return_addr = REGISTER_RAW(-3);
+                    auto return_func = REGISTER_RAW(-2);
+                    auto return_stack = REGISTER_RAW(-1);
 
                     // "Clean" the stack
                     // - Must not leave any boxes in unused registers
                     // or subsequent loads to register will mistakenly write-through
                     // - Also must not leave any references so the GC can collect stuff off the stack
                     // TODO: try and elide this, or make more efficient
-                    REGISTER_RAW(-4) = i.r0 ? REGISTER_RAW(i.r1) : value_null();
-                    // std::cout << "### GC after func: " << _pr->name << std::endl;
+                    REGISTER_RAW(-3) = i.r0 ? REGISTER_RAW(i.r1) : value_null();
+                    // std::cout << "### GC after func: " << _pr->bytecode->name << std::endl;
                     std::memset(_stack.data() + _stackbase, 0xffffffff, MAX_REGISTERS * sizeof(Value));
                     heap.gc(globals, _stack, _stackbase);
-                    REGISTER_RAW(-3) = value_null();
                     REGISTER_RAW(-2) = value_null();
                     REGISTER_RAW(-1) = value_null();
 
                     _pc = return_addr._i;
-                    _pr = (CodeFragment*)return_func._p;
-                    _pe = _pr->instructions.size();
+                    _pr = (FunctionType*)return_func._p;
+                    _pe = _pr->bytecode->instructions.size();
                     _stackbase = return_stack._i;
 
                     if (_stackbase == 0) {
