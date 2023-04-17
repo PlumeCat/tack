@@ -55,9 +55,6 @@ std::string CodeFragment::str() {
         i++;
     }
 
-    for (auto& f : fragments) {
-        s << f->str();
-    }
     return s.str();
 }
 

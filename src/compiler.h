@@ -30,7 +30,6 @@ struct CodeFragment {
     std::vector<Instruction> instructions;
     std::vector<Value> storage; // program constant storage goes at the bottom of the stack for now
     std::list<std::string> strings; // string constants and literals storage - includes identifiers for objects
-    std::list<CodeFragment*> fragments; // local functions (everything is a local function from the POV of the global context)
     std::vector<CaptureInfo> capture_info;
 
     uint16_t store_number(double d);

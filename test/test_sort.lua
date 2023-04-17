@@ -1,5 +1,4 @@
 -- lua_sort_test.lua
-
 math.randomseed(os.time())
 
 alloc_count = 0
@@ -78,9 +77,13 @@ N = 1000
 local A = table_random(N, N)
 
 -- table_print(A)
+collectgarbage("collect") -- run twice
+collectgarbage("collect")
+collectgarbage("stop") -- Fair comparison!
 local before = os.clock()
 local B = table_quicksort(A)
 local after = os.clock()
+collectgarbage("restart")
 -- table_print(B)
 
 print("Time taken: " .. tostring(after - before))

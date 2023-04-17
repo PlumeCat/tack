@@ -18,6 +18,10 @@ export fn ping2() {
 }
 export fn ping1() {
     counter = counter + 1
-    pring("ping")
+    print("ping")
     pong(ping2)
 }
+
+ping1()
+
+print("end pingpong")

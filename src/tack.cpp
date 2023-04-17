@@ -35,8 +35,12 @@ Value tack_clock(int nargs, Value* args) {
     return value_from_number(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 1e6);
 }
 
+Interpreter* vm;
+
 Value tack_pong(int nargs, Value* args) {
-    auto func = value_to_function(args[0]);
+    // auto func = value_to_function(args[0]);
+    log("pong");
+    vm->call(args[0], nullptr, 0);
 }
 
 int main(int argc, char* argv[]) {
@@ -62,9 +66,11 @@ int main(int argc, char* argv[]) {
 
     try {
         auto vm = Interpreter {};
+        ::vm = &vm;
         vm.set_global("print", true, value_from_cfunction(tack_print));
         vm.set_global("random", true, value_from_cfunction(tack_random));
         vm.set_global("clock", true, value_from_cfunction(tack_clock));
+        vm.set_global("pong", true, value_from_cfunction(tack_pong));
 
         for (auto& f: files) {
             log("executing source file:", f);
@@ -75,7 +81,11 @@ int main(int argc, char* argv[]) {
             }
             auto& source = s.value();
             vm.call(vm.load(source), nullptr, 0);
-            vm.call(vm.get_global("foo"), nullptr, 0);
+            
+            auto foo = vm.get_global("foo");
+            if (value_is_function(foo)) {
+                vm.call(foo, nullptr, 0);
+            }
         }
     } catch (std::exception& e) {
         log(e.what());

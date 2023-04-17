@@ -15,10 +15,11 @@
 
 Interpreter::Interpreter() {
     next_globalid = 0;
-    stackbase = 0;
+    stackbase = STACK_FRAME_OVERHEAD;
     global_scope.compiler = nullptr;
     global_scope.parent_scope = nullptr;
     global_scope.is_function_scope = false;
+    stack.fill(value_null());
 }
 
 uint16_t Interpreter::next_gid() {
@@ -70,11 +71,6 @@ CodeFragment* Interpreter::create_fragment() {
 Value Interpreter::load(const std::string& source) {
     auto out_ast = AstNode {};
     parse(source, out_ast);
-    
-    // if (log_ast) {
-    //     log("AST: ", out_ast.tostring());
-    // }
-
     auto ast = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
 
     // creates the root fragment
@@ -83,6 +79,7 @@ Value Interpreter::load(const std::string& source) {
     fragment->name = "[global]";
     compiler.compile_func(&ast, fragment, &global_scope);
     auto* func = heap.alloc_function(fragment);
+
     // func is unreachable - addref it so it won't get deleted
     func->refcount = 1;
     return value_from_function(func);
@@ -102,13 +99,15 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
     auto _pe = _pr->bytecode->instructions.size();
 
     // stack/registers
-    // auto _stack = Stack {};
-    stackbase = STACK_FRAME_OVERHEAD;
-    stack.fill(value_null());
-    stack[0]._i = _pr->bytecode->instructions.size(); // pseudo return address
-    stack[1]._p = (void*)func; // pseudo return program
-    stack[2]._i = 0; // reset stack base to 0, should not be reached
-    // stack[3]._p = _pr->bytecode->captures; // captures array
+    auto initial_stackbase = stackbase;
+    stackbase += STACK_FRAME_OVERHEAD;
+
+    REGISTER_RAW(-3)._i = _pr->bytecode->instructions.size();
+    REGISTER_RAW(-2)._p = (void*)func;
+    REGISTER_RAW(-1)._i = 0; // special case
+    // stack[0]._i = _pr->bytecode->instructions.size(); // pseudo return address
+    // stack[1]._p = (void*)func; // pseudo return program
+    // stack[2]._i = stackbase; // reset stack base to 0, should not be reached
 
     auto dumpstack = [&]() {
         log("in", _pr->bytecode->name);
@@ -417,15 +416,16 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     auto return_addr = REGISTER_RAW(-3);
                     auto return_func = REGISTER_RAW(-2);
                     auto return_stack = REGISTER_RAW(-1);
+                    auto return_val = REGISTER(i.r1);
 
                     // "Clean" the stack
                     // - Must not leave any boxes in unused registers
                     // or subsequent loads to register will mistakenly write-through
                     // - Also must not leave any references so the GC can collect stuff off the stack
                     // TODO: try and elide this, or make more efficient
-                    REGISTER_RAW(-3) = i.r0 ? REGISTER_RAW(i.r1) : value_null();
                     // std::cout << "### GC after func: " << _pr->bytecode->name << std::endl;
                     std::memset(stack.data() + stackbase, 0xffffffff, MAX_REGISTERS * sizeof(Value));
+                    REGISTER_RAW(-3) = return_val;
                     heap.gc(globals, stack, stackbase);
                     REGISTER_RAW(-2) = value_null();
                     REGISTER_RAW(-1) = value_null();
@@ -449,7 +449,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
         log("runtime error: ", e.what());
         dumpstack();
     }
-
+    stackbase = initial_stackbase;
 }
 
 #undef error

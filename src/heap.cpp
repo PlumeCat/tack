@@ -96,7 +96,9 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
     // iterate over all allocations, and visit when there's a nonzero refcount
 
     // mark stack
-    gc_visit(stack[stackbase - STACK_FRAME_OVERHEAD]); // special case: s-4 contains the return value (unique to the current stack frame) // TODO: remove this
+    // TODO: visit functions in the call stack just in case
+    // TODO: remove this special case: also need to visit the return value (unique to the current call frame)
+    gc_visit(stack[stackbase - STACK_FRAME_OVERHEAD]);
     for (auto s = stackbase; stack[s-1]._i != 0; s = stack[s-1]._i) {
         for (auto i = stack[s-1]._i; i < s - STACK_FRAME_OVERHEAD; i++) {
             gc_visit(stack[i]);
@@ -107,7 +109,7 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
     auto i = _objects.begin();
     while (i != _objects.end()) {
         if (!i->marker && i->refcount == 0) {
-            std::cout << "collected " << value_from_object(&(*i)) << std::endl;
+            //std::cout << "collected " << value_from_object(&(*i)) << std::endl;
             i = _objects.erase(i);
         } else {
             i->marker = false;
@@ -119,7 +121,7 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
     auto j = _arrays.begin();
     while (j != _arrays.end()) {
         if (!j->marker && j->refcount == 0) {
-            std::cout << "collected " << value_from_array(&(*j)) << std::endl;
+            //std::cout << "collected " << value_from_array(&(*j)) << std::endl;
             j = _arrays.erase(j);
         } else {
             j->marker = false;
@@ -131,7 +133,7 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
     auto k = _boxes.begin();
     while (k != _boxes.end()) {
         if (!k->marker && k->refcount == 0) {
-            std::cout << "collected " << value_from_boxed(&(*k)) << std::endl;
+            //std::cout << "collected " << value_from_boxed(&(*k)) << std::endl;
             k = _boxes.erase(k);
         } else {
             k->marker = false;
@@ -143,13 +145,15 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
     auto f = _functions.begin();
     while (f != _functions.end()) {
         if (!f->marker && f->refcount == 0) {
-            std::cout << "collected " << value_from_function(&(*f)) << std::endl;
+            std::cout << "collected " << f->bytecode->name << std::endl;
             f = _functions.erase(f);
         } else {
             f->marker = false;
             f++;
         }
     }
+
+    std::cout << "===== GC STOP =====" << std::endl;
 
     now = std::chrono::steady_clock::now();
     last_gc_duration = now - last_gc;
