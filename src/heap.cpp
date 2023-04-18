@@ -62,12 +62,15 @@ void gc_visit(Value value) {
             }
             break;
         }
+        default:break;
     }
 }
 
 void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbase) {
     // Basic mark-n-sweep garbage collector
     // Doesn't handle strings just yet
+
+    // TODO: bad code style everywhere
 
     // TODO: have a look at incremental GC
     // TODO: long way down the line, mark phase should be parallelizable
@@ -79,6 +82,7 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
     // gc every 1ms
     auto now = std::chrono::steady_clock::now();
     if (1000 > std::chrono::duration_cast<std::chrono::microseconds>(now - last_gc).count()) {
+    // if (true) {
         return;
     }
     last_gc = now;
@@ -121,8 +125,10 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
     auto j = _arrays.begin();
     while (j != _arrays.end()) {
         if (!j->marker && j->refcount == 0) {
-            //std::cout << "collected " << value_from_array(&(*j)) << std::endl;
-            j = _arrays.erase(j);
+            // std::cout << "collected " << value_from_array(&(*j)) << std::endl;
+            j->refcount = 0xDEAD;
+            j++;
+            // j = _arrays.erase(j);
         } else {
             j->marker = false;
             j++;

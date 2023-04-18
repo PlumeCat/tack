@@ -59,9 +59,10 @@ for i in 0, N {
 const before = clock()
 const B = quicksort(A)
 const after = clock()
-print("time taken")
-print(after - before)
+print("time taken", after - before)
 
 if #A != #B {
     print("not same size!")
+    print(A)
+    print(B)
 }

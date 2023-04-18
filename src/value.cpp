@@ -15,7 +15,6 @@ std::ostream& operator<<(std::ostream& o, const Value& v) {
     switch (v._i & type_bits) {
         case (uint64_t)Type::Null:      return o << "null";
         case (uint64_t)Type::Boolean:   return o << (value_to_boolean(v) ? "true" : "false");
-        // case (uint64_t)Type::Integer:   return o << value_to_integer(v);
         case (uint64_t)Type::String:    return o << value_to_string(v);
         case (uint64_t)Type::Pointer:   return o << value_to_pointer(v);
         case (uint64_t)Type::Object:    return o << *value_to_object(v);

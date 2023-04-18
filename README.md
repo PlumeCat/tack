@@ -27,13 +27,12 @@ make
 - [ ] comments
 - [ ] boolean literals and operations (do as number?)
 - [ ] string operations
-- [ ] calling tack functions from C
+- [x] calling tack functions from C
 - [x] garbage collector. must be allowed to retain pointers in C world
 - [ ] algebraics
 - [ ] some kind of error handling (note: lua has pcall(func) not true exceptions)
 - [x] initialization for array and object literals
-- [ ] module system or `export` or `dofile()` or otherwise 
-	- different files should be able to access each other's globals
+- [ ] proper module system
 - [ ] python style slice syntax for arrays
 - [x] allow more than 256 constants
 - [ ] language standard library, doesn't have to be massive

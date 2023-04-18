@@ -38,9 +38,8 @@ Value tack_clock(int nargs, Value* args) {
 Interpreter* vm;
 
 Value tack_pong(int nargs, Value* args) {
-    // auto func = value_to_function(args[0]);
     log("pong");
-    vm->call(args[0], nullptr, 0);
+    return vm->call(args[0], nullptr, 0);
 }
 
 int main(int argc, char* argv[]) {
@@ -84,7 +83,13 @@ int main(int argc, char* argv[]) {
             
             auto foo = vm.get_global("foo");
             if (value_is_function(foo)) {
-                vm.call(foo, nullptr, 0);
+                auto args = std::array<Value,3> {
+                    value_from_number(3),
+                    value_from_number(4),
+                    value_from_number(5)
+                };
+                auto retval = vm.call<3>(foo, args);
+                log("RETVAL: ", value_to_number(retval));
             }
         }
     } catch (std::exception& e) {

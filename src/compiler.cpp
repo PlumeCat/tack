@@ -128,7 +128,7 @@ void Compiler::push_scope(ScopeContext* parent_scope, bool is_top_level) {
 void Compiler::pop_scope() {
     // unbind all bound registers
     for (auto& b : scopes.back().bindings) {
-        //registers[b.second.reg] = FREE; // TODO: un-disable once capture is working, and see if still works
+        // registers[b.second.reg] = RegisterState::FREE; // TODO: un-disable once capture is working, and see if still works
     }
     scopes.pop_back();
 }

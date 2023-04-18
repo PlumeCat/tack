@@ -1,5 +1,8 @@
 "Basic test of multiple Tack stacks, "
 
+print(fn() { return 4 }())
+
+
 export let counter = 0
 
 export fn ping4() {
@@ -22,6 +25,18 @@ export fn ping1() {
     pong(ping2)
 }
 
+
+export fn foo(a, b, c) {
+    print([ a, b, c ], a + b + c)
+    return a + b + c
+}
+
 ping1()
 
+print(fn() { return [ 1, 2 ] }())
+
+
 print("end pingpong")
+
+
+print("end array")

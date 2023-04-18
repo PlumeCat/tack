@@ -96,18 +96,20 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
     // program counter
     auto _pr = func; // current program
     auto _pc = 0u;
-    auto _pe = _pr->bytecode->instructions.size();
 
     // stack/registers
     auto initial_stackbase = stackbase;
     stackbase += STACK_FRAME_OVERHEAD;
 
+    // copy arguments to stack
+    if (nargs) {
+        std::memcpy(&stack[stackbase], args, sizeof(Value) * nargs);
+    }
+
+    // set up initial call frame
     REGISTER_RAW(-3)._i = _pr->bytecode->instructions.size();
     REGISTER_RAW(-2)._p = (void*)func;
     REGISTER_RAW(-1)._i = 0; // special case
-    // stack[0]._i = _pr->bytecode->instructions.size(); // pseudo return address
-    // stack[1]._p = (void*)func; // pseudo return program
-    // stack[2]._i = stackbase; // reset stack base to 0, should not be reached
 
     auto dumpstack = [&]() {
         log("in", _pr->bytecode->name);
@@ -122,7 +124,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
     };
 
     try {
-        while (_pc < _pe) {
+        while (true) {
             auto i = _pr->bytecode->instructions[_pc];
             switch (i.opcode) {
             case Opcode::UNKNOWN: break;
@@ -394,14 +396,13 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                         auto nargs = i.r1;
                         auto new_base = i.r2 + STACK_FRAME_OVERHEAD;
                         
+                        // set up call frame
                         REGISTER_RAW(new_base - 3)._i = _pc; // push return addr
                         REGISTER_RAW(new_base - 2)._p = (void*)_pr; // return program
                         REGISTER_RAW(new_base - 1)._i = stackbase; // push return frameptr
-                        // REGISTER_RAW(new_base - 1)._p = func->captures.data();
 
                         _pr = func;
                         _pc = -1; // TODO: gather all instructions into one big chunk to avoid this
-                        _pe = _pr->bytecode->instructions.size();
                         stackbase = stackbase + new_base; // new stack frame
                     } else if (value_is_cfunction(r0)) {
                         auto cfunc = value_to_cfunction(r0);
@@ -418,6 +419,9 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     auto return_stack = REGISTER_RAW(-1);
                     auto return_val = REGISTER(i.r1);
 
+                    _pc = return_addr._i;
+                    _pr = (FunctionType*)return_func._p;
+
                     // "Clean" the stack
                     // - Must not leave any boxes in unused registers
                     // or subsequent loads to register will mistakenly write-through
@@ -425,19 +429,15 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     // TODO: try and elide this, or make more efficient
                     // std::cout << "### GC after func: " << _pr->bytecode->name << std::endl;
                     std::memset(stack.data() + stackbase, 0xffffffff, MAX_REGISTERS * sizeof(Value));
-                    REGISTER_RAW(-3) = return_val;
+                    
                     heap.gc(globals, stack, stackbase);
+                    REGISTER_RAW(-3) = return_val;
                     REGISTER_RAW(-2) = value_null();
                     REGISTER_RAW(-1) = value_null();
-
-                    _pc = return_addr._i;
-                    _pr = (FunctionType*)return_func._p;
-                    _pe = _pr->bytecode->instructions.size();
                     stackbase = return_stack._i;
-
                     if (stackbase == 0) {
-                        // end of program
-                        _pc = _pe;
+                        stackbase = initial_stackbase;
+                        return return_val;
                     }
                 }
             break; default: error("unknown instruction: " + to_string(i.opcode));
@@ -449,7 +449,9 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
         log("runtime error: ", e.what());
         dumpstack();
     }
-    stackbase = initial_stackbase;
+
+    error("Reached end of interpreter loop - should be impossible");
+    return value_null(); // should be unreachable
 }
 
 #undef error

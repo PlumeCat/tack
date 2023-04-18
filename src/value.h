@@ -143,12 +143,17 @@ inline bool value_is_vec3(Value v)                      { return (v._i & type_bi
 inline bool value_is_vec4(Value v)                      { return (v._i & type_bits) == type_bits_vec4; }
 inline bool value_is_mat4(Value v)                      { return (v._i & type_bits) == type_bits_mat4; }
 
-static void _check(bool c, char* msg) {
-    if (!c) {
+static void _check(bool(*checker)(Value), Value v, const char* msg) {
+    if ((v._i & type_bits) == type_bits_array) {
+        if (((ArrayType*)(v._i & pointer_bits))->refcount == 0xDEAD) {
+            std::cout << "tried to use dead array" << std::endl;
+        }
+    }
+    if (!checker(v)) {
         throw std::runtime_error(std::string("type error: expected ") + msg);
     }
 }
-#define check(ty) _check(value_is_##ty(v), #ty)
+#define check(ty) _check(value_is_##ty, v, #ty)
 // #define check(ty) if (!value_is_##ty(v)) throw std::runtime_error("type error: expected " #ty);
 inline StringType* value_to_string(Value v)             { check(string);    return (StringType*)(v._i & pointer_bits); }
 inline ArrayType* value_to_array(Value v)               { check(array);     return (ArrayType*)(v._i & pointer_bits); }

@@ -54,4 +54,10 @@ public:
     // returns the file-level scope as a callable function
     Value load(const std::string& source);
     Value call(Value fn, Value* args, int nargs);
+    
+    // convenience wrapper
+    template<size_t N>
+    Value call(Value fn, std::array<Value, N>& args) {
+        return call(fn, args.data(), N);
+    }
 };
