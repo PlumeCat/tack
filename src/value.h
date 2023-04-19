@@ -68,6 +68,7 @@ enum class Type : uint64_t {
 };
 
 struct CodeFragment;
+struct Interpreter;
 
 // TODO: this is straight undefined behaviour
 struct Value {
@@ -98,8 +99,9 @@ struct FunctionType : GCType {
     std::vector<Value> captures; // contains boxes
 };
 
-using CFunctionType = Value(int, Value*);
+using CFunctionType = Value(Interpreter*, int, Value*);
 
+// TODO: replace
 struct vec2 { float x, y; };
 struct vec3 { float x, y, z; };
 struct vec4 { float x, y, z, w; };
@@ -143,18 +145,7 @@ inline bool value_is_vec3(Value v)                      { return (v._i & type_bi
 inline bool value_is_vec4(Value v)                      { return (v._i & type_bits) == type_bits_vec4; }
 inline bool value_is_mat4(Value v)                      { return (v._i & type_bits) == type_bits_mat4; }
 
-static void _check(bool(*checker)(Value), Value v, const char* msg) {
-    if ((v._i & type_bits) == type_bits_array) {
-        if (((ArrayType*)(v._i & pointer_bits))->refcount == 0xDEAD) {
-            std::cout << "tried to use dead array" << std::endl;
-        }
-    }
-    if (!checker(v)) {
-        throw std::runtime_error(std::string("type error: expected ") + msg);
-    }
-}
-#define check(ty) _check(value_is_##ty, v, #ty)
-// #define check(ty) if (!value_is_##ty(v)) throw std::runtime_error("type error: expected " #ty);
+#define check(ty) if (!value_is_##ty(v)) throw std::runtime_error("type error: expected " #ty);
 inline StringType* value_to_string(Value v)             { check(string);    return (StringType*)(v._i & pointer_bits); }
 inline ArrayType* value_to_array(Value v)               { check(array);     return (ArrayType*)(v._i & pointer_bits); }
 inline ObjectType* value_to_object(Value v)             { check(object);    return (ObjectType*)(v._i & pointer_bits); }
@@ -171,4 +162,6 @@ inline double value_to_number(Value v)                  { check(number);    retu
 inline void* value_to_pointer(Value v)                  { check(pointer);   return (void*)(v._i & pointer_bits); }
 #undef check
 
+std::ostream& operator<<(std::ostream& o, const ArrayType& arr);
+std::ostream& operator<<(std::ostream& o, ObjectType& obj);
 std::ostream& operator<<(std::ostream& o, const Value& v);

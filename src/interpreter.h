@@ -10,10 +10,10 @@ struct Stack : std::array<Value, MAX_STACK> {
 struct Heap {
 private:
     // heap
-    std::list<ArrayType> _arrays;
-    std::list<ObjectType> _objects;
-    std::list<FunctionType> _functions;
-    std::list<BoxType> _boxes;
+    std::list<ArrayType> arrays;
+    std::list<ObjectType> objects;
+    std::list<FunctionType> functions;
+    std::list<BoxType> boxes;
     
     // statistics
     std::chrono::steady_clock::time_point last_gc;
@@ -38,8 +38,6 @@ private:
     uint16_t next_globalid; // TODO: bit clumsy, try and improve it
     std::vector<Value> globals;
     std::list<CodeFragment> fragments;
-
-    // void execute(CodeFragment* fragment, Value* captures);
 
 public:
     Interpreter();

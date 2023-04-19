@@ -1,23 +1,28 @@
 #include "value.h"
 #include "interpreter.h"
+#include <jlib/log.h>
+
+// TODO: proper debug logging / diagnostics / monitoring system
+
+#define log(...)
 
 ArrayType* Heap::alloc_array() {
-    return &_arrays.emplace_back();
+    return &arrays.emplace_back();
 }
 
 ObjectType* Heap::alloc_object() {
-    return &_objects.emplace_back();
+    return &objects.emplace_back();
 }
 
 FunctionType* Heap::alloc_function(CodeFragment* code) {
-    return &_functions.emplace_back(FunctionType {
+    return &functions.emplace_back(FunctionType {
         .bytecode = code,
         .captures = {}
     });
 }
 
 BoxType* Heap::alloc_box(Value val) {
-    return &_boxes.emplace_back(BoxType {
+    return &boxes.emplace_back(BoxType {
         .value = val
     });
 }
@@ -86,7 +91,8 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
         return;
     }
     last_gc = now;
-    std::cout << "===== GC =====" << std::endl;
+
+    log("===== GC =====");
 
     // mark globals
     for (const auto& v: globals) {
@@ -104,62 +110,70 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
     // TODO: remove this special case: also need to visit the return value (unique to the current call frame)
     gc_visit(stack[stackbase - STACK_FRAME_OVERHEAD]);
     for (auto s = stackbase; stack[s-1]._i != 0; s = stack[s-1]._i) {
-        for (auto i = stack[s-1]._i; i < s - STACK_FRAME_OVERHEAD; i++) {
+        for (auto i = stack[s-1]._i; i < s - (STACK_FRAME_OVERHEAD); i++) {
             gc_visit(stack[i]);
         }
     }
 
-    // sweep objects
-    auto i = _objects.begin();
-    while (i != _objects.end()) {
-        if (!i->marker && i->refcount == 0) {
-            //std::cout << "collected " << value_from_object(&(*i)) << std::endl;
-            i = _objects.erase(i);
-        } else {
-            i->marker = false;
-            i++;
+    log("sweeping objects");
+    {
+        auto i = objects.begin();
+        while (i != objects.end()) {
+            if (!i->marker && i->refcount == 0) {
+                log("collected object: ", value_from_object(&(*i)));
+                i = objects.erase(i);
+            } else {
+                i->marker = false;
+                i++;
+            }
         }
     }
 
-    // sweep arrays
-    auto j = _arrays.begin();
-    while (j != _arrays.end()) {
-        if (!j->marker && j->refcount == 0) {
-            // std::cout << "collected " << value_from_array(&(*j)) << std::endl;
-            j->refcount = 0xDEAD;
-            j++;
-            // j = _arrays.erase(j);
-        } else {
-            j->marker = false;
-            j++;
+    log("sweeping arrays");
+    {
+        auto i = arrays.begin();
+        while (i != arrays.end()) {
+            if (!i->marker && i->refcount == 0) {
+                log("collected array: ", *i);
+                i = arrays.erase(i);
+            } else {
+                i->marker = false;
+                i++;
+            }
         }
     }
 
-    // sweep boxes
-    auto k = _boxes.begin();
-    while (k != _boxes.end()) {
-        if (!k->marker && k->refcount == 0) {
-            //std::cout << "collected " << value_from_boxed(&(*k)) << std::endl;
-            k = _boxes.erase(k);
-        } else {
-            k->marker = false;
-            k++;
+    log("sweeping boxes");
+    {
+        auto i = boxes.begin();
+        while (i != boxes.end()) {
+            if (!i->marker && i->refcount == 0) {
+                log("collected box", i->value);
+                i = boxes.erase(i);
+            } else {
+                i->marker = false;
+                i++;
+            }
         }
     }
 
-    // sweep functions
-    auto f = _functions.begin();
-    while (f != _functions.end()) {
-        if (!f->marker && f->refcount == 0) {
-            std::cout << "collected " << f->bytecode->name << std::endl;
-            f = _functions.erase(f);
-        } else {
-            f->marker = false;
-            f++;
+    log("sweeping functions");
+    {
+        auto i = functions.begin();
+        while (i != functions.end()) {
+            if (!i->marker && i->refcount == 0) {
+                log("collected function: ", i->bytecode->name);
+                i = functions.erase(i);
+            } else {
+                i->marker = false;
+                i++;
+            }
         }
     }
+    
+    #undef sweep
 
-    std::cout << "===== GC STOP =====" << std::endl;
+    log("===== ENDGC =====");
 
     now = std::chrono::steady_clock::now();
     last_gc_duration = now - last_gc;

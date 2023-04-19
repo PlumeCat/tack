@@ -408,7 +408,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                         auto cfunc = value_to_cfunction(r0);
                         auto nargs = i.r1;
                         auto new_base = i.r2 + STACK_FRAME_OVERHEAD;
-                        REGISTER_RAW(i.r2) = cfunc(nargs, &stack[stackbase + new_base]);
+                        REGISTER_RAW(i.r2) = cfunc(this, nargs, &stack[stackbase + new_base]);
                     } else {
                         error("tried to call non-function");
                     }
@@ -430,8 +430,8 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     // std::cout << "### GC after func: " << _pr->bytecode->name << std::endl;
                     std::memset(stack.data() + stackbase, 0xffffffff, MAX_REGISTERS * sizeof(Value));
                     
-                    heap.gc(globals, stack, stackbase);
                     REGISTER_RAW(-3) = return_val;
+                    heap.gc(globals, stack, stackbase);
                     REGISTER_RAW(-2) = value_null();
                     REGISTER_RAW(-1) = value_null();
                     stackbase = return_stack._i;

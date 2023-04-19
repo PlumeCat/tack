@@ -1,5 +1,11 @@
+let arr_count = 0
+fn alloc_array() {
+    arr_count = arr_count + 1
+    return []
+}
+
 fn array_random(M) {
-    const arr = []
+    const arr = alloc_array()
     for i in 0, M {
         arr << random()
     }
@@ -7,7 +13,7 @@ fn array_random(M) {
 }
 
 fn join(a, b) {
-    const c = []
+    const c = alloc_array()
 
     for i in 0, #a {
         c << a[i]
@@ -36,8 +42,8 @@ fn quicksort(arr) {
     " midpoint "
     if min == max { return arr }
     const mid = (min + max) / 2
-    const upper = []
-    const lower = []
+    const upper = alloc_array()
+    const lower = alloc_array()
 
     " pivot "
     for i in 0, n {
@@ -49,8 +55,8 @@ fn quicksort(arr) {
     return join(quicksort(lower), quicksort(upper))
 }
 
-const N = 1000
-const A = []
+const N = 102400
+const A = alloc_array()
 
 for i in 0, N {
     A << i
@@ -66,3 +72,6 @@ if #A != #B {
     print(A)
     print(B)
 }
+
+
+print("Array allocations: ", arr_count)

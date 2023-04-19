@@ -1,7 +1,7 @@
 -- lua_sort_test.lua
 math.randomseed(os.time())
 
-alloc_count = 0
+local alloc_count = 0
 
 function alloc_table()
     alloc_count = alloc_count + 1
@@ -67,13 +67,18 @@ function table_quicksort(t)
             ul = ul + 1
         end
     end
+
     return table_join(
         table_quicksort(lower),
         table_quicksort(upper)
     )
+    
+    
+    -- local res = table_join(table_quicksort(lower), table_quicksort(upper))
+    -- return res -- make tailcall impossible
 end
 
-N = 1000
+local N = 102400
 local A = table_random(N, N)
 
 -- table_print(A)
@@ -87,3 +92,4 @@ collectgarbage("restart")
 -- table_print(B)
 
 print("Time taken: " .. tostring(after - before))
+print("Table allocations: ", alloc_count)

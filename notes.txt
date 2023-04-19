@@ -71,25 +71,6 @@ Grammar:
 		literal-array
 		literal-function
 
-Types:
-	null:		null
-	bool:		true, false
-	int:		64 bit integer
-	pointer:	32 or 64 bit opaque pointer for c/c++/(rust?) interop
-	double		64 bit float
-	string		utf8 string
-				can do short string optimization
-				can do interning for longer strings
-	vec2
-	vec3
-	vec4
-	mat4
-
-	array		[ 0, 1, 2, ... ]
-	object		{ a = 1, b = 2, ... }
-	function	fn (x, y, z) {} // closures are passed by-ref as well
-	// boxed
-
 Instructions:
 	from abusive testing, lua allows only 200 local variables
 	if you then try and call a function and pass them all, it will complain
@@ -113,9 +94,7 @@ Instructions:
 	instruction, so you can schedule an unconditional jump straight after
 	to implement condjump
 
-	we could do something similar, just call it the CONDSKIP instruction, remove condjump
-	and add an unconditional jump for control flow, then emit CONDSKIP for conditions
-	and remove the current CONDJUMP, which can only jump over 256 instructions :(
+	we do something similar called CONDSKIP
 
 Objects, arrays, closures
 	objects will need some kind of 'prototype' or 'index' field to implement classes

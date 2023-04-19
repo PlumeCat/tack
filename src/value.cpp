@@ -6,8 +6,6 @@ std::ostream& operator<<(std::ostream& o, const mat4& v) { return o << "mat4 { .
 std::ostream& operator<<(std::ostream& o, const vec2& v) { return o << "vec2 { " << v.x << ", " << v.y << " }"; }
 std::ostream& operator<<(std::ostream& o, const vec3& v) { return o << "vec2 { " << v.x << ", " << v.y << ", " << v.z << " }"; }
 std::ostream& operator<<(std::ostream& o, const vec4& v) { return o << "vec2 { " << v.x << ", " << v.y << ", " << v.z << ", " << v.w << " }"; }
-std::ostream& operator<<(std::ostream& o, const ArrayType& arr);
-std::ostream& operator<<(std::ostream& o, ObjectType& obj);
 std::ostream& operator<<(std::ostream& o, const Value& v) {
     if (!std::isnan(v._d)) {
         return o << value_to_number(v);
