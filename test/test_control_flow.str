@@ -15,10 +15,6 @@ fn() {
     }
 }()
 
-fn factorial() {
-    
-}
-
 fn foo() {
     "testing capture of the iterable"
     let arr = [ 1, 2, 3, 4, 5 ]
