@@ -3,18 +3,22 @@
 #include <jlib/log.h>
 
 // TODO: proper debug logging / diagnostics / monitoring system
-
-#define log(...)
+// #define debug log
+#define debug(...)
+#define dump(...)
 
 ArrayType* Heap::alloc_array() {
+    alloc_count++;
     return &arrays.emplace_back();
 }
 
 ObjectType* Heap::alloc_object() {
+    alloc_count++;
     return &objects.emplace_back();
 }
 
 FunctionType* Heap::alloc_function(CodeFragment* code) {
+    alloc_count++;
     return &functions.emplace_back(FunctionType {
         .bytecode = code,
         .captures = {}
@@ -22,12 +26,14 @@ FunctionType* Heap::alloc_function(CodeFragment* code) {
 }
 
 BoxType* Heap::alloc_box(Value val) {
+    alloc_count++;
     return &boxes.emplace_back(BoxType {
         .value = val
     });
 }
 
 void gc_visit(Value value) {
+    dump("visit: ", value);
     switch (value_get_type(value)) {
         case (Type)type_bits_boxed: {
             auto b = value_to_boxed(value);
@@ -84,15 +90,16 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
     // TODO: look into generational hypothesis
     // TODO: general speed ups
 
-    // gc every 1ms
-    auto now = std::chrono::steady_clock::now();
-    if (1000 > std::chrono::duration_cast<std::chrono::microseconds>(now - last_gc).count()) {
-    // if (true) {
+    if (alloc_count < prev_alloc_count * 2 || alloc_count <= MIN_GC_ALLOCATIONS) {
         return;
     }
-    last_gc = now;
 
-    log("===== GC =====");
+    // gc every 1ms
+    auto before = std::chrono::steady_clock::now();
+    debug("===== GC: START ===");
+    debug("  prev alloc count: ", prev_alloc_count);
+    debug("  cur alloc count:  ", alloc_count);
+    auto num_collections = 0;
 
     // mark globals
     for (const auto& v: globals) {
@@ -115,12 +122,13 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
         }
     }
 
-    log("sweeping objects");
+    dump("sweeping objects");
     {
         auto i = objects.begin();
         while (i != objects.end()) {
             if (!i->marker && i->refcount == 0) {
-                log("collected object: ", value_from_object(&(*i)));
+                dump("collected object: ", value_from_object(&(*i)));
+                num_collections += 1;
                 i = objects.erase(i);
             } else {
                 i->marker = false;
@@ -129,12 +137,13 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
         }
     }
 
-    log("sweeping arrays");
+    dump("sweeping arrays");
     {
         auto i = arrays.begin();
         while (i != arrays.end()) {
             if (!i->marker && i->refcount == 0) {
-                log("collected array: ", *i);
+                dump("collected array: ", *i);
+                num_collections += 1;
                 i = arrays.erase(i);
             } else {
                 i->marker = false;
@@ -143,12 +152,13 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
         }
     }
 
-    log("sweeping boxes");
+    dump("sweeping boxes");
     {
         auto i = boxes.begin();
         while (i != boxes.end()) {
             if (!i->marker && i->refcount == 0) {
-                log("collected box", i->value);
+                dump("collected box", i->value);
+                num_collections += 1;
                 i = boxes.erase(i);
             } else {
                 i->marker = false;
@@ -157,12 +167,13 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
         }
     }
 
-    log("sweeping functions");
+    dump("sweeping functions");
     {
         auto i = functions.begin();
         while (i != functions.end()) {
             if (!i->marker && i->refcount == 0) {
-                log("collected function: ", i->bytecode->name);
+                dump("collected function: ", i->bytecode->name);
+                num_collections += 1;
                 i = functions.erase(i);
             } else {
                 i->marker = false;
@@ -170,11 +181,16 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
             }
         }
     }
-    
-    #undef sweep
 
-    log("===== ENDGC =====");
+    auto after = std::chrono::steady_clock::now();
+    last_gc = after;
+    auto duration = after - before;
+    auto ms = (float)std::chrono::duration_cast<std::chrono::microseconds>(duration).count() / 1000.f;
+    prev_alloc_count = alloc_count;
+    alloc_count -= num_collections;
+    debug("===== GC: END =====");
+    debug("  collected:       ", num_collections);
+    debug("  new alloc count: ", alloc_count);
+    debug("  time taken:      ", ms);
 
-    now = std::chrono::steady_clock::now();
-    last_gc_duration = now - last_gc;
 }

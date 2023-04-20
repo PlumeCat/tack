@@ -69,6 +69,7 @@ uint8_t Compiler::allocate_register() {
     for (auto i = 0; i < MAX_REGISTERS; i++) {
         if (registers[i] == RegisterState::FREE) {
             registers[i] = RegisterState::BUSY;
+            output->max_register = std::max(output->max_register, (uint32_t)i);
             return i;
         }
     }

@@ -85,10 +85,10 @@ Value Interpreter::load(const std::string& source) {
     return value_from_function(func);
 }
 
-#define handle(opcode) break; case Opcode::opcode:
+#define handle(opcode)  break; case Opcode::opcode:
+#define error(err)      ({ throw std::runtime_error(err), value_null(); });
 #define REGISTER_RAW(n) stack[stackbase+n]
 #define REGISTER(n)     *(value_is_boxed(REGISTER_RAW(n)) ? &value_to_boxed(REGISTER_RAW(n))->value : &REGISTER_RAW(n))
-#define error(err) ({ throw std::runtime_error(err), value_null(); });
 
 Value Interpreter::call(Value fn, Value* args, int nargs) {
     auto* func = value_to_function(fn);
@@ -395,6 +395,10 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                         auto func = value_to_function(r0);
                         auto nargs = i.r1;
                         auto new_base = i.r2 + STACK_FRAME_OVERHEAD;
+
+                        if (new_base + func->bytecode->max_register > MAX_STACK) {
+                            error("would exceed stack");
+                        }
                         
                         // set up call frame
                         REGISTER_RAW(new_base - 3)._i = _pc; // push return addr

@@ -16,8 +16,9 @@ private:
     std::list<BoxType> boxes;
     
     // statistics
-    std::chrono::steady_clock::time_point last_gc;
-    std::chrono::steady_clock::duration last_gc_duration;
+    std::chrono::steady_clock::time_point last_gc = std::chrono::steady_clock::now();
+    uint32_t prev_alloc_count;
+    uint32_t alloc_count; // a bit clumsy - counts all allocations
 
 public:
     ArrayType* alloc_array();

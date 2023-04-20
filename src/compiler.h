@@ -11,6 +11,7 @@
 static const uint32_t MAX_REGISTERS = 256;
 static const uint32_t STACK_FRAME_OVERHEAD = 3; // TODO: make this 3, can load captures through _pr
 static const uint32_t MAX_STACK = 4096;
+static const uint32_t MIN_GC_ALLOCATIONS = 1024; // min allocations before GC will run; don't make it too small
 
 enum class RegisterState {
     FREE = 0,
@@ -31,6 +32,7 @@ struct CodeFragment {
     std::vector<Value> storage; // program constant storage goes at the bottom of the stack for now
     std::list<std::string> strings; // string constants and literals storage - includes identifiers for objects
     std::vector<CaptureInfo> capture_info;
+    uint32_t max_register = 0;
 
     uint16_t store_number(double d);
     uint16_t store_string(const std::string& data);

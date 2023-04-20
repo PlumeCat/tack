@@ -55,7 +55,7 @@ fn quicksort(arr) {
     return join(quicksort(lower), quicksort(upper))
 }
 
-const N = 102400
+const N = 1000000
 const A = alloc_array()
 
 for i in 0, N {

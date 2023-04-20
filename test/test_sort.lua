@@ -72,23 +72,19 @@ function table_quicksort(t)
         table_quicksort(lower),
         table_quicksort(upper)
     )
-    
-    
-    -- local res = table_join(table_quicksort(lower), table_quicksort(upper))
-    -- return res -- make tailcall impossible
 end
 
-local N = 102400
+local N = 1000000
 local A = table_random(N, N)
 
 -- table_print(A)
-collectgarbage("collect") -- run twice
-collectgarbage("collect")
-collectgarbage("stop") -- Fair comparison!
+-- collectgarbage("collect") -- run twice
+-- collectgarbage("collect")
+-- collectgarbage("stop") -- Fair comparison!
 local before = os.clock()
 local B = table_quicksort(A)
 local after = os.clock()
-collectgarbage("restart")
+-- collectgarbage("restart")
 -- table_print(B)
 
 print("Time taken: " .. tostring(after - before))
