@@ -20,17 +20,16 @@ make
 - [ ] break and continue? labelled break?
 - [x] arrays
 - [x] objects
-- [x] comments
+- [ ] comments
 - [x] closures
 - [x] consts
 - [x] calling C functions from tack
-- [ ] comments
 - [ ] boolean literals and operations (do as number?)
 - [ ] string operations
 - [x] calling tack functions from C
 - [x] garbage collector. must be allowed to retain pointers in C world
 - [ ] algebraics
-- [ ] some kind of error handling (note: lua has pcall(func) not true exceptions)
+- [ ] some kind of error handling
 - [x] initialization for array and object literals
 - [ ] proper module system
 - [ ] python style slice syntax for arrays

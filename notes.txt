@@ -98,25 +98,10 @@ Instructions:
 
 Objects, arrays, closures
 	objects will need some kind of 'prototype' or 'index' field to implement classes
+		- or can use copydown ES5 style
+		- could add a magic 'this' keyword, which is valid inside the body of an object literal and refers to the object itself
 
 	arrays are true arrays, not just object in disguise
-
-	for a free function the closure is the containing scope
-	captured scopes will need to capture parent scopes as well (up to module or function boundary)
-	so will need a linked list or something
-
-	some syntax sugar:
-		let f = fn (x, y) {}
-		fn f(x, y) {}
-
-	this is assumed to be running as part of a game engine
-	so make sure the garbage collector can be done in parallel slices multi threaded and deterministic time limits
-
-	Identifier accesses:
-	Currently, access expressions push the identifier as a key to the stack,
-	then goes to the object. Requires a box-check and type-check for the object and the key.
-	This is supremely wasteful as we know that the identifier is an unboxed string at compile time
-	There should be a faster way that goes straight to the object (eg intern identifiers separately)
 
 Insert/remove while iterating
 	From code:
@@ -133,7 +118,7 @@ Insert/remove while iterating
 			Discouraged for lists, unclear for dict or other mutable collections
 
 Exceptions / error handling
-	The interpreter loop is stackless - maintains its own stack
+	The interpreter loop is stackless - maintains its own stack, doesn't use the C stack
 	This means we don't need exceptions, longjmp, goto or anything
 	too problematic for error handling. Instead we can just jump out of the interpreter loop
 	to a defined error handler, maintain the program state and provide the option
@@ -155,9 +140,6 @@ Exceptions / error handling
 			})
 			tack_execute(program) // throws a tack error
 		}
-
-	make sure that if an instruction errors and we choose to continue, the stack is preserved, ie the expected
-	pops/pushes have occurred
 
 Types
 	Type analysis might be useful for optimization
@@ -210,51 +192,23 @@ Types
 		f(1, 2, "foo"); // CS = tuple<int,int,string>;
 		( For variadic functions/calls, the variadic part will be treated like an array,
 		but perhaps is possible to monomorphize arrays as well?)
-	MoMo: 
+
 		emit different code for each call signature, and if possible use type deduction at the call site
 		to decide which code to call
 		inline caching: deciding the call at runtime as quickly as possible.
 
-Boxes:
-	currently we box *values* and have a special type for it. Then on register access (read or write),
-	we check whether the register contains a box, and read-write to that instead if so.
-	this involves a wasteful check every single register access, 1-3 register accesses per instruction
-	
-	however in theory we can see whether every variable needs to be boxed or not at compile time
-	so we should emit ALLOC_BOX when a boxed variable is encountered 
-	and READ_BOX and WRITE_BOX for each boxed variable usage
-
-	this will necessitate to emit NOOP and MOVE for variable declaration and read (we already emit
-	MOVE for writes) and then if the variable is boxed, replace all NOOP with ALLOC_BOX, MOVE with 
-	READ_BOX/WRITE_BOX
-
 Notes:
 	Functions vs closures vs "quasi-closures"
 
-	A function would be a simple "pure-ish" function that takes some arguments, returns some value, and
-	maybe has a few local variables. It does not close over variables from lexical higher scopes, so it would
-	not constrain the lifetimes of any part of the lexical higher scopes.
+	Any captures have to be auto-boxed because of the possibility of reassign
+	All captures are resolved at compile time but boxing currently happens at runtime
 
-	A closure would close over some of the variables in the LHS, so it will affect those variable's lifetimes.
-	eg. 
-		fn counter() {
-			let i = 0
-			fn inner() {
-				i = i + 1
-				return i
-			}
-			return inner
-		}
-	Because inner uses i from the outer scope, i must be boxed and ref-counted
-	We will do this by generating an invisible tuple which contains all the captures (by reference)
-	and is passed around with the function as a pair, participates in garbage collection, etc.
-	Scalars which are captured in this manner must be auto-boxed.
-	All the captures can be resolved at compile time, so even if there are captured variables from scopes that are multiple
-	levels up, the reference that the closure uses is directly available in this invisible tuple
+	A "quasi closure" is a closure that captures variables from the outer scope,
+	but itself is not used by the outer scope / does not escape the outer scope.
 
-	There is a commonly occurring special case of closures that can be optimized however, which we can call "quasi-closures"
-	This is the case of closure that uses variables from the parent scope, but itself is not used outside the parent scope
-	eg. a function that is used as a sorting predicate
+	Worth investigating whether it can get its captures from the stack (eg with negative offsets) instead of needing to box. 
+
+	Eg a function used as a sorting predicate
 
 		fn quasi_closure_test() {
 			let foo = 1
@@ -271,14 +225,12 @@ Notes:
 			sorted_data = sort(some_data, predicate)
 		}
 
-	Because predicate is not used outside quasi_closure_test, we don't need to box any of the captures
-	because the function lifetime is strictly shorter than the parent function, therefore everything that the child
-	function needs to use should be found on the stack, and therefore should be accessible to the child function
-	(It might need the parent scope's stack offset at runtime however, so some LOADs might become LOAD_WITH_OFFSET)
-	We can use escape analysis to figure out whether the inner function escapes the outer function, and
-	therefore whether it is a quasi-closure or not.
+	In this case the call stack has 'sort' in the call stack, ie
+		quasi_closure_test -> sort -> predicate
+	So will need to know where the captures will be in the stack - there may be
+	more indirections as well, it will not be deterministic at compile time
 
-	Another special case for closures is a recursive non-anonymous function
+	Another special case for closures is a recursive named function
 	The code emitted is something like this
 		fn foo() {
 			...
@@ -290,6 +242,7 @@ Notes:
 			...
 			foo(...)
 		}
+	
 	so foo has to capture itself from the enclosing scope.
 	might be worth optimising this case
 	lua appears to set the function as an upvalue
@@ -300,17 +253,5 @@ Notes:
 
 	we could do something like always put a function in its own registers
 	eg at position 0
-	
 
-Globals:
-	There are globals and there are globals.
-	Because of the way scoping works, variables at file-level scope are considered "globals"
-	from the point of view of the rest of the code in the same file - ie they are accessible everywhere
-	in that file; however they are not accessible outside the file (we will need "export let" 
-	or similar to make that possible)
-	True globals are the ones created/declared by the host with 'set_global' - these live in the proper
-	root scope and should be accessible everywhere.
-
-Closures don't need ArrayType for captures, and it complicates GC a bit
-A plain vector will do fine.
-Also don't need to put the capture list in the stack frame, because we can get it from _pr
+	could have a "recurse" keyword; will call the function at REGISTER(-3)
