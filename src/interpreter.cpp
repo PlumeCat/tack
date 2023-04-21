@@ -289,14 +289,12 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     auto code = (CodeFragment*)value_to_pointer(_pr->bytecode->storage[i.u1]);
                     auto* func = heap.alloc_function(code);
 
-                    // capture captures
-                    // box new captures (TODO: does this work?)
+                    // capture captures; box inplace if necessary
                     for (auto c : code->capture_info) {
                         auto val = REGISTER_RAW(c.source_register);
                         if (!value_is_boxed(val)) {
                             auto box = value_from_boxed(heap.alloc_box(val));
                             func->captures.emplace_back(box);
-                            // box existing variable inplace
                             REGISTER_RAW(c.source_register) = box;
                         } else {
                             func->captures.emplace_back(val);
@@ -328,7 +326,6 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     REGISTER(i.r0) = value_from_object(obj);
                 }
                 handle(LOAD_ARRAY) {
-                    // TODO: rename this instr if it's going to be for objects as well
                     auto arr_val = REGISTER(i.r1);
                     auto ind_val = REGISTER(i.r2);
                     auto arr_type = value_get_type(arr_val);
@@ -406,7 +403,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                         REGISTER_RAW(new_base - 1)._i = stackbase; // push return frameptr
 
                         _pr = func;
-                        _pc = -1; // TODO: gather all instructions into one big chunk to avoid this
+                        _pc = -1;
                         stackbase = stackbase + new_base; // new stack frame
                     } else if (value_is_cfunction(r0)) {
                         auto cfunc = value_to_cfunction(r0);
@@ -426,12 +423,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     _pc = return_addr._i;
                     _pr = (FunctionType*)return_func._p;
 
-                    // "Clean" the stack
-                    // - Must not leave any boxes in unused registers
-                    // or subsequent loads to register will mistakenly write-through
-                    // - Also must not leave any references so the GC can collect stuff off the stack
-                    // TODO: try and elide this, or make more efficient
-                    // std::cout << "### GC after func: " << _pr->bytecode->name << std::endl;
+                    // "Clean" the stack - Must not leave any boxes in unused registers or subsequent loads to register will mistakenly write-through
                     std::memset(stack.data() + stackbase, 0xffffffff, MAX_REGISTERS * sizeof(Value));
                     
                     REGISTER_RAW(-3) = return_val;
@@ -449,7 +441,6 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
             _pc++;
         }
     } catch (std::exception& e) {
-        // TODO: stack unwind
         log("runtime error: ", e.what());
         dumpstack();
     }

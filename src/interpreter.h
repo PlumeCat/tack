@@ -36,7 +36,7 @@ private:
     uint32_t stackbase;
 
     Compiler::ScopeContext global_scope; // c-provided globals go here
-    uint16_t next_globalid; // TODO: bit clumsy, try and improve it
+    uint16_t next_globalid;
     std::vector<Value> globals;
     std::list<CodeFragment> fragments;
 

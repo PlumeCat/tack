@@ -64,8 +64,6 @@ Compiler::VariableContext* Compiler::lookup(const std::string& name) {
 
 // get a free register
 uint8_t Compiler::allocate_register() {
-    // TODO: lifetime analysis for variables
-    // make the register available as soon as the variable is not used any more
     for (auto i = 0; i < MAX_REGISTERS; i++) {
         if (registers[i] == RegisterState::FREE) {
             registers[i] = RegisterState::BUSY;
@@ -128,9 +126,9 @@ void Compiler::push_scope(ScopeContext* parent_scope, bool is_top_level) {
 }
 void Compiler::pop_scope() {
     // unbind all bound registers
-    for (auto& b : scopes.back().bindings) {
-        // registers[b.second.reg] = RegisterState::FREE; // TODO: un-disable once capture is working, and see if still works
-    }
+    // for (auto& b : scopes.back().bindings) {
+        // registers[b.second.reg] = RegisterState::FREE;
+    // }
     scopes.pop_back();
 }
 
@@ -145,7 +143,7 @@ void Compiler::compile_func(const AstNode* node, CodeFragment* output, ScopeCont
     // emit bindings for the N arguments
     for (auto i = 0; i < nargs; i++) {
         auto& param = node->children[0].children[i]; // Identifier
-        bind_name(param.data_s, i, false); // TODO: could choose to make arguments const?
+        bind_name(param.data_s, i, false);
         // NOTE: impossible to be global
     }
     child(1);
@@ -243,12 +241,6 @@ uint8_t Compiler::compile(const AstNode* node) {
             return 0xff;
         }
         handle(ForStat) {
-            // for i in iterable { ... }
-            // i, iterable, block
-            // if (is_global) {
-                // error("for loop not supported at global scope");
-            // }
-
             auto& ident = node->children[0].data_s;
             push_scope(&scopes.back());
             auto reg_var = allocate_register(); // loop variable
@@ -276,11 +268,6 @@ uint8_t Compiler::compile(const AstNode* node) {
             return 0xff;
         }
         handle(ForStat2) {
-            // for k, v in obj { ... }
-            // if (is_global) {
-            //     error("2-ary for loop not supported at global scope");
-            // }
-            
             auto& i1 = node->children[0].data_s;
             auto& i2 = node->children[1].data_s;
             push_scope(&scopes.back());
@@ -311,24 +298,20 @@ uint8_t Compiler::compile(const AstNode* node) {
             return 0xff;
         }
         handle(ForStatInt) {
-            // for i in a, b { ... }
-            // if (is_global) {
-            //     error("for loop not supported at global scope");
-            // }
             auto& ident = node->children[0].data_s;
             push_scope(&scopes.back()); // new scope - only contains the loop variable, block will get own scope
             auto reg_a = child(1); // start value
             auto reg_b = child(2); // end value
             auto reg_b_state = registers[reg_b];
             registers[reg_b] = RegisterState::BOUND; // HACK: the block might try and free this register
-            bind_name(ident, reg_a, false); // TODO: find better approach for globals
+            bind_name(ident, reg_a, false);
             label(forloop);
             emit(FOR_INT, reg_a, reg_b, 0);
             label(skip_loop);
             emit(JUMPF, 0, 0, 0);
             child(3); // block
             label(loop_bottom);
-            emit(INCREMENT, reg_a, 0, 0); // TODO: messy
+            emit(INCREMENT, reg_a, 0, 0);
             emit_u(JUMPB, 0, uint16_t((loop_bottom + 1) - forloop));
             rewrite_u(skip_loop, JUMPF, 0, uint16_t((loop_bottom + 2) - skip_loop));
             pop_scope();
@@ -348,7 +331,7 @@ uint8_t Compiler::compile(const AstNode* node) {
         }
         handle(ConstDeclStat) {
             should_allocate(1);
-            auto reg = child(1); // TODO: doesn't work with recursive named functions
+            auto reg = child(1);
 
             auto is_export = node->children[0].data_d;
             auto var = bind_name(node->children[0].data_s, reg, true, is_export);
@@ -392,10 +375,6 @@ uint8_t Compiler::compile(const AstNode* node) {
                     if (var->is_const) {
                         error("can't reassign const variable");
                     } else {
-                        // TODO: try and elide this MOVE
-                        // if the moved-from register is "busy" but not "bound", then the value is not used again
-                        // only need MOVE if assigning directly from another variable
-                        // in which case MOVE is more like COPY
                         if (var->is_global) {
                             emit_u(WRITE_GLOBAL, source_reg, var->g_id);
                         } else {
@@ -515,15 +494,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             free_register(in);
             return out;
         }
-        handle(AddExp) { // 1 out
-            // TODO: experiment with the following:
-            //      i1 = compile_node(...)
-            //      free_register(i1)
-            //      i2 = compile_node(...)
-            //      free_register(i2)
-            //      out = allocate_register()
-            //      ...
-            // allows to reuse one of the registers (if not bound)
+        handle(AddExp) {
             auto in1 = child(0);
             auto in2 = child(1);
             auto out = allocate_register();
@@ -624,9 +595,6 @@ uint8_t Compiler::compile(const AstNode* node) {
         }
         handle(ArrayLiteral) {
             auto array_reg = allocate_register();
-
-            // TODO: inefficient stack usage, try and elide some of these MOVEs, also with function calls
-            // TODO: allow more than 256 elements?
             auto n_elems = (uint8_t)node->children.size();
             auto elem_regs = std::vector<uint8_t>{};
             for (auto n = 0; n < n_elems; n++) {
@@ -644,9 +612,6 @@ uint8_t Compiler::compile(const AstNode* node) {
         }
         handle(ObjectLiteral) {
             auto obj_reg = allocate_register();
-
-            // TODO: key loading / stack usage a bit inefficient here as well
-            // TODO: allow more than 256 elements?
             auto n_elems = (uint8_t)node->children.size();
             auto key_indices = std::vector<uint8_t>{};
             auto val_regs = std::vector<uint8_t>{};

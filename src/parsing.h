@@ -63,10 +63,9 @@ struct AstNode {
         : type(AstType::NumLiteral), data_d(d) {}
 
     std::string tostring(const std::string& indent = "") const {
-        using namespace std; // TODO: remove at earliest opportunity
         auto s = indent + to_string(type) + 
-            (type == AstType::Identifier ? " " + data_s : ""s) + 
-            (type == AstType::NumLiteral ? " "s + std::to_string(data_d) : "") +
+            (type == AstType::Identifier ? " " + data_s : "") + 
+            (type == AstType::NumLiteral ? " " + std::to_string(data_d) : "") +
             ' ' + std::to_string(line_number);
         for (const auto& c : children) {
             s += "\n" + indent + c.tostring(indent + "  ");

@@ -174,23 +174,18 @@ DEFPARSER(param_def, {
 	while (true) {
 		TRY(identifier) {
 			p.children.emplace_back(identifier);
-			TRYs(',') {} else break; // TODO: disallow trailing comma
+			TRYs(',') {} else break;
 		} else break;
 	}
 	SUCCESS(p);
 });
 DEFPARSER(func_literal, {
 	EXPECT("fn")
-	// TRY(identifier) {}
 	TRYs('(') {} else ERROR("expected parameter definition after 'fn'");
 	TRY(param_def) {
 		TRYs(')') {} else ERROR("expected ')' after parameter definition");
 		TRY(block) {
-			// if (identifier.type == AstType::Identifier) {
-			// 	SUCCESS(AstType::FuncLiteral, param_def, block, identifier);
-			// } else {
-				SUCCESS(AstType::FuncLiteral, param_def, block);
-			// }
+			SUCCESS(AstType::FuncLiteral, param_def, block);
 		} else ERROR("expected block after parameter definition");
 	}
 });
@@ -553,11 +548,9 @@ bool parse(const std::string& code, AstNode& out_ast) {
 	out_ast = AstNode { AstType::Unknown };
 	auto res = parse_module(s_code, out_ast);
 	if (!res) {
-		// TODO: parse error
 		throw runtime_error("parser error: "s + string(s_code.substr(0, 100)));
 	}
 	if (s_code.size()) {
-		// TODO: expected end of file error
 		throw runtime_error("expected end of file: "s + string(s_code.substr(0, 100)));
 	}
 	return true;

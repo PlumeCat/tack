@@ -80,16 +80,7 @@ void gc_visit(Value value) {
 void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbase) {
     // Basic mark-n-sweep garbage collector
     // Doesn't handle strings just yet
-
     // TODO: bad code style everywhere
-
-    // TODO: have a look at incremental GC
-    // TODO: long way down the line, mark phase should be parallelizable
-    // https://www.lua.org/wshop18/Ierusalimschy.pdf
-
-    // TODO: look into generational hypothesis
-    // TODO: general speed ups
-
     if (alloc_count < prev_alloc_count * 2 || alloc_count <= MIN_GC_ALLOCATIONS) {
         return;
     }
@@ -106,15 +97,7 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
         gc_visit(v);
     }
 
-    // TODO:
-    // need to consider refcounted stuff as GC roots, so the C-side can keep stuff alive
-    // Lua solves this with the registry, maybe that's faster? separate pool for objects referenced from C
-    // remove from tack-pool when refcounted, return to tack-pool when released
-    // iterate over all allocations, and visit when there's a nonzero refcount
-
     // mark stack
-    // TODO: visit functions in the call stack just in case
-    // TODO: remove this special case: also need to visit the return value (unique to the current call frame)
     gc_visit(stack[stackbase - STACK_FRAME_OVERHEAD]);
     for (auto s = stackbase; stack[s-1]._i != 0; s = stack[s-1]._i) {
         for (auto i = stack[s-1]._i; i < s - (STACK_FRAME_OVERHEAD); i++) {
