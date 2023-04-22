@@ -9,6 +9,11 @@ struct Stack : std::array<Value, MAX_STACK> {
     // void push_frame(CodeFragment* current_pr, uint32_t current_pc, uint32_t current_sb, Value* newcap);
     // void pop_frame();
 };
+
+enum class GCState : uint8_t {
+    Disabled = 0,
+    Enabled = 1,
+};
 struct Heap {
 private:
     // heap
@@ -22,12 +27,16 @@ private:
     uint32_t prev_alloc_count;
     uint32_t alloc_count; // a bit clumsy - counts all allocations
     float last_gc_ms = 0.f;
+    GCState gc_state = GCState::Enabled;
 
 public:
     ArrayType* alloc_array();
     ObjectType* alloc_object();
     FunctionType* alloc_function(CodeFragment* code);
     BoxType* alloc_box(Value val);
+
+    GCState get_state() const;
+    void set_state(GCState state);
 
     void gc(std::vector<Value>& globals, const Stack& stack, uint32_t stackbase);
 };

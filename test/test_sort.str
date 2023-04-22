@@ -63,7 +63,9 @@ for i in 0, N {
 }
 
 const before = clock()
+gc_disable()
 const B = quicksort(A)
+gc_enable()
 const after = clock()
 print("time taken", after - before)
 

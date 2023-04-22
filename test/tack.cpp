@@ -17,6 +17,15 @@
 #include <jlib/log.h>
 #include <jlib/text_file.h>
 
+Value tack_gc_disable(Interpreter* vm, int, Value*) {
+    vm->heap.set_state(GCState::Disabled);
+    return value_null();
+}
+Value tack_gc_enable(Interpreter* vm, int, Value*) {
+    vm->heap.set_state(GCState::Enabled);
+    return value_null();
+}
+
 Value tack_print(Interpreter*, int nargs, Value* args) {
     auto ss = std::stringstream{};
     for (auto i = 0; i < nargs; i++) {
@@ -64,6 +73,8 @@ int main(int argc, char* argv[]) {
         vm.set_global("print", true, value_from_cfunction(tack_print));
         vm.set_global("random", true, value_from_cfunction(tack_random));
         vm.set_global("clock", true, value_from_cfunction(tack_clock));
+        vm.set_global("gc_enable", true, tack_gc_enable);
+        vm.set_global("gc_disable", true, tack_gc_disable);
 
         for (auto& f: files) {
             auto s = read_text_file(f);
