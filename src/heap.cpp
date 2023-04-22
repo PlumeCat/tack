@@ -7,6 +7,13 @@
 #define debug(...)
 #define dump(...)
 
+void Heap::gc_state(GCState state) {
+    this->state = state;
+}
+GCState Heap::gc_state() const {
+    return state;
+}
+
 ArrayType* Heap::alloc_array() {
     alloc_count++;
     return &arrays.emplace_back();
@@ -81,7 +88,7 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
     // Basic mark-n-sweep garbage collector
     // Doesn't handle strings just yet
     // TODO: bad code style everywhere
-    if (gc_state == GCState::Disabled
+    if (state == GCState::Disabled
         || alloc_count < prev_alloc_count * 2 
         || alloc_count <= MIN_GC_ALLOCATIONS) {
         return;

@@ -27,7 +27,7 @@ private:
     uint32_t prev_alloc_count;
     uint32_t alloc_count; // a bit clumsy - counts all allocations
     float last_gc_ms = 0.f;
-    GCState gc_state = GCState::Enabled;
+    GCState state = GCState::Enabled;
 
 public:
     ArrayType* alloc_array();
@@ -35,8 +35,8 @@ public:
     FunctionType* alloc_function(CodeFragment* code);
     BoxType* alloc_box(Value val);
 
-    GCState get_state() const;
-    void set_state(GCState state);
+    GCState gc_state() const;
+    void gc_state(GCState state);
 
     void gc(std::vector<Value>& globals, const Stack& stack, uint32_t stackbase);
 };
@@ -44,8 +44,8 @@ public:
 struct Interpreter {
     bool log_ast = false;
     bool log_bytecode = false;
+
 private:
-    
     Heap heap;
     Stack stack;
     uint32_t stackbase;
@@ -68,6 +68,9 @@ public:
     // returns the file-level scope as a callable function
     Value load(const std::string& source);
     Value call(Value fn, Value* args, int nargs);
+
+    GCState gc_state() const;
+    void gc_state(GCState state);
     
     // convenience wrapper
     template<size_t N>

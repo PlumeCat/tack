@@ -29,6 +29,13 @@ uint16_t Interpreter::next_gid() {
     return next_globalid++;
 }
 
+void Interpreter::gc_state(GCState state) {
+    heap.gc_state(state);
+}
+GCState Interpreter::gc_state() const {
+    return heap.gc_state();
+}
+
 Value Interpreter::get_global(const std::string& name) {
     auto* var = global_scope.lookup(name);
     if (!var) {
