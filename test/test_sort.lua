@@ -77,15 +77,13 @@ end
 local N = 1000000
 local A = table_random(N, N)
 
--- table_print(A)
--- collectgarbage("collect") -- run twice
--- collectgarbage("collect")
--- collectgarbage("stop") -- Fair comparison!
+collectgarbage("collect") -- run twice
+collectgarbage("collect")
+collectgarbage("stop") -- Fair comparison!
 local before = os.clock()
 local B = table_quicksort(A)
 local after = os.clock()
--- collectgarbage("restart")
--- table_print(B)
+collectgarbage("restart")
 
 print("Time taken: " .. tostring(after - before))
 print("Table allocations: ", alloc_count)

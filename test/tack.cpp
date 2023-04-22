@@ -1,7 +1,4 @@
-﻿#include "parsing.h"
-#include "value.h"
-#include "compiler.h"
-#include "interpreter.h"
+﻿#include "../src/interpreter.h"
 
 #include <iostream>
 #include <sstream>

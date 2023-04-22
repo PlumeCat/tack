@@ -96,6 +96,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
     // program counter
     auto _pr = func; // current program
     auto _pc = 0u;
+    auto _pe = func->bytecode->instructions.size();
 
     // stack/registers
     auto initial_stackbase = stackbase;
@@ -124,7 +125,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
     };
 
     try {
-        while (true) {
+        while (_pc < _pe) {
             auto i = _pr->bytecode->instructions[_pc];
             switch (i.opcode) {
             case Opcode::UNKNOWN: break;
@@ -403,6 +404,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                         REGISTER_RAW(new_base - 1)._i = stackbase; // push return frameptr
 
                         _pr = func;
+                        _pe = func->bytecode->instructions.size();
                         _pc = -1;
                         stackbase = stackbase + new_base; // new stack frame
                     } else if (value_is_cfunction(r0)) {
@@ -422,6 +424,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
 
                     _pc = return_addr._i;
                     _pr = (FunctionType*)return_func._p;
+                    _pe = _pr->bytecode->instructions.size();
 
                     // "Clean" the stack - Must not leave any boxes in unused registers or subsequent loads to register will mistakenly write-through
                     std::memset(stack.data() + stackbase, 0xffffffff, MAX_REGISTERS * sizeof(Value));

@@ -9,7 +9,10 @@ std::ostream& operator<<(std::ostream& o, const vec3& v) { return o << "vec2 { "
 std::ostream& operator<<(std::ostream& o, const vec4& v) { return o << "vec2 { " << v.x << ", " << v.y << ", " << v.z << ", " << v.w << " }"; }
 std::ostream& operator<<(std::ostream& o, const Value& v) {
     if (!std::isnan(v._d)) {
-        return o << std::setprecision(9) << value_to_number(v);
+        if (v._d == trunc(v._d)) {
+            return o << (uint64_t)v._d;
+        }
+        return o << v._d;
     }
     switch (v._i & type_bits) {
         case (uint64_t)Type::Null:      return o << "null";
