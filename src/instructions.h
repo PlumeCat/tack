@@ -49,7 +49,7 @@ struct Instruction {
     uint8_t r0;
     union {
         // TODO: -Wpedantic dislikes anonymous structs :(
-        struct { uint8_t r1, r2; };
+        struct { uint8_t r1, r2; } u8;
         int16_t s1;
         uint16_t u1;
     };

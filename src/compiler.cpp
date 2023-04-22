@@ -5,13 +5,13 @@
 #include <sstream>
 
 // emit an instruction with 3 8 bit operands
-#define emit(op, r0, r1, r2)            output->instructions.emplace_back(Instruction { Opcode::op, r0, { r1, r2 } });
+#define emit(op, _0, _1, _2)            output->instructions.emplace_back(Instruction { .opcode = Opcode::op, .r0 = _0, .u8 = { _1, _2 } });
 
 // emit an instruction with 1 u8 operand r and 1 u16 operand u
 #define emit_u(op, r, u)                output->instructions.emplace_back(Instruction { .opcode = Opcode::op, .r0 = r, .u1 = u });
 
 // rewrite an instruction with 3 8-bit operands
-#define rewrite(pos, type, r0, r1, r2)  output->instructions[pos] = Instruction { Opcode::type, r0, r1, r2 };
+#define rewrite(pos, type, _0, _1, _2)  output->instructions[pos] = Instruction { .opcode = Opcode::type, .r0 = _0, .u8 = { _1, _2 } };
 
 // rewrite an instruction with 1 u8 operand r and 1 u16 operand u
 #define rewrite_u(pos, type, r, u)      output->instructions[pos] = Instruction { .opcode = Opcode::type, .r0 = r, .u1 = u };
@@ -44,7 +44,7 @@ std::string CodeFragment::str() {
     s << "function: " << name << std::endl;
     auto i = 0;
     for (auto bc : instructions) {
-        s << "    " << i << ": " << ::to_string(bc.opcode) << ' ' << (uint32_t)bc.r0 << ' ' << (uint32_t)bc.r1 << ' ' << (uint32_t)bc.r2 << '\n';
+        s << "    " << i << ": " << ::to_string(bc.opcode) << ' ' << (uint32_t)bc.r0 << ' ' << (uint32_t)bc.u8.r1 << ' ' << (uint32_t)bc.u8.r2 << '\n';
         i++;
     }
 
