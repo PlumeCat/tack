@@ -11,7 +11,7 @@ struct ParseContext : private string_view {
 	ParseContext(const string& s) : string_view(s) {}
 
 	void remove_prefix(string_view::size_type s) noexcept {
-		for (auto i = 0; i < s; i++) {
+		for (auto i = 0u; i < s; i++) {
 			if ((*this)[i] == '\n') {
 				line_number += 1;
 			}
@@ -60,7 +60,7 @@ bool is_identifier_start_char(char c) {
 	return isalpha(c) || c == '_';
 }
 void skip_whitespace(ParseContext& code) {
-	auto n = 0;
+	auto n = 0u;
 	for (; n < code.size(); n++) {
 		if (!isspace(code[n])) {
 			break;
@@ -83,7 +83,7 @@ bool parse_raw_number(ParseContext& code, double& out) {
 bool parse_raw_string_literal(ParseContext& code, std::string& out) {
 	skip_whitespace(code);
 	if (code.size() && code[0] == '"') {
-		for (auto n = 1; n < code.size(); n++) {
+		for (auto n = 1u; n < code.size(); n++) {
 			if (code[n] == '"') {
 				out = code.substr(1, n - 1);
 				code.remove_prefix(n + 1);
@@ -97,7 +97,7 @@ bool parse_raw_string_literal(ParseContext& code, std::string& out) {
 bool parse_raw_identifier(ParseContext& code, std::string& out) {
 	skip_whitespace(code);
 	if (code.size() && is_identifier_start_char(code[0])) {
-		for (auto n = 1; n < code.size(); n++) {
+		for (auto n = 1u; n < code.size(); n++) {
 			if (!is_identifier_char(code[n])) {
 				out = code.substr(0, n);
 				code.remove_prefix(n);

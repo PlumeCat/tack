@@ -78,6 +78,8 @@ struct Value {
         void* _p;
     };
 };
+
+#define GCType() bool marker = false; uint32_t refcount = 0;
 struct GCType {
     bool marker = false;
     uint32_t refcount = 0; // for retaining in host
@@ -88,15 +90,18 @@ using StringType = const char;
 
 #include "object_type.h"
 
-struct BoxType : GCType {
+struct BoxType {
     Value value;
+    GCType()
 };
-struct ArrayType : GCType {
+struct ArrayType {
     std::vector<Value> values;
+    GCType()
 };
-struct FunctionType : GCType {
+struct FunctionType {
     CodeFragment* bytecode;
     std::vector<Value> captures; // contains boxes
+    GCType()
 };
 
 using CFunctionType = Value(Interpreter*, int, Value*);

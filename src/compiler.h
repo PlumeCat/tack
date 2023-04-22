@@ -51,23 +51,23 @@ struct Compiler {
         Compiler* compiler;
         ScopeContext* parent_scope = nullptr;
         bool is_function_scope = false;
-        std::unordered_map<std::string, VariableContext> bindings; // variables
+        std::unordered_map<std::string, VariableContext> bindings = {}; // variables
 
         // lookup a variable
         // if it lives in a parent function, code will be emitted to capture it
         VariableContext* lookup(const std::string& name);
     };
-    Interpreter* interpreter;
+    Interpreter* interpreter = nullptr;
     // root AST node from last compile_func() call
-    const AstNode* node;
+    const AstNode* node = nullptr;
     // current output as of last compile_func() call, included here for convenience
-    CodeFragment* output;
+    CodeFragment* output = nullptr;
     // bool is_global = false; // variable bindings become global instead of stack
 
     // compiler state
-    std::array<RegisterState, MAX_REGISTERS> registers;
-    std::list<ScopeContext> scopes;
-    std::vector<CaptureInfo> captures;
+    std::array<RegisterState, MAX_REGISTERS> registers = {};
+    std::list<ScopeContext> scopes = {};
+    std::vector<CaptureInfo> captures = {};
 
     // lookup a variable in the current scope stack
     VariableContext* lookup(const std::string& name);

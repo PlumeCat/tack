@@ -3,6 +3,8 @@
 #include "compiler.h"
 #include "value.h"
 
+#include <chrono>
+
 struct Stack : std::array<Value, MAX_STACK> {
     // void push_frame(CodeFragment* current_pr, uint32_t current_pc, uint32_t current_sb, Value* newcap);
     // void pop_frame();
@@ -19,6 +21,7 @@ private:
     std::chrono::steady_clock::time_point last_gc = std::chrono::steady_clock::now();
     uint32_t prev_alloc_count;
     uint32_t alloc_count; // a bit clumsy - counts all allocations
+    float last_gc_ms = 0.f;
 
 public:
     ArrayType* alloc_array();
@@ -30,7 +33,10 @@ public:
 };
 
 struct Interpreter {
+    bool log_ast = false;
+    bool log_bytecode = false;
 private:
+    
     Heap heap;
     Stack stack;
     uint32_t stackbase;

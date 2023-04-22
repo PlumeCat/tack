@@ -3,7 +3,7 @@
 #include <iostream>
 #include <iomanip>
 
-std::ostream& operator<<(std::ostream& o, const mat4& v) { return o << "mat4 { ... }"; }
+std::ostream& operator<<(std::ostream& o, const mat4& v) { return o << "mat4 { " << v.m[0] << " }"; }
 std::ostream& operator<<(std::ostream& o, const vec2& v) { return o << "vec2 { " << v.x << ", " << v.y << " }"; }
 std::ostream& operator<<(std::ostream& o, const vec3& v) { return o << "vec2 { " << v.x << ", " << v.y << ", " << v.z << " }"; }
 std::ostream& operator<<(std::ostream& o, const vec4& v) { return o << "vec2 { " << v.x << ", " << v.y << ", " << v.z << ", " << v.w << " }"; }
@@ -35,7 +35,7 @@ std::ostream& operator<<(std::ostream& o, const ArrayType& arr) {
     o << "array [";
     if (arr.values.size()) {
         o << ' ' << arr.values[0];
-        for (auto i = 1; i < arr.values.size(); i++) {
+        for (auto i = 1u; i < arr.values.size(); i++) {
             o << ", " << arr.values[i];
         }
         o << ' ';

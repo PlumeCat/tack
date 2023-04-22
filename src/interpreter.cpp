@@ -10,7 +10,7 @@
 #include <vector>
 #include <array>
 #include <exception>
-#include <chrono>
+
 #include <cstring>
 
 Interpreter::Interpreter() {
@@ -46,10 +46,10 @@ Compiler::VariableContext* Interpreter::set_global(const std::string& name, bool
     if (!var) {
         // HACK:
         var = &global_scope.bindings.try_emplace(name, Compiler::VariableContext {
-            .g_id = next_gid(),
+            .reg = 0xff,
             .is_const = is_const,
             .is_global = true,
-            .reg = 0xff
+            .g_id = next_gid()
         }).first->second;
     }
 
@@ -86,7 +86,7 @@ Value Interpreter::load(const std::string& source) {
 }
 
 #define handle(opcode)  break; case Opcode::opcode:
-#define error(err)      ({ throw std::runtime_error(err), value_null(); });
+#define error(err)      throw std::runtime_error(err);
 #define REGISTER_RAW(n) stack[stackbase+n]
 #define REGISTER(n)     *(value_is_boxed(REGISTER_RAW(n)) ? &value_to_boxed(REGISTER_RAW(n))->value : &REGISTER_RAW(n))
 
@@ -120,7 +120,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
         while (stack[s-2]._i != 0) {
             auto func = (CodeFragment*)stack[s-3]._p;
             log(" -", func->name);
-            s = stack[s-2]._i;
+            s = ret_s;
         }
     };
 
@@ -392,6 +392,11 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     if (value_is_function(r0)) {
                         auto func = value_to_function(r0);
                         auto nargs = i.r1;
+                        auto correct_nargs = 0; // func->bytecode->nargs;
+                        // TODO: arity checking
+                        if (false && nargs != correct_nargs) {
+                            error("wrong nargs");
+                        }
                         auto new_base = i.r2 + STACK_FRAME_OVERHEAD;
 
                         if (new_base + func->bytecode->max_register > MAX_STACK) {

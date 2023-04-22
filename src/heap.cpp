@@ -21,21 +21,21 @@ FunctionType* Heap::alloc_function(CodeFragment* code) {
     alloc_count++;
     return &functions.emplace_back(FunctionType {
         .bytecode = code,
-        .captures = {}
+        .captures = {},
+        .marker = false,
+        .refcount = 0
     });
 }
 
 BoxType* Heap::alloc_box(Value val) {
     alloc_count++;
-    return &boxes.emplace_back(BoxType {
-        .value = val
-    });
+    return &boxes.emplace_back(BoxType { .value = val });
 }
 
 void gc_visit(Value value) {
     dump("visit: ", value);
-    switch (value_get_type(value)) {
-        case (Type)type_bits_boxed: {
+    switch ((uint64_t)value_get_type(value)) {
+        case type_bits_boxed: {
             auto b = value_to_boxed(value);
             if (!b->marker) {
                 b->marker = true;
@@ -43,7 +43,7 @@ void gc_visit(Value value) {
             }
             break;
         }
-        case Type::Object: {
+        case type_bits_object: {
             auto o = value_to_object(value);
             if (!o->marker) {
                 o->marker = true;
@@ -53,7 +53,7 @@ void gc_visit(Value value) {
             }
             break;
         }
-        case Type::Array: {
+        case type_bits_array: {
             auto a = value_to_array(value);
             if (!a->marker) {
                 a->marker = true;
@@ -63,7 +63,7 @@ void gc_visit(Value value) {
             }
             break;
         }
-        case Type::Function: {
+        case type_bits_function: {
             auto f = value_to_function(value);
             if (!f->marker) {
                 f->marker = true;
@@ -171,6 +171,7 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
     last_gc = after;
     auto duration = after - before;
     auto ms = (float)std::chrono::duration_cast<std::chrono::microseconds>(duration).count() / 1000.f;
+    last_gc_ms = ms;
     prev_alloc_count = alloc_count;
     alloc_count -= num_collections;
     debug("===== GC: END =====");

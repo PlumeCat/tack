@@ -8,13 +8,13 @@
 #define emit(op, r0, r1, r2)            output->instructions.emplace_back(Instruction { Opcode::op, r0, { r1, r2 } });
 
 // emit an instruction with 1 u8 operand r and 1 u16 operand u
-#define emit_u(op, r, u)                output->instructions.emplace_back(Instruction { Opcode::op, .r0 = r, .u1 = u });
+#define emit_u(op, r, u)                output->instructions.emplace_back(Instruction { .opcode = Opcode::op, .r0 = r, .u1 = u });
 
 // rewrite an instruction with 3 8-bit operands
 #define rewrite(pos, type, r0, r1, r2)  output->instructions[pos] = Instruction { Opcode::type, r0, r1, r2 };
 
 // rewrite an instruction with 1 u8 operand r and 1 u16 operand u
-#define rewrite_u(pos, type, r, u)      output->instructions[pos] = Instruction { Opcode::type, .r0 = r, .u1 = u };
+#define rewrite_u(pos, type, r, u)      output->instructions[pos] = Instruction { .opcode = Opcode::type, .r0 = r, .u1 = u };
 
 #define label(name)                     auto name = output->instructions.size();
 #define should_allocate(n)
@@ -64,7 +64,7 @@ Compiler::VariableContext* Compiler::lookup(const std::string& name) {
 
 // get a free register
 uint8_t Compiler::allocate_register() {
-    for (auto i = 0; i < MAX_REGISTERS; i++) {
+    for (auto i = 0u; i < MAX_REGISTERS; i++) {
         if (registers[i] == RegisterState::FREE) {
             registers[i] = RegisterState::BUSY;
             output->max_register = std::max(output->max_register, (uint32_t)i);
@@ -76,7 +76,7 @@ uint8_t Compiler::allocate_register() {
 
 // get 2 registers next to each other
 uint8_t Compiler::allocate_register2() {
-    for (auto i = 0; i < MAX_REGISTERS - 1; i++) {
+    for (auto i = 0u; i < MAX_REGISTERS - 1; i++) {
         if (registers[i] == RegisterState::FREE &&
             registers[i+1] == RegisterState::FREE) {
             registers[i] = RegisterState::BUSY;
@@ -116,7 +116,7 @@ void Compiler::free_register(uint8_t reg) {
 
 // free all unbound registers
 void Compiler::free_all_registers() {
-    for (auto i = 0; i < MAX_REGISTERS; i++) {
+    for (auto i = 0u; i < MAX_REGISTERS; i++) {
         free_register(i);
     }
 }
@@ -141,7 +141,7 @@ void Compiler::compile_func(const AstNode* node, CodeFragment* output, ScopeCont
     auto nargs = node->children[0].children.size(); // ParamDef
     
     // emit bindings for the N arguments
-    for (auto i = 0; i < nargs; i++) {
+    for (auto i = 0u; i < nargs; i++) {
         auto& param = node->children[0].children[i]; // Identifier
         bind_name(param.data_s, i, false);
         // NOTE: impossible to be global
@@ -436,7 +436,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             should_allocate(1);
             auto n = node->data_d;
             auto out = allocate_register();
-            auto index = output->store_number(node->data_d);
+            auto index = output->store_number(n);
             emit_u(LOAD_CONST, out, index);
             return out;
         }
@@ -470,14 +470,14 @@ uint8_t Compiler::compile(const AstNode* node) {
 
             // compile the arguments first and remember which registers they are in
             auto arg_regs = std::vector<uint8_t> {};
-            for (auto i = 0; i < nargs; i++) {
+            for (auto i = 0u; i < nargs; i++) {
                 arg_regs.emplace_back(compile(&node->children[1].children[i]));
             }
             auto func_reg = child(0); // LHS evaluates to function
 
             // copy arguments to top of stack in sequence
             auto return_reg = get_end_register();
-            for (auto i = 0; i < nargs; i++) {
+            for (auto i = 0u; i < nargs; i++) {
                 emit(MOVE, uint8_t(return_reg + i + STACK_FRAME_OVERHEAD), arg_regs[i], 0);
             }
 

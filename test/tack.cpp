@@ -17,7 +17,7 @@
 #include <jlib/log.h>
 #include <jlib/text_file.h>
 
-Value tack_print(Interpreter* vm, int nargs, Value* args) {
+Value tack_print(Interpreter*, int nargs, Value* args) {
     auto ss = std::stringstream{};
     for (auto i = 0; i < nargs; i++) {
         ss << args[i] << ' ';
@@ -25,29 +25,29 @@ Value tack_print(Interpreter* vm, int nargs, Value* args) {
     log<true, false>(ss.str());
     return value_null();
 }
-Value tack_random(Interpreter* vm, int nargs, Value* args) {
+Value tack_random(Interpreter*, int, Value*) {
     return value_from_number(rand());
 }
-Value tack_clock(Interpreter* vm, int nargs, Value* args) {
+Value tack_clock(Interpreter*, int, Value*) {
     return value_from_number(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 1e6);
 }
 Value tack_dofile(Interpreter* vm, int nargs, Value* args) {
     for (auto i = 0; i < nargs; i++) {
         auto s = value_to_string(args[i]);
+        vm->call(vm->load(read_text_file(s).value_or("")), nullptr, 0);
     }
     return value_null();
 }
 
 int main(int argc, char* argv[]) {
-    auto log_ast = false;
-    auto log_bytecode = false;
+    auto vm = Interpreter {};
     auto files = std::vector<std::string>{};
     for (auto i = 1; i < argc; i++) {
         auto arg = std::string(argv[i]);
         if (arg == "-A") {
-            log_ast = true;
+            vm.log_ast = true;
         } else if  (arg == "-D") {
-            log_bytecode = true;
+            vm.log_bytecode = true;
         } else {
             files.emplace_back(std::move(arg));
         }
@@ -60,7 +60,6 @@ int main(int argc, char* argv[]) {
     }
 
     try {
-        auto vm = Interpreter {};
         vm.set_global("dofile", true, value_from_cfunction(tack_dofile));
         vm.set_global("print", true, value_from_cfunction(tack_print));
         vm.set_global("random", true, value_from_cfunction(tack_random));
