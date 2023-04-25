@@ -31,6 +31,13 @@ std::ostream& operator<<(std::ostream& o, const Value& v) {
         default:                        return o << "(unknown) " << std::hex << v._i;
     }
 }
+bool value_get_truthy(Value v) {
+    return
+        (!std::isnan(v._d))                         ? (v._d != 0.0) : // number -> compare to 0
+        (v._i == UINT64_MAX)                        ? false :
+        ((v._i & type_bits) == type_bits_boolean)   ? (v._i & boolean_bits) :
+        true;
+}
 std::ostream& operator<<(std::ostream& o, const ArrayType& arr) {
     o << "array [";
     if (arr.values.size()) {

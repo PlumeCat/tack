@@ -229,6 +229,18 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                         error("expected number or array");
                     }
                 }
+                
+                handle(AND) {
+                    REGISTER(i.r0) = value_from_boolean(
+                        value_get_truthy(REGISTER(i.u8.r1)) && value_get_truthy(REGISTER(i.u8.r2))
+                    );
+                }
+                handle(OR) {
+                    REGISTER(i.r0) = value_from_boolean(
+                        value_get_truthy(REGISTER(i.u8.r1)) || value_get_truthy(REGISTER(i.u8.r2))
+                    );
+                }
+                
                 handle(LESS) {
                     REGISTER(i.r0) = value_from_boolean(
                         value_to_number(REGISTER(i.u8.r1)) <
@@ -336,11 +348,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     }
                 }
                 handle(CONDSKIP) {
-                    auto val = REGISTER(i.r0);
-                    if ((
-                        (value_get_type(val) == Type::Boolean && value_to_boolean(val)) ||
-                        (value_get_type(val) == Type::Number && value_to_number(val))
-                        )) {
+                    if (value_get_truthy(REGISTER(i.r0))) {
                         _pc++;
                     }
                 }

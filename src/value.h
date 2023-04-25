@@ -134,6 +134,12 @@ inline Value value_from_vec4(vec4* v4)                  { return { nan_bits | ty
 inline Value value_from_mat4(mat4* m4)                  { return { nan_bits | type_bits_mat4   | uint64_t(m4) }; }
 
 // type checks
+
+/*
+0, null, false are falsy
+everything else is truthy, including empty string, empty object, null pointer, etc
+*/
+bool value_get_truthy(Value v);
 inline Type value_get_type(Value v)                     { return std::isnan(v._d) ? (Type)(v._i & type_bits) : Type::Number; }
 inline bool value_is_null(Value v)                      { return v._i == UINT64_MAX; }
 inline bool value_is_boolean(Value v)                   { return (v._i & type_bits) == type_bits_boolean; }
