@@ -30,6 +30,7 @@ struct CaptureInfo {
 struct CodeFragment {
     std::string name;
     std::vector<Instruction> instructions;
+    std::vector<uint32_t> line_numbers;
     std::vector<Value> storage; // program constant storage goes at the bottom of the stack for now
     std::list<std::string> strings; // string constants and literals storage - includes identifiers for objects
     std::vector<CaptureInfo> capture_info;
@@ -40,6 +41,8 @@ struct CodeFragment {
     uint16_t store_fragment(CodeFragment* ptr);
     std::string str();
 };
+
+
 
 struct Compiler {
     struct VariableContext {
@@ -100,6 +103,11 @@ struct Compiler {
     void compile_func(const AstNode* node, CodeFragment* output, ScopeContext* parent_scope = nullptr);
     uint8_t compile(const AstNode* node);
 
+    void emit_ins(Opcode op, uint8_t r0, uint8_t r1, uint8_t r2, uint32_t ln = 0);
+    void emit_u_ins(Opcode op, uint8_t r0, uint16_t u, uint32_t ln = 0);
+    void emit_s_ins(Opcode op, uint8_t r0, int16_t s, uint32_t ln = 0);
+    void rewrite_ins(uint32_t pos, Opcode op, uint8_t r0, uint8_t r1, uint8_t r2);
+    void rewrite_u_ins(uint32_t pos, Opcode op, uint8_t r0, uint16_t u);
 };
 
 

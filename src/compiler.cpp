@@ -8,17 +8,22 @@
 #include <jlib/log.h>
 
 // emit an instruction with 3 8 bit operands
-#define emit(op, _0, _1, _2)            output->instructions.emplace_back(Instruction { .opcode = Opcode::op, .r0 = _0, .u8 = { _1, _2 } });
+#define emit(op, _0, _1, _2)            emit_ins(Opcode::op, _0, _1, _2, node->line_number);
+
+// emit with line number zero
+#define emit_z(op, _0, _1, _2)          emit_ins(Opcode::op, _0, _1, _2, 0);
 
 // emit an instruction with 1 u8 operand r and 1 u16 operand u
-#define emit_u(op, r, u)                output->instructions.emplace_back(Instruction { .opcode = Opcode::op, .r0 = r, .u1 = u });
-#define emit_s(op, r, s)                output->instructions.emplace_back(Instruction { .opcode = Opcode::op, .r0 = r, .s1 = s });
+#define emit_u(op, r, u)                emit_u_ins(Opcode::op, r, u, node->line_number);
+
+// emit an instruction with 1 u8 operand r and 1 s16 operand s
+#define emit_s(op, r, s)                emit_s_ins(Opcode::op, r, s, node->line_number);
 
 // rewrite an instruction with 3 8-bit operands
-#define rewrite(pos, type, _0, _1, _2)  output->instructions[pos] = Instruction { .opcode = Opcode::type, .r0 = _0, .u8 = { _1, _2 } };
+#define rewrite(pos, type, _0, _1, _2)  rewrite_ins(pos, Opcode::type, _0, _1, _2);
 
 // rewrite an instruction with 1 u8 operand r and 1 u16 operand u
-#define rewrite_u(pos, type, r, u)      output->instructions[pos] = Instruction { .opcode = Opcode::type, .r0 = r, .u1 = u };
+#define rewrite_u(pos, type, r, u)      rewrite_u_ins(pos, Opcode::type, r, u);
 
 #define label(name)                     auto name = output->instructions.size();
 #define should_allocate(n)
@@ -57,7 +62,7 @@ std::string CodeFragment::str() {
     {
         s << "function: " << name << std::endl;
         auto i = 0;
-        for (auto bc : instructions) {
+        for (auto& bc : instructions) {
             s << "    " << i << ": " << ::to_string(bc.opcode) << ' ' << (uint32_t)bc.r0 << ' ' << (uint32_t)bc.u8.r1 << ' ' << (uint32_t)bc.u8.r2 << '\n';
             i++;
         }
@@ -82,6 +87,25 @@ std::string CodeFragment::str() {
     }
 
     return s.str();
+}
+
+void Compiler::emit_ins(Opcode op, uint8_t r0, uint8_t r1, uint8_t r2, uint32_t ln) {
+    output->instructions.emplace_back(Instruction { .opcode = op, .r0 = r0, .u8 = { r1, r2 } });
+    output->line_numbers.emplace_back(ln);
+}
+void Compiler::emit_u_ins(Opcode op, uint8_t r0, uint16_t u, uint32_t ln) {
+    output->instructions.emplace_back(Instruction { .opcode = op, .r0 = r0, .u1 = u });\
+    output->line_numbers.emplace_back(ln);
+}
+void Compiler::emit_s_ins(Opcode op, uint8_t r0, int16_t s, uint32_t ln) {
+    output->instructions.emplace_back(Instruction { .opcode = op, .r0 = r0, .s1 = s });\
+    output->line_numbers.emplace_back(ln);
+}
+void Compiler::rewrite_ins(uint32_t pos, Opcode op, uint8_t r0, uint8_t r1, uint8_t r2) {
+    output->instructions[pos] = Instruction { .opcode = op, .r0 = r0, .u8 = { r1, r2 } };
+}
+void Compiler::rewrite_u_ins(uint32_t pos, Opcode op, uint8_t r0, uint16_t u) {
+    output->instructions[pos] = Instruction { .opcode = op, .r0 = r0, .u1 = u};
 }
 
 Compiler::VariableContext* Compiler::lookup(const std::string& name) {
@@ -156,11 +180,10 @@ void Compiler::pop_scope() {
         // TODO: disabled currently because boxes must remain bound forever without nulling the regsiter
         // and there's no way to disambiguate boxed vs not-boxed at scope exit (might be conditionally captured)
         // registers[b.second.reg] = RegisterState::FREE;
-        
             
         // HACK: zero out all mirror variables and variables that were captured
         if (b.second.is_capture || b.second.is_mirror) {
-            emit(ZERO_CAPTURE, b.second.reg, 0, 0);
+            emit_z(ZERO_CAPTURE, b.second.reg, 0, 0);
         }
     }
     scopes.pop_back();
@@ -183,7 +206,7 @@ void Compiler::compile_func(const AstNode* node, CodeFragment* output, ScopeCont
 
     child(1);
     pop_scope();
-    emit(RET, 0, 0, 0);
+    emit_z(RET, 0, 0, 0);
 
     if (interpreter->log_bytecode) {
         log(this->output->str());
@@ -214,7 +237,8 @@ Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& nam
 
                 // read into mirror variable
                 // would be optimal to READ_CAPTURE once per function instead of every scope used
-                compiler->emit(READ_CAPTURE, mirror_reg, uint8_t(compiler->output->capture_info.size() - 1), 0);
+                // compiler->emit(READ_CAPTURE, mirror_reg, );
+                compiler->emit_z(READ_CAPTURE, mirror_reg, uint8_t(compiler->output->capture_info.size() - 1), 0);
 
                 // return the MIRROR variable not the original!
                 return mirror;

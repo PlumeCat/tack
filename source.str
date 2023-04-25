@@ -1,22 +1,22 @@
 fn foo() {
-    fn bar() {
-        print(
-    "hello world")
+    fn foo1() {
+        print("hello world")
     }
-    fn baz() {
-        2 + 3
+    fn foo2() {
+        return 100
     }
-    let quz = fn () {}
 
-    bar() + "foo"
+    foo1()
+    return foo2() + #[]
 }
 
 
 fn baz() {
     fn bar() {
-        foo()
+        return foo()
     }
-    bar()
+    return bar()
 }
 
-baz()
+print(baz())
+

@@ -144,11 +144,14 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
     REGISTER_RAW(-1)._i = 0; // special case
 
     auto dumpstack = [&]() {
-        log("encountered at", _pr->bytecode->name);
+        auto ln = _pr->bytecode->line_numbers[_pc];
+        log("encountered at line:", ln, "in", _pr->bytecode->name);
         auto s = stackbase;
         while (stack[s-1]._i != 0) {
+            auto retpc = stack[s-3]._i;
             auto func = ((FunctionType*)stack[s-2]._p)->bytecode;
-            log(" - called from", func->name);
+            auto retln = func->line_numbers[retpc];
+            log(" - called from line:", retln, "in", func->name);
             s = stack[s-1]._i;
         }
     };
@@ -173,16 +176,11 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                 handle(LOAD_CONST) {
                     REGISTER(i.r0) = _pr->bytecode->storage[i.u1];
                 }
-                handle(ADD) {
-                    REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.u8.r1)) + value_to_number(REGISTER(i.u8.r2)));
-                }
                 handle(INCREMENT) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r0)) + 1);
                 }
-                handle(MOD) {
-                    auto x = value_to_number(REGISTER(i.u8.r1));
-                    auto y = value_to_number(REGISTER(i.u8.r2));
-                    REGISTER(i.r0) = value_from_number(fmod(x, y));
+                handle(ADD) {
+                    REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.u8.r1)) + value_to_number(REGISTER(i.u8.r2)));
                 }
                 handle(SUB) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.u8.r1)) - value_to_number(REGISTER(i.u8.r2)));
@@ -192,6 +190,11 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                 }
                 handle(DIV) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.u8.r1)) / value_to_number(REGISTER(i.u8.r2)));
+                }
+                handle(MOD) {
+                    auto x = value_to_number(REGISTER(i.u8.r1));
+                    auto y = value_to_number(REGISTER(i.u8.r2));
+                    REGISTER(i.r0) = value_from_number(fmod(x, y));
                 }
                 handle(SHL) {
                     auto lhs = REGISTER(i.u8.r1);
