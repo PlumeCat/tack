@@ -113,7 +113,6 @@ Compiler::VariableContext* Compiler::bind_name(const std::string& binding, uint8
         return interpreter->set_global(binding, is_const, value_null());
     } else {
         registers[reg] = RegisterState::BOUND;
-        log("binding: ", binding, (uint32_t)reg);
         return &scopes.back().bindings.try_emplace(binding, VariableContext { reg, is_const }).first->second;
     }
 }
