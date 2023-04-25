@@ -12,6 +12,7 @@
 
 // emit an instruction with 1 u8 operand r and 1 u16 operand u
 #define emit_u(op, r, u)                output->instructions.emplace_back(Instruction { .opcode = Opcode::op, .r0 = r, .u1 = u });
+#define emit_s(op, r, s)                output->instructions.emplace_back(Instruction { .opcode = Opcode::op, .r0 = r, .s1 = s });
 
 // rewrite an instruction with 3 8-bit operands
 #define rewrite(pos, type, _0, _1, _2)  output->instructions[pos] = Instruction { .opcode = Opcode::type, .r0 = _0, .u8 = { _1, _2 } };
@@ -25,6 +26,15 @@
 #define error(msg)                      throw std::runtime_error("compiler error: " msg)
 #define child(n)                        compile(&node->children[n]);
 
+
+bool is_small_integer(double d, int16_t& out_si) {
+    auto td = trunc(d);
+    if (td == d && td < INT16_MAX && td > INT16_MIN) {
+        out_si = (int16_t)td;
+        return true;
+    }
+    return false;
+}
 
 
 uint16_t CodeFragment::store_number(double d) {
@@ -144,7 +154,7 @@ void Compiler::pop_scope() {
             
         // HACK: zero out all mirror variables and variables that were captured
         if (b.second.is_capture || b.second.is_mirror) {
-            emit(SETNULL, b.second.reg, 0, 0);
+            emit(ZERO_CAPTURE, b.second.reg, 0, 0);
         }
     }
     scopes.pop_back();
@@ -225,6 +235,90 @@ uint8_t Compiler::compile(const AstNode* node) {
             }
             pop_scope();
             free_all_registers();
+            return 0xff;
+        }
+        handle(ConstDeclStat) {
+            should_allocate(1);
+            auto reg = child(1);
+
+            auto is_export = node->children[0].data_d;
+            auto var = bind_name(node->children[0].data_s, reg, true, is_export);
+            if (is_export) {
+                emit_u(WRITE_GLOBAL, reg, var->g_id);
+            }
+            return 0xff;
+        }
+        handle(VarDeclStat) {
+            should_allocate(1);
+            auto reg = child(1);
+            
+            auto is_export = node->children[0].data_d;
+            auto var = bind_name(node->children[0].data_s, reg, false, is_export);
+            if (is_export) {
+                emit_u(WRITE_GLOBAL, reg, var->g_id);
+            }
+            return 0xff;
+        }
+        handle(FuncDeclStat) {
+            // HACK: This is an amalgam of ConstDeclStat and FuncLiteral
+            // Currently it has to be specially interleaved because recursive functions need to be
+            // able to capture themselves by name, which is impossible with bind_name("recursive", compile(...))
+
+            auto& ident = node->children[0].data_s;
+            auto func = interpreter->create_fragment();
+            func->name = output->name + "::" + ident;
+
+            auto out = allocate_register();
+            auto index = output->store_fragment(func);
+            
+            /* interleaved from ConstDeclStat */ auto is_export = node->children[0].data_d;
+            /* interleaved from ConstDeclStat */ auto var = bind_name(ident, out, true, is_export);
+            
+            auto compiler = Compiler { .interpreter = interpreter };
+            compiler.compile_func(&node->children[1], func, &scopes.back());
+            emit_u(ALLOC_FUNC, out, index);
+            
+            /* interleaved from ConstDeclStat */ if (is_export) {
+            /* interleaved from ConstDeclStat */    emit_u(WRITE_GLOBAL, out, var->g_id);
+            /* interleaved from ConstDeclStat */ }
+
+            return 0xff;
+        }
+        handle(AssignStat) {
+            should_allocate(0);
+            auto source_reg = child(1);
+            auto& lhs = node->children[0];
+            if (lhs.type == AstType::Identifier) {
+                if (auto var = lookup(node->children[0].data_s)) {
+                    if (var->is_const) {
+                        error("can't reassign const variable");
+                    } else {
+                        if (var->is_global) {
+                            emit_u(WRITE_GLOBAL, source_reg, var->g_id);
+                        } else {
+                            emit(MOVE, var->reg, source_reg, 0);
+                        }
+                    }
+                } else {
+                    error("can't find variable: " + node->children[0].data_s);
+                }
+            } else if (lhs.type == AstType::IndexExp) {
+                auto array_reg = compile(&lhs.children[0]);
+                auto index_reg = compile(&lhs.children[1]);
+                emit(STORE_ARRAY, source_reg, array_reg, index_reg);
+                free_register(index_reg);
+                free_register(array_reg);
+            } else if (lhs.type == AstType::AccessExp) {
+                auto obj_reg = compile(&lhs.children[0]);
+                // save identifier as string and load it
+                auto key_reg = allocate_register();
+                auto index = output->store_string(lhs.children[1].data_s);
+                emit_u(LOAD_CONST, key_reg, index);
+                emit(STORE_OBJECT, source_reg, obj_reg, key_reg);
+                free_register(obj_reg);
+                free_register(key_reg);
+            }
+            free_register(source_reg);
             return 0xff;
         }
         handle(IfStat) {
@@ -346,91 +440,6 @@ uint8_t Compiler::compile(const AstNode* node) {
             registers[reg_b] = reg_b_state; // HACK
             return 0xff;
         }
-        handle(VarDeclStat) {
-            should_allocate(1);
-            auto reg = child(1);
-            
-            auto is_export = node->children[0].data_d;
-            auto var = bind_name(node->children[0].data_s, reg, false, is_export);
-            if (is_export) {
-                emit_u(WRITE_GLOBAL, reg, var->g_id);
-            }
-            return 0xff;
-        }
-        handle(ConstDeclStat) {
-            should_allocate(1);
-            auto reg = child(1);
-
-            auto is_export = node->children[0].data_d;
-            auto var = bind_name(node->children[0].data_s, reg, true, is_export);
-            if (is_export) {
-                emit_u(WRITE_GLOBAL, reg, var->g_id);
-            }
-            return 0xff;
-        }
-        handle(FuncDeclStat) {
-            // HACK: This is an amalgam of ConstDeclStat and FuncLiteral
-            // Currently it has to be specially interleaved because recursive functions need to be
-            // able to capture themselves by name, which is impossible with bind_name("recursive", compile(...))
-
-            auto& ident = node->children[0].data_s;
-            auto func = interpreter->create_fragment();
-            func->name = output->name + "::" + ident;
-
-            auto out = allocate_register();
-            auto index = output->store_fragment(func);
-            
-            /* interleaved from ConstDeclStat */ auto is_export = node->children[0].data_d;
-            /* interleaved from ConstDeclStat */ auto var = bind_name(ident, out, true, is_export);
-            
-            auto compiler = Compiler { .interpreter = interpreter };
-            compiler.compile_func(&node->children[1], func, &scopes.back());
-            emit_u(ALLOC_FUNC, out, index);
-            
-            /* interleaved from ConstDeclStat */ if (is_export) {
-            /* interleaved from ConstDeclStat */    emit_u(WRITE_GLOBAL, out, var->g_id);
-            /* interleaved from ConstDeclStat */ }
-
-            return 0xff;
-        }
-
-        handle(AssignStat) {
-            should_allocate(0);
-            auto source_reg = child(1);
-            auto& lhs = node->children[0];
-            if (lhs.type == AstType::Identifier) {
-                if (auto var = lookup(node->children[0].data_s)) {
-                    if (var->is_const) {
-                        error("can't reassign const variable");
-                    } else {
-                        if (var->is_global) {
-                            emit_u(WRITE_GLOBAL, source_reg, var->g_id);
-                        } else {
-                            emit(MOVE, var->reg, source_reg, 0);
-                        }
-                    }
-                } else {
-                    error("can't find variable: " + node->children[0].data_s);
-                }
-            } else if (lhs.type == AstType::IndexExp) {
-                auto array_reg = compile(&lhs.children[0]);
-                auto index_reg = compile(&lhs.children[1]);
-                emit(STORE_ARRAY, source_reg, array_reg, index_reg);
-                free_register(index_reg);
-                free_register(array_reg);
-            } else if (lhs.type == AstType::AccessExp) {
-                auto obj_reg = compile(&lhs.children[0]);
-                // save identifier as string and load it
-                auto key_reg = allocate_register();
-                auto index = output->store_string(lhs.children[1].data_s);
-                emit_u(LOAD_CONST, key_reg, index);
-                emit(STORE_OBJECT, source_reg, obj_reg, key_reg);
-                free_register(obj_reg);
-                free_register(key_reg);
-            }
-            free_register(source_reg);
-            return 0xff;
-        }
         handle(ReturnStat) {
             if (node->children.size()) {
                 auto return_register = child(0);
@@ -460,104 +469,26 @@ uint8_t Compiler::compile(const AstNode* node) {
             error("identifier: can't find variable: " + node->data_s);
             return 0xff;
         }
-        handle(NumLiteral) {
-            should_allocate(1);
-            auto n = node->data_d;
-            auto out = allocate_register();
-            auto index = output->store_number(n);
-            emit_u(LOAD_CONST, out, index);
-            return out;
-        }
-        handle(StringLiteral) {
-            should_allocate(1);
-            auto out = allocate_register();
-            auto index = output->store_string(node->data_s);
-            emit_u(LOAD_CONST, out, index);
-            return out;
-        }
-        handle(FuncLiteral) {
-            should_allocate(1);
-            auto func = interpreter->create_fragment();
-            auto index = output->store_fragment(func);
-            func->name = output->name + "::(anonymous)";
 
-            auto out = allocate_register();            
-            // compile must happen before ALLOC_FUNC because
-            // child compiler can emit READ_CAPTURE into current scope
-            auto compiler = Compiler { .interpreter = interpreter };
-            compiler.compile_func(node, func, &scopes.back());
-
-            // allocate new closure into new register
-            emit_u(ALLOC_FUNC, out, index);
-
-            return out;
-        }
-        handle(CallExp) {
-            should_allocate(1);
-            auto nargs = (uint8_t)node->children[1].children.size();
-
-            // compile the arguments first and remember which registers they are in
-            auto arg_regs = std::vector<uint8_t> {};
-            for (auto i = 0u; i < nargs; i++) {
-                arg_regs.emplace_back(compile(&node->children[1].children[i]));
-            }
-            auto func_reg = child(0); // LHS evaluates to function
-
-            // copy arguments to top of stack in sequence
-            auto return_reg = get_end_register();
-            for (auto i = 0u; i < nargs; i++) {
-                emit(MOVE, uint8_t(return_reg + i + STACK_FRAME_OVERHEAD), arg_regs[i], 0);
-            }
-
-            emit(CALL, func_reg, nargs, return_reg);
-
-            // return value goes in end-reg so mark it as used
-            registers[return_reg] = RegisterState::BUSY;
-            return return_reg; // return value copied to end register
-        }
-        handle(LenExp) {
-            auto in = child(0);
-            auto out = allocate_register();
-            emit(LEN, out, in, 0);
-            free_register(in);
-            return out;
-        }
-        handle(AddExp) {
+        handle(OrExp) {
             auto in1 = child(0);
             auto in2 = child(1);
             auto out = allocate_register();
-            emit(ADD, out, in1, in2);
+            emit(OR, out, in1, in2);
             free_register(in1);
             free_register(in2);
             return out;
         }
-        handle(SubExp) {
+        handle(AndExp) {
             auto in1 = child(0);
             auto in2 = child(1);
             auto out = allocate_register();
-            emit(SUB, out, in1, in2);
+            emit(AND, out, in1, in2);
             free_register(in1);
             free_register(in2);
             return out;
         }
-        handle(LessExp) {
-            auto in1 = child(0);
-            auto in2 = child(1);
-            auto out = allocate_register();
-            emit(LESS, out, in1, in2);
-            free_register(in1);
-            free_register(in2);
-            return out;
-        }
-        handle(LessEqExp) {
-            auto in1 = child(0);
-            auto in2 = child(1);
-            auto out = allocate_register();
-            emit(LESSEQ, out, in1, in2);
-            free_register(in1);
-            free_register(in2);
-            return out;
-        }
+
         handle(EqExp) {
             auto in1 = child(0);
             auto in2 = child(1);
@@ -576,6 +507,15 @@ uint8_t Compiler::compile(const AstNode* node) {
             free_register(in2);
             return out;
         }
+        handle(LessExp) {
+            auto in1 = child(0);
+            auto in2 = child(1);
+            auto out = allocate_register();
+            emit(LESS, out, in1, in2);
+            free_register(in1);
+            free_register(in2);
+            return out;
+        }
         handle(GreaterExp) {
             auto in1 = child(0);
             auto in2 = child(1);
@@ -585,11 +525,61 @@ uint8_t Compiler::compile(const AstNode* node) {
             free_register(in2);
             return out;
         }
+        handle(LessEqExp) {
+            auto in1 = child(0);
+            auto in2 = child(1);
+            auto out = allocate_register();
+            emit(LESSEQ, out, in1, in2);
+            free_register(in1);
+            free_register(in2);
+            return out;
+        }
         handle(GreaterEqExp) {
             auto in1 = child(0);
             auto in2 = child(1);
             auto out = allocate_register();
             emit(GREATEREQ, out, in1, in2);
+            free_register(in1);
+            free_register(in2);
+            return out;
+        }
+        
+        // handle(BitOrExp)
+        // handle(BitAndExp)
+        // handle(BitXorExp)
+        handle(ShiftRightExp) {
+            auto in1 = child(0);
+            auto in2 = child(1);
+            auto out = allocate_register();
+            emit(SHR, out, in1, in2);
+            free_register(in1);
+            free_register(in2);
+            return out;
+        }
+        handle(ShiftLeftExp) {
+            auto in1 = child(0);
+            auto in2 = child(1);
+            auto out = allocate_register();
+            emit(SHL, out, in1, in2);
+            free_register(in1);
+            free_register(in2);
+            return out;
+        }
+        
+        handle(AddExp) {
+            auto in1 = child(0);
+            auto in2 = child(1);
+            auto out = allocate_register();
+            emit(ADD, out, in1, in2);
+            free_register(in1);
+            free_register(in2);
+            return out;
+        }
+        handle(SubExp) {
+            auto in1 = child(0);
+            auto in2 = child(1);
+            auto out = allocate_register();
+            emit(SUB, out, in1, in2);
             free_register(in1);
             free_register(in2);
             return out;
@@ -619,6 +609,64 @@ uint8_t Compiler::compile(const AstNode* node) {
             emit(MOD, out, in1, in2);
             free_register(in1);
             free_register(in2);
+            return out;
+        }
+        
+        handle(LenExp) {
+            auto in = child(0);
+            auto out = allocate_register();
+            emit(LEN, out, in, 0);
+            free_register(in);
+            return out;
+        }
+        
+        handle(NumLiteral) {
+            should_allocate(1);
+            auto n = node->data_d;
+            auto out = allocate_register();
+            auto si = int16_t{0};
+            if (is_small_integer(n, si)) {
+                emit_s(LOAD_I_SN, out, si);
+            } else {
+                auto index = output->store_number(n);
+                emit_u(LOAD_CONST, out, index);
+            }
+            return out;
+        }
+        handle(BoolLiteral) {
+            should_allocate(1);
+            auto out = allocate_register();
+            emit(LOAD_I_BOOL, out, (uint8_t)node->data_d, 0);
+            return out;
+        }
+        handle(NullLiteral) {
+            should_allocate(1);
+            auto out = allocate_register();
+            emit(LOAD_I_NULL, out, 0, 0);
+            return out;
+        }
+        handle(StringLiteral) {
+            should_allocate(1);
+            auto out = allocate_register();
+            auto index = output->store_string(node->data_s);
+            emit_u(LOAD_CONST, out, index);
+            return out;
+        }
+        handle(FuncLiteral) {
+            should_allocate(1);
+            auto func = interpreter->create_fragment();
+            auto index = output->store_fragment(func);
+            func->name = output->name + "::(anonymous)";
+
+            auto out = allocate_register();            
+            // compile must happen before ALLOC_FUNC because
+            // child compiler can emit READ_CAPTURE into current scope
+            auto compiler = Compiler { .interpreter = interpreter };
+            compiler.compile_func(node, func, &scopes.back());
+
+            // allocate new closure into new register
+            emit_u(ALLOC_FUNC, out, index);
+
             return out;
         }
         handle(ArrayLiteral) {
@@ -660,11 +708,28 @@ uint8_t Compiler::compile(const AstNode* node) {
             emit(ALLOC_OBJECT, obj_reg, n_elems, end_reg);
             return obj_reg;
         }
-        handle(ShiftLeftExp) {
-            auto arr = child(0);
-            auto value = child(1);
-            emit(SHL, arr, value, 0);
-            return 0xff;
+        handle(CallExp) {
+            should_allocate(1);
+            auto nargs = (uint8_t)node->children[1].children.size();
+
+            // compile the arguments first and remember which registers they are in
+            auto arg_regs = std::vector<uint8_t> {};
+            for (auto i = 0u; i < nargs; i++) {
+                arg_regs.emplace_back(compile(&node->children[1].children[i]));
+            }
+            auto func_reg = child(0); // LHS evaluates to function
+
+            // copy arguments to top of stack in sequence
+            auto return_reg = get_end_register();
+            for (auto i = 0u; i < nargs; i++) {
+                emit(MOVE, uint8_t(return_reg + i + STACK_FRAME_OVERHEAD), arg_regs[i], 0);
+            }
+
+            emit(CALL, func_reg, nargs, return_reg);
+
+            // return value goes in end-reg so mark it as used
+            registers[return_reg] = RegisterState::BUSY;
+            return return_reg; // return value copied to end register
         }
         handle(IndexExp) {
             auto arr = child(0);

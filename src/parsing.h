@@ -12,27 +12,56 @@
     ast(FuncDeclStat)\
     ast(AssignStat)\
     ast(IfStat)\
-    ast(WhileStat) ast(ForStat) ast(ForStat2) ast(ForStatInt)\
+    ast(WhileStat)\
+    ast(ForStat)\
+    ast(ForStat2)\
+    ast(ForStatInt)\
     ast(ReturnStat)\
     \
     ast(TernaryExp)\
+    ast(Identifier)\
     \
-    ast(OrExp) ast(AndExp)\
-    ast(BitOrExp) ast(BitAndExp) ast(BitXorExp)\
-    ast(EqExp) ast(NotEqExp) ast(LessExp) ast(GreaterExp) ast(LessEqExp) ast(GreaterEqExp)\
-    ast(ShiftLeftExp) ast(ShiftRightExp)\
-    ast(AddExp) ast(SubExp) ast(MulExp) ast(DivExp) ast(ModExp) ast(PowExp)\
+    ast(OrExp)\
+    ast(AndExp)\
     \
-    ast(NegateExp) ast(NotExp) ast(BitNotExp) ast(LenExp)\
+    ast(EqExp)\
+    ast(NotEqExp)\
+    ast(LessExp)\
+    ast(GreaterExp)\
+    ast(LessEqExp)\
+    ast(GreaterEqExp)\
     \
-    ast(CallExp) ast(ArgList)\
-    ast(IndexExp)\
-    ast(AccessExp)\
+    ast(BitOrExp)\
+    ast(BitAndExp)\
+    ast(BitXorExp)\
+    ast(ShiftLeftExp)\
+    ast(ShiftRightExp)\
     \
+    ast(AddExp)\
+    ast(SubExp)\
+    ast(MulExp)\
+    ast(DivExp)\
+    ast(ModExp)\
+    ast(PowExp)\
+    \
+    ast(NegateExp)\
+    ast(NotExp)\
+    ast(BitNotExp)\
+    ast(LenExp)\
+    \
+    ast(NumLiteral)\
+    ast(BoolLiteral)\
+    ast(NullLiteral)\
+    ast(StringLiteral)\
     ast(FuncLiteral)\
     ast(ParamDef)\
-    ast(NumLiteral) ast(StringLiteral) ast(ArrayLiteral) ast(ObjectLiteral)\
-    ast(Identifier)\
+    ast(ArrayLiteral)\
+    ast(ObjectLiteral)\
+    \
+    ast(CallExp)\
+    ast(ArgList)\
+    ast(IndexExp)\
+    ast(AccessExp)\
 
 
 #define ast(x) x,
@@ -61,6 +90,8 @@ struct AstNode {
         : type(type), data_s(data_s) {}
     AstNode(double d)
         : type(AstType::NumLiteral), data_d(d) {}
+    AstNode(bool b)
+        : type(AstType::BoolLiteral), data_d(b) {}
 
     std::string tostring(const std::string& indent = "") const {
         auto s = indent + to_string(type) + 

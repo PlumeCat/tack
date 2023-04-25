@@ -194,6 +194,11 @@ DEFPARSER(func_literal, {
 });
 
 DEFPARSER(literal, {
+	SUBPARSER(symbol_literal, {
+		TRYs("true") SUCCESS(true);
+		TRYs("false") SUCCESS(false);
+		TRYs("null") SUCCESS(AstType::NullLiteral);
+	})
 	SUBPARSER(num_literal, {
 		auto num = 0.0;
 		if (parse_raw_number(code, num)) {
@@ -244,6 +249,7 @@ DEFPARSER(literal, {
 	TRY(object_literal) SUCCESS(object_literal);
 	TRY(func_literal) SUCCESS(func_literal);
 	TRY(num_literal) SUCCESS(num_literal);
+	TRY(symbol_literal) SUCCESS(symbol_literal);
 });
 
 DEFPARSER(primary_exp, {

@@ -160,11 +160,17 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
             auto i = _pr->bytecode->instructions[_pc];
             switch (i.opcode) {
             case Opcode::UNKNOWN: break;
-                handle(SETNULL) {
+                handle(ZERO_CAPTURE) {
                     REGISTER_RAW(i.r0) = value_null();
                 }
-                handle(LOAD_I) {
+                handle(LOAD_I_SN) {
                     REGISTER(i.r0) = value_from_number(i.u1);
+                }
+                handle(LOAD_I_NULL) {
+                    REGISTER(i.r0) = value_null();
+                }
+                handle(LOAD_I_BOOL) {
+                    REGISTER(i.r0) = value_from_boolean(i.u8.r1);
                 }
                 handle(LOAD_CONST) {
                     REGISTER(i.r0) = _pr->bytecode->storage[i.u1];
@@ -190,8 +196,38 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.u8.r1)) / value_to_number(REGISTER(i.u8.r2)));
                 }
                 handle(SHL) {
-                    auto* arr = value_to_array(REGISTER(i.r0));
-                    arr->values.emplace_back(REGISTER(i.u8.r1));
+                    auto lhs = REGISTER(i.u8.r1);
+                    auto rhs = REGISTER(i.u8.r2);
+                    if (value_is_array(lhs)) {
+                        auto* arr = value_to_array(lhs);
+                        arr->values.emplace_back(rhs);
+                        // put the appended value into r0
+                        REGISTER(i.r0) = rhs;
+                    } else if (value_is_number(lhs)) {
+                        REGISTER(i.r0) = value_from_number(
+                            (uint32_t)value_to_number(lhs) << 
+                            (uint32_t)value_to_number(rhs)
+                        );
+                    } else {
+                        error("expected number or array");
+                    }
+                }
+                handle(SHR) {
+                    auto lhs = REGISTER(i.u8.r1);
+                    auto rhs = REGISTER(i.u8.r2);
+                    if (value_is_array(lhs)) {
+                        auto* arr = value_to_array(lhs);
+                        // put the popped value into r0
+                        REGISTER(i.r0) = arr->values.back();
+                        arr->values.pop_back();
+                    } else if (value_is_number(lhs)) {
+                        REGISTER(i.r0) = value_from_number(
+                            (uint32_t)value_to_number(lhs) >>
+                            (uint32_t)value_to_number(rhs)
+                        );
+                    } else {
+                        error("expected number or array");
+                    }
                 }
                 handle(LESS) {
                     REGISTER(i.r0) = value_from_boolean(
@@ -303,7 +339,6 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     auto val = REGISTER(i.r0);
                     if ((
                         (value_get_type(val) == Type::Boolean && value_to_boolean(val)) ||
-                        // (value_get_type(val) == Type::Integer && value_to_integer(val)) ||
                         (value_get_type(val) == Type::Number && value_to_number(val))
                         )) {
                         _pc++;
@@ -316,8 +351,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     REGISTER(i.r0) = value_from_number(arr->values.size());
                 }
                 handle(READ_CAPTURE) {
-                    REGISTER_RAW(i.r0) = _pr->captures[i.u8.r1];//((Value*)(REGISTER_RAW(-1)._p))[i.u8.r1];
-                    // value_to_array(REGISTER_RAW(-1))->values.at(i.u8.r1);
+                    REGISTER_RAW(i.r0) = _pr->captures[i.u8.r1];
                 }
                 handle(ALLOC_FUNC) {
                     // create closure
