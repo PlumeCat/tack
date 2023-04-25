@@ -144,14 +144,12 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
     REGISTER_RAW(-1)._i = 0; // special case
 
     auto dumpstack = [&]() {
-        log("in", _pr->bytecode->name);
-
+        log("encountered at", _pr->bytecode->name);
         auto s = stackbase;
-        auto ret_s = stack[s-2]._i;
-        while (stack[s-2]._i != 0) {
-            auto func = (CodeFragment*)stack[s-3]._p;
-            log(" -", func->name);
-            s = ret_s;
+        while (stack[s-1]._i != 0) {
+            auto func = ((FunctionType*)stack[s-2]._p)->bytecode;
+            log(" - called from", func->name);
+            s = stack[s-1]._i;
         }
     };
 
@@ -527,6 +525,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
     } catch (std::exception& e) {
         log("runtime error: ", e.what());
         dumpstack();
+        return value_null();
     }
 
     error("Reached end of interpreter loop - should be impossible");

@@ -1,23 +1,22 @@
-let X = 1
-let Y = 2
+fn foo() {
+    fn bar() {
+        print(
+    "hello world")
+    }
+    fn baz() {
+        2 + 3
+    }
+    let quz = fn () {}
 
-fn f2() {
-    if 0 {
-        X = 3
-    } else {
-        X = X + 1
-    }
-    X = X + 3
-}
-fn f1() {
-    if 0 {
-        X = 100
-    } else {
-        X = 200
-    }
+    bar() + "foo"
 }
 
-f1()
-f2()
 
-print(X, Y)
+fn baz() {
+    fn bar() {
+        foo()
+    }
+    bar()
+}
+
+baz()

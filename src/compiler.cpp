@@ -54,25 +54,31 @@ uint16_t CodeFragment::store_fragment(CodeFragment* fragment) {
 
 std::string CodeFragment::str() {
     auto s = std::stringstream {};
-    s << "function: " << name << std::endl;
-    auto i = 0;
-    for (auto bc : instructions) {
-        s << "    " << i << ": " << ::to_string(bc.opcode) << ' ' << (uint32_t)bc.r0 << ' ' << (uint32_t)bc.u8.r1 << ' ' << (uint32_t)bc.u8.r2 << '\n';
-        i++;
+    {
+        s << "function: " << name << std::endl;
+        auto i = 0;
+        for (auto bc : instructions) {
+            s << "    " << i << ": " << ::to_string(bc.opcode) << ' ' << (uint32_t)bc.r0 << ' ' << (uint32_t)bc.u8.r1 << ' ' << (uint32_t)bc.u8.r2 << '\n';
+            i++;
+        }
     }
 
-    s << "  storage:\n";
-    i = 0;
-    for (auto& x : storage) {
-        s << "    " << i << ": " << x << '\n';
-        i++;
+    if (storage.size()) {
+        s << "  storage:\n";
+        auto i = 0;
+        for (auto& x : storage) {
+            s << "    " << i << ": " << x << '\n';
+            i++;
+        }
     }
 
-    i = 0;
-    s << "  captures:\n";
-    for (auto& c : capture_info) {
-        s << "    " << i << ": " << (uint32_t)c.source_register << " -> " << (uint32_t)c.dest_register << "(" << c.name << ")" "\n";
-        i++;
+    if (capture_info.size()) {
+        auto i = 0;
+        s << "  captures:\n";
+        for (auto& c : capture_info) {
+            s << "    " << i << ": " << (uint32_t)c.source_register << " -> " << (uint32_t)c.dest_register << "(" << c.name << ")" "\n";
+            i++;
+        }
     }
 
     return s.str();

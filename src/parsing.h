@@ -97,7 +97,7 @@ struct AstNode {
         auto s = indent + to_string(type) + 
             (type == AstType::Identifier ? " " + data_s : "") + 
             (type == AstType::NumLiteral ? " " + std::to_string(data_d) : "") +
-            ' ' + std::to_string(line_number);
+            " (" + std::to_string(line_number) + ')';
         for (const auto& c : children) {
             s += "\n" + indent + c.tostring(indent + "  ");
         }

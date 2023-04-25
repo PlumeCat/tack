@@ -5,11 +5,12 @@
 
 // parsing utils
 using namespace std;
+using namespace std::string_literals;
 
 struct ParseContext : private string_view {
     uint32_t line_number = 1;
+    
     ParseContext(const string& s) : string_view(s) {}
-
     void remove_prefix(string_view::size_type s) noexcept {
         for (auto i = 0u; i < s; i++) {
             if ((*this)[i] == '\n') {
@@ -30,13 +31,13 @@ struct ParseContext : private string_view {
 #ifdef ERROR
 #undef ERROR
 #endif
-#define ERROR(msg) throw runtime_error("parsing error: " msg );// | line: " + to_string(code.line_number) + "\n'" + string(code.substr(0, 32))  + "... '")
+#define ERROR(msg) throw runtime_error("parsing error "s + msg + " | line: " + to_string(code.line_number) + "\n'" + string(code.substr(0, 32))  + "... '");
 #define EXPECT(s) if (!parse_raw_string(code, s)) { FAIL(); }
 
 #define paste(a, b) a##b
 #define DECLPARSER(name) bool paste(parse_, name)(ParseContext& code, AstNode& out)
-#define DEFPARSER(name, body) DECLPARSER(name) { auto _c = code; body; FAIL(); }
-#define SUBPARSER(name, body) auto paste(parse_, name) = [&](ParseContext& code, AstNode& out) -> bool { auto _c = code; body; FAIL(); };
+#define DEFPARSER(name, body) DECLPARSER(name) { skip_whitespace(code); auto _c = code; body; FAIL(); }
+#define SUBPARSER(name, body) auto paste(parse_, name) = [&](ParseContext& code, AstNode& out) -> bool { skip_whitespace(code); auto _c = code; body; FAIL(); };
 
 #define TRY4(n1,n2,n3,n4)\
     auto n1 = AstNode {}; auto n2 = AstNode {}; auto n3 = AstNode {}; auto n4 = AstNode {};\
@@ -127,7 +128,6 @@ bool parse_raw_string(ParseContext& code, const std::string& c) {
     return false;
 }
 
-
 // left recursive binary operation
 // eg SubExpr = SubExpr '-' MulExpr
 //			  | MulExpr
@@ -145,6 +145,7 @@ bool parse_raw_string(ParseContext& code, const std::string& c) {
             SUCCESS(res);\
         }\
    });
+
 // binary operation non recursive in the grammar sense
 #define BINOP2(name, ty, precedent, op)\
     DEFPARSER(name, {\
@@ -158,8 +159,6 @@ bool parse_raw_string(ParseContext& code, const std::string& c) {
             SUCCESS(lhs)\
         }\
    });
-
-
 
 // language
 DECLPARSER(stat_list);
@@ -176,7 +175,7 @@ DEFPARSER(param_def, {
     auto p = AstNode(AstType::ParamDef);
     while (true) {
         TRY(identifier) {
-            p.children.emplace_back(identifier);
+            p.children.push_back(identifier);
             TRYs(',') {} else break;
         } else break;
     }
@@ -366,8 +365,8 @@ DEFPARSER(cmp_exp, {
 BINOP(bit_and_exp, BitAndExp, cmp_exp, "&");
 BINOP(bit_xor_exp, BitXorExp, bit_and_exp, "^");
 BINOP(bit_or_exp, BitOrExp, bit_xor_exp, "|");
-BINOP(and_exp, AndExp, bit_or_exp, "&&");
-BINOP(or_exp, OrExp, and_exp, "||");
+BINOP(and_exp, AndExp, bit_or_exp, "and");
+BINOP(or_exp, OrExp, and_exp, "or");
 
 DEFPARSER(ternary_exp, {
     TRY(or_exp) {

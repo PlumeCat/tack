@@ -107,7 +107,7 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
     }
 
     // mark stack
-    gc_visit(stack[stackbase - STACK_FRAME_OVERHEAD]);
+    gc_visit(stack[stackbase - STACK_FRAME_OVERHEAD]); // visit return value
     for (auto s = stackbase; stack[s-1]._i != 0; s = stack[s-1]._i) {
         for (auto i = stack[s-1]._i; i < s - (STACK_FRAME_OVERHEAD); i++) {
             gc_visit(stack[i]);
