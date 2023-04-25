@@ -7,22 +7,22 @@
 using namespace std;
 
 struct ParseContext : private string_view {
-	uint32_t line_number = 1;
-	ParseContext(const string& s) : string_view(s) {}
+    uint32_t line_number = 1;
+    ParseContext(const string& s) : string_view(s) {}
 
-	void remove_prefix(string_view::size_type s) noexcept {
-		for (auto i = 0u; i < s; i++) {
-			if ((*this)[i] == '\n') {
-				line_number += 1;
-			}
-		}
-		string_view::remove_prefix(s);
-	}
+    void remove_prefix(string_view::size_type s) noexcept {
+        for (auto i = 0u; i < s; i++) {
+            if ((*this)[i] == '\n') {
+                line_number += 1;
+            }
+        }
+        string_view::remove_prefix(s);
+    }
 
-	using string_view::operator[];
-	using string_view::size;
-	using string_view::data;
-	using string_view::substr;
+    using string_view::operator[];
+    using string_view::size;
+    using string_view::data;
+    using string_view::substr;
 };
 
 #define SUCCESS(...) { out = AstNode(__VA_ARGS__); out.line_number = _c.line_number; return true; }
@@ -57,74 +57,74 @@ struct ParseContext : private string_view {
 
 
 bool is_identifier_char(char c) {
-	return isalnum(c) || c == '_';
+    return isalnum(c) || c == '_';
 }
 bool is_identifier_start_char(char c) {
-	return isalpha(c) || c == '_';
+    return isalpha(c) || c == '_';
 }
 void skip_whitespace(ParseContext& code) {
-	auto n = 0u;
-	for (; n < code.size(); n++) {
-		if (!isspace(code[n])) {
-			break;
-		}
-	}
-	code.remove_prefix(n);
+    auto n = 0u;
+    for (; n < code.size(); n++) {
+        if (!isspace(code[n])) {
+            break;
+        }
+    }
+    code.remove_prefix(n);
 }
 
 bool parse_raw_number(ParseContext& code, double& out) {
-	auto end = (char*)nullptr;
-	auto result = strtod(code.data(), &end);
-	auto dist = end - code.data();
-	if (dist != 0) {
-		code.remove_prefix(dist);
-		out = result;
-		return true;
-	}
-	return false;
+    auto end = (char*)nullptr;
+    auto result = strtod(code.data(), &end);
+    auto dist = end - code.data();
+    if (dist != 0) {
+        code.remove_prefix(dist);
+        out = result;
+        return true;
+    }
+    return false;
 }
 bool parse_raw_string_literal(ParseContext& code, std::string& out) {
-	skip_whitespace(code);
-	if (code.size() && code[0] == '"') {
-		for (auto n = 1u; n < code.size(); n++) {
-			if (code[n] == '"') {
-				out = code.substr(1, n - 1);
-				code.remove_prefix(n + 1);
-				return true;
-			}
-		}
-		ERROR("expected closing quote '\"'");
-	}
-	return false;
+    skip_whitespace(code);
+    if (code.size() && code[0] == '"') {
+        for (auto n = 1u; n < code.size(); n++) {
+            if (code[n] == '"') {
+                out = code.substr(1, n - 1);
+                code.remove_prefix(n + 1);
+                return true;
+            }
+        }
+        ERROR("expected closing quote '\"'");
+    }
+    return false;
 }
 bool parse_raw_identifier(ParseContext& code, std::string& out) {
-	skip_whitespace(code);
-	if (code.size() && is_identifier_start_char(code[0])) {
-		for (auto n = 1u; n < code.size(); n++) {
-			if (!is_identifier_char(code[n])) {
-				out = code.substr(0, n);
-				code.remove_prefix(n);
-				return true;
-			}
-		}
-	}
-	return false;
+    skip_whitespace(code);
+    if (code.size() && is_identifier_start_char(code[0])) {
+        for (auto n = 1u; n < code.size(); n++) {
+            if (!is_identifier_char(code[n])) {
+                out = code.substr(0, n);
+                code.remove_prefix(n);
+                return true;
+            }
+        }
+    }
+    return false;
 }
 bool parse_raw_string(ParseContext& code, char c) {
-	skip_whitespace(code);
-	if (code.size() && code[0] == c) {
-		code.remove_prefix(1);
-		return true;
-	}
-	return false;
+    skip_whitespace(code);
+    if (code.size() && code[0] == c) {
+        code.remove_prefix(1);
+        return true;
+    }
+    return false;
 }
 bool parse_raw_string(ParseContext& code, const std::string& c) {
-	skip_whitespace(code);
-	if (code.size() >= c.size() && code.substr(0, c.size()) == c) {
-		code.remove_prefix(c.size());
-		return true;
-	}
-	return false;
+    skip_whitespace(code);
+    if (code.size() >= c.size() && code.substr(0, c.size()) == c) {
+        code.remove_prefix(c.size());
+        return true;
+    }
+    return false;
 }
 
 
@@ -167,178 +167,178 @@ DECLPARSER(exp);
 DECLPARSER(block);
 
 DEFPARSER(identifier, {
-	auto identifier = ""s;
-	if (parse_raw_identifier(code, identifier)) {
-		SUCCESS(AstType::Identifier, identifier);
-	}
+    auto identifier = ""s;
+    if (parse_raw_identifier(code, identifier)) {
+        SUCCESS(AstType::Identifier, identifier);
+    }
 });
 DEFPARSER(param_def, {
-	auto p = AstNode(AstType::ParamDef);
-	while (true) {
-		TRY(identifier) {
-			p.children.emplace_back(identifier);
-			TRYs(',') {} else break;
-		} else break;
-	}
-	SUCCESS(p);
+    auto p = AstNode(AstType::ParamDef);
+    while (true) {
+        TRY(identifier) {
+            p.children.emplace_back(identifier);
+            TRYs(',') {} else break;
+        } else break;
+    }
+    SUCCESS(p);
 });
 DEFPARSER(func_literal, {
-	EXPECT("fn")
-	TRYs('(') {} else ERROR("expected parameter definition after 'fn'");
-	TRY(param_def) {
-		TRYs(')') {} else ERROR("expected ')' after parameter definition");
-		TRY(block) {
-			SUCCESS(AstType::FuncLiteral, param_def, block);
-		} else ERROR("expected block after parameter definition");
-	}
+    EXPECT("fn")
+    TRYs('(') {} else ERROR("expected parameter definition after 'fn'");
+    TRY(param_def) {
+        TRYs(')') {} else ERROR("expected ')' after parameter definition");
+        TRY(block) {
+            SUCCESS(AstType::FuncLiteral, param_def, block);
+        } else ERROR("expected block after parameter definition");
+    }
 });
 
 DEFPARSER(literal, {
-	SUBPARSER(symbol_literal, {
-		TRYs("true") SUCCESS(true);
-		TRYs("false") SUCCESS(false);
-		TRYs("null") SUCCESS(AstType::NullLiteral);
-	})
-	SUBPARSER(num_literal, {
-		auto num = 0.0;
-		if (parse_raw_number(code, num)) {
-			SUCCESS(num);
-		}
-	});
-	SUBPARSER(string_literal, {
-		auto str = ""s;
-		if (parse_raw_string_literal(code, str)) {
-			SUCCESS(AstType::StringLiteral, str);
-		}
-	});
-	SUBPARSER(object_literal, {
-		TRYs('{') {
-			auto res = AstNode(AstType::ObjectLiteral);
+    SUBPARSER(symbol_literal, {
+        TRYs("true") SUCCESS(true);
+        TRYs("false") SUCCESS(false);
+        TRYs("null") SUCCESS(AstType::NullLiteral);
+    })
+    SUBPARSER(num_literal, {
+        auto num = 0.0;
+        if (parse_raw_number(code, num)) {
+            SUCCESS(num);
+        }
+    });
+    SUBPARSER(string_literal, {
+        auto str = ""s;
+        if (parse_raw_string_literal(code, str)) {
+            SUCCESS(AstType::StringLiteral, str);
+        }
+    });
+    SUBPARSER(object_literal, {
+        TRYs('{') {
+            auto res = AstNode(AstType::ObjectLiteral);
 
-			while (true) {
-				TRY(identifier) {
-					TRYs('=') {
-						TRY(exp) {
-							res.children.emplace_back(AstType::AssignStat, identifier, exp);
-							TRYs(',') {} else break;
-						} else ERROR("expected expression after '=' (object)")
-					} else ERROR("expected '=' after key (object)")
-				} else break;
-			}
+            while (true) {
+                TRY(identifier) {
+                    TRYs('=') {
+                        TRY(exp) {
+                            res.children.emplace_back(AstType::AssignStat, identifier, exp);
+                            TRYs(',') {} else break;
+                        } else ERROR("expected expression after '=' (object)")
+                    } else ERROR("expected '=' after key (object)")
+                } else break;
+            }
 
-			TRYs('}') {} else ERROR("expected ',' or '}' after member")
-			SUCCESS(res);
-		}
-	});
-	SUBPARSER(array_literal, {
-		TRYs('[') {
-			auto res = AstNode(AstType::ArrayLiteral);
-			while (true) {
-				TRY(exp) {
-					res.children.emplace_back(exp);
-					TRYs(',') {} else break;
-				} else break;
-			}
+            TRYs('}') {} else ERROR("expected ',' or '}' after member")
+            SUCCESS(res);
+        }
+    });
+    SUBPARSER(array_literal, {
+        TRYs('[') {
+            auto res = AstNode(AstType::ArrayLiteral);
+            while (true) {
+                TRY(exp) {
+                    res.children.emplace_back(exp);
+                    TRYs(',') {} else break;
+                } else break;
+            }
 
-			EXPECT(']');
-			SUCCESS(res);
-		}
-	});
-	TRY(string_literal) SUCCESS(string_literal);
-	TRY(array_literal) SUCCESS(array_literal);
-	TRY(object_literal) SUCCESS(object_literal);
-	TRY(func_literal) SUCCESS(func_literal);
-	TRY(num_literal) SUCCESS(num_literal);
-	TRY(symbol_literal) SUCCESS(symbol_literal);
+            EXPECT(']');
+            SUCCESS(res);
+        }
+    });
+    TRY(string_literal) SUCCESS(string_literal);
+    TRY(array_literal) SUCCESS(array_literal);
+    TRY(object_literal) SUCCESS(object_literal);
+    TRY(func_literal) SUCCESS(func_literal);
+    TRY(num_literal) SUCCESS(num_literal);
+    TRY(symbol_literal) SUCCESS(symbol_literal);
 });
 
 DEFPARSER(primary_exp, {
-	TRY(literal) SUCCESS(literal)
-	TRY(identifier) SUCCESS(identifier)
-	TRYs('(') {
-		TRY(exp) {
-			TRYs(')') {} else ERROR("expected closing ')'");
-			SUCCESS(exp)
-		}
-	}
+    TRY(literal) SUCCESS(literal)
+    TRY(identifier) SUCCESS(identifier)
+    TRYs('(') {
+        TRY(exp) {
+            TRYs(')') {} else ERROR("expected closing ')'");
+            SUCCESS(exp)
+        }
+    }
 });
 DEFPARSER(postfix_exp, {
-	SUBPARSER(access_postfix, {
-		// access expr
-		TRYs('.') {
-			TRY(identifier) {
-				SUCCESS(identifier)
-			} else ERROR("expected identifier after '.'");
-		}
-	});
-	SUBPARSER(index_postfix, {
-		// index expr
-		TRYs('[') {
-			TRY(exp) {
-				TRYs(']') {
-					SUCCESS(exp)
-				}
-			}
-		}
-	});
-	SUBPARSER(call_postfix, {
-		SUBPARSER(arg_list, {
-			auto res = AstNode(AstType::ArgList);
+    SUBPARSER(access_postfix, {
+        // access expr
+        TRYs('.') {
+            TRY(identifier) {
+                SUCCESS(identifier)
+            } else ERROR("expected identifier after '.'");
+        }
+    });
+    SUBPARSER(index_postfix, {
+        // index expr
+        TRYs('[') {
+            TRY(exp) {
+                TRYs(']') {
+                    SUCCESS(exp)
+                }
+            }
+        }
+    });
+    SUBPARSER(call_postfix, {
+        SUBPARSER(arg_list, {
+            auto res = AstNode(AstType::ArgList);
 
-			TRY(exp) {
-				res.children.emplace_back(exp);
-			} else SUCCESS(res)
+            TRY(exp) {
+                res.children.emplace_back(exp);
+            } else SUCCESS(res)
 
-			while (true) {
-				TRYs(',') {
-					TRY(exp) {
-						res.children.emplace_back(exp);
-					} else ERROR("unexpected symbol in argument list");
-				} else break;
-			}
-			SUCCESS(res)
-		});
-		TRYs('(') {
-			TRY(arg_list) {
-				TRYs(')') {
-					SUCCESS(arg_list)
-				} else ERROR("expected ')' after argument list");
-			} else ERROR("expected ')' or argument list after '('");
-		}
-	});
-	TRY(primary_exp) {
-		while (true) {
-			TRY(call_postfix) {
-				primary_exp = AstNode(AstType::CallExp, primary_exp, call_postfix);
-				continue;
-			}
-			TRY(access_postfix) {
-				primary_exp = AstNode(AstType::AccessExp, primary_exp, access_postfix); // access_postfix is Identifier
-				continue;
-			}
-			TRY(index_postfix) {
-				primary_exp = AstNode(AstType::IndexExp, primary_exp, index_postfix); // index_postfix is Exp
-				continue;
-			}
-			break;
-		}
-		SUCCESS(primary_exp)
-	}
+            while (true) {
+                TRYs(',') {
+                    TRY(exp) {
+                        res.children.emplace_back(exp);
+                    } else ERROR("unexpected symbol in argument list");
+                } else break;
+            }
+            SUCCESS(res)
+        });
+        TRYs('(') {
+            TRY(arg_list) {
+                TRYs(')') {
+                    SUCCESS(arg_list)
+                } else ERROR("expected ')' after argument list");
+            } else ERROR("expected ')' or argument list after '('");
+        }
+    });
+    TRY(primary_exp) {
+        while (true) {
+            TRY(call_postfix) {
+                primary_exp = AstNode(AstType::CallExp, primary_exp, call_postfix);
+                continue;
+            }
+            TRY(access_postfix) {
+                primary_exp = AstNode(AstType::AccessExp, primary_exp, access_postfix); // access_postfix is Identifier
+                continue;
+            }
+            TRY(index_postfix) {
+                primary_exp = AstNode(AstType::IndexExp, primary_exp, index_postfix); // index_postfix is Exp
+                continue;
+            }
+            break;
+        }
+        SUCCESS(primary_exp)
+    }
 });
 DEFPARSER(prefix_exp, {
-	TRYs('-') {
-		TRY(prefix_exp) SUCCESS(AstType::NegateExp, prefix_exp);
-	} else TRYs('!') {
-		TRY(prefix_exp) SUCCESS(AstType::NotExp, prefix_exp);
-	} else TRYs('~') {
-		TRY(prefix_exp) SUCCESS(AstType::BitNotExp, prefix_exp);
-	} else TRYs('#') {
-		TRY(prefix_exp) SUCCESS(AstType::LenExp, prefix_exp);
-	}
-	TRY(postfix_exp) SUCCESS(postfix_exp)
+    TRYs('-') {
+        TRY(prefix_exp) SUCCESS(AstType::NegateExp, prefix_exp);
+    } else TRYs('!') {
+        TRY(prefix_exp) SUCCESS(AstType::NotExp, prefix_exp);
+    } else TRYs('~') {
+        TRY(prefix_exp) SUCCESS(AstType::BitNotExp, prefix_exp);
+    } else TRYs('#') {
+        TRY(prefix_exp) SUCCESS(AstType::LenExp, prefix_exp);
+    }
+    TRY(postfix_exp) SUCCESS(postfix_exp)
 });
 DEFPARSER(unary_exp, {
-	TRY(prefix_exp) SUCCESS(prefix_exp)
+    TRY(prefix_exp) SUCCESS(prefix_exp)
 });
 
 BINOP(pow_exp, PowExp, unary_exp, "**");
@@ -351,16 +351,16 @@ BINOP(shr_exp, ShiftRightExp, add_exp, ">>");
 BINOP(shl_exp, ShiftLeftExp, shr_exp, "<<");
 
 DEFPARSER(cmp_exp, {
-	TRY(shl_exp) {
-		auto lhs = shl_exp;
-		TRYs("==") { TRY(shl_exp) { SUCCESS(AstType::EqExp,       lhs, shl_exp); } }
-		TRYs("!=") { TRY(shl_exp) { SUCCESS(AstType::NotEqExp,    lhs, shl_exp); } }
-		TRYs("<=") { TRY(shl_exp) { SUCCESS(AstType::LessEqExp,   lhs, shl_exp); } }
-		TRYs(">=") { TRY(shl_exp) { SUCCESS(AstType::GreaterEqExp,lhs, shl_exp); } }
-		TRYs("<")  { TRY(shl_exp) { SUCCESS(AstType::LessExp,     lhs, shl_exp); } }
-		TRYs(">")  { TRY(shl_exp) { SUCCESS(AstType::GreaterExp,  lhs, shl_exp); } }
-		SUCCESS(lhs);
-	}
+    TRY(shl_exp) {
+        auto lhs = shl_exp;
+        TRYs("==") { TRY(shl_exp) { SUCCESS(AstType::EqExp,       lhs, shl_exp); } }
+        TRYs("!=") { TRY(shl_exp) { SUCCESS(AstType::NotEqExp,    lhs, shl_exp); } }
+        TRYs("<=") { TRY(shl_exp) { SUCCESS(AstType::LessEqExp,   lhs, shl_exp); } }
+        TRYs(">=") { TRY(shl_exp) { SUCCESS(AstType::GreaterEqExp,lhs, shl_exp); } }
+        TRYs("<")  { TRY(shl_exp) { SUCCESS(AstType::LessExp,     lhs, shl_exp); } }
+        TRYs(">")  { TRY(shl_exp) { SUCCESS(AstType::GreaterExp,  lhs, shl_exp); } }
+        SUCCESS(lhs);
+    }
 });
 
 BINOP(bit_and_exp, BitAndExp, cmp_exp, "&");
@@ -370,197 +370,197 @@ BINOP(and_exp, AndExp, bit_or_exp, "&&");
 BINOP(or_exp, OrExp, and_exp, "||");
 
 DEFPARSER(ternary_exp, {
-	TRY(or_exp) {
-		TRYs('?') {
-			TRY(exp) {
-				auto e1 = exp;
-				TRYs(':') {} else throw runtime_error("Expected ':' in ternary expression");
-				TRY(exp) {} else throw runtime_error("Expected expression after ':'");
-				SUCCESS(AstType::TernaryExp, or_exp, e1, exp);
-			} else throw runtime_error("Expected expression after '?'");
-		}
-		SUCCESS(or_exp);
-	}
+    TRY(or_exp) {
+        TRYs('?') {
+            TRY(exp) {
+                auto e1 = exp;
+                TRYs(':') {} else throw runtime_error("Expected ':' in ternary expression");
+                TRY(exp) {} else throw runtime_error("Expected expression after ':'");
+                SUCCESS(AstType::TernaryExp, or_exp, e1, exp);
+            } else throw runtime_error("Expected expression after '?'");
+        }
+        SUCCESS(or_exp);
+    }
 });
 
 DEFPARSER(exp, { TRY(ternary_exp) SUCCESS(ternary_exp); });
 
 DEFPARSER(const_decl_stat, {
-	auto is_export = parse_raw_string(code, "export");
-	EXPECT("const")
-	TRY(identifier) {
-		identifier.data_d = is_export;
-		EXPECT('=')
-		TRY(exp) { SUCCESS(AstType::ConstDeclStat, identifier, exp) }
-	}
+    auto is_export = parse_raw_string(code, "export");
+    EXPECT("const")
+    TRY(identifier) {
+        identifier.data_d = is_export;
+        EXPECT('=')
+        TRY(exp) { SUCCESS(AstType::ConstDeclStat, identifier, exp) }
+    }
 });
 DEFPARSER(var_decl_stat, {
-	auto is_export = parse_raw_string(code, "export");
-	EXPECT("let")
-	TRY(identifier) {
-		identifier.data_d = is_export;
-		EXPECT('=')
-		TRY(exp) {
-			SUCCESS(AstType::VarDeclStat, identifier, exp)
-		}
-	}
+    auto is_export = parse_raw_string(code, "export");
+    EXPECT("let")
+    TRY(identifier) {
+        identifier.data_d = is_export;
+        EXPECT('=')
+        TRY(exp) {
+            SUCCESS(AstType::VarDeclStat, identifier, exp)
+        }
+    }
 });
 DEFPARSER(func_decl_stat, {
-	auto is_export = parse_raw_string(code, "export");
-	EXPECT("fn")
-	TRY(identifier) { identifier.data_d = is_export; } else { FAIL(); } // parsing failure not an error - could be a freestanding anonymous fn
-	TRYs('(') {} else ERROR("expected parameter definition after identifier");
-	TRY(param_def) {
-		TRYs(')') {} else ERROR("expected ')' after parameter definition");
-		TRY(block) {
-			SUCCESS(AstType::FuncDeclStat, identifier,
-				AstNode(AstType::FuncLiteral, param_def, block)
-			);
-		}
-	}
+    auto is_export = parse_raw_string(code, "export");
+    EXPECT("fn")
+    TRY(identifier) { identifier.data_d = is_export; } else { FAIL(); } // parsing failure not an error - could be a freestanding anonymous fn
+    TRYs('(') {} else ERROR("expected parameter definition after identifier");
+    TRY(param_def) {
+        TRYs(')') {} else ERROR("expected ')' after parameter definition");
+        TRY(block) {
+            SUCCESS(AstType::FuncDeclStat, identifier,
+                AstNode(AstType::FuncLiteral, param_def, block)
+            );
+        }
+    }
 });
 
 DEFPARSER(assign_stat, {
-	TRY(postfix_exp) {
-		TRYs('=') {
-			TRY(exp) {
-				SUCCESS(AstType::AssignStat, postfix_exp, exp);
-			} else throw runtime_error("expected expression after '='");
-		}
-	}
+    TRY(postfix_exp) {
+        TRYs('=') {
+            TRY(exp) {
+                SUCCESS(AstType::AssignStat, postfix_exp, exp);
+            } else throw runtime_error("expected expression after '='");
+        }
+    }
 });
 DEFPARSER(block, {
-	EXPECT('{')
-	TRY(stat_list) {
-		EXPECT('}')
-		SUCCESS(stat_list)
-	}
+    EXPECT('{')
+    TRY(stat_list) {
+        EXPECT('}')
+        SUCCESS(stat_list)
+    }
 });
 DEFPARSER(return_stat, {
-	TRYs("return") {
-		TRY(exp) {
-			SUCCESS(AstType::ReturnStat, exp);
-		}
-		SUCCESS(AstType::ReturnStat);
-	}
+    TRYs("return") {
+        TRY(exp) {
+            SUCCESS(AstType::ReturnStat, exp);
+        }
+        SUCCESS(AstType::ReturnStat);
+    }
 });
 
 DEFPARSER(if_stat, {
-	SUBPARSER(else_block, {
-		EXPECT("else")
-		TRY(if_stat) {
-			SUCCESS(if_stat);
-		}
-		TRY(block) {
-			SUCCESS(block);
-		}
-	});
+    SUBPARSER(else_block, {
+        EXPECT("else")
+        TRY(if_stat) {
+            SUCCESS(if_stat);
+        }
+        TRY(block) {
+            SUCCESS(block);
+        }
+    });
 
-	EXPECT("if")
-	TRY2(exp, block) {
-		TRY(else_block) {
-			SUCCESS(AstType::IfStat, exp, block, else_block)
-		}
-		SUCCESS(AstType::IfStat, exp, block)
-	}
+    EXPECT("if")
+    TRY2(exp, block) {
+        TRY(else_block) {
+            SUCCESS(AstType::IfStat, exp, block, else_block)
+        }
+        SUCCESS(AstType::IfStat, exp, block)
+    }
 });
 DEFPARSER(while_stat, {
-	EXPECT("while");
-	TRY2(exp, block) {
-		SUCCESS(AstType::WhileStat, exp, block)
-	}
+    EXPECT("while");
+    TRY2(exp, block) {
+        SUCCESS(AstType::WhileStat, exp, block)
+    }
 });
 
 DEFPARSER(for_stat, {
-	// "for i in array/object/func { ... }"
-	// "for i, v in object { ... }"
-	// "for i in 1, 10 { ... }"
+    // "for i in array/object/func { ... }"
+    // "for i, v in object { ... }"
+    // "for i in 1, 10 { ... }"
 
-	EXPECT("for");
-	TRY(identifier) {
-		auto i1 = identifier;
-		auto i2 = AstNode{};
-		auto has_i2 = false;
+    EXPECT("for");
+    TRY(identifier) {
+        auto i1 = identifier;
+        auto i2 = AstNode{};
+        auto has_i2 = false;
 
-		// optional second identifier for object-style loop
-		TRYs(',') {
-			TRY(identifier) {
-				i2 = identifier;
-				has_i2 = true;
-			} else ERROR("expected identifier after ','");
-		}
-		TRYs("in") {
-			TRY(exp) {
-				auto e1 = exp;
-				auto e2 = AstNode{};
-				auto has_e2 = false;
-				TRYs(',') {
-					TRY(exp) {
-						has_e2 = true;
-						e2 = exp;
-					} else ERROR("expected expression after ',' after 'in'");
-				}
-				// exp must evaluate to array, object or function
+        // optional second identifier for object-style loop
+        TRYs(',') {
+            TRY(identifier) {
+                i2 = identifier;
+                has_i2 = true;
+            } else ERROR("expected identifier after ','");
+        }
+        TRYs("in") {
+            TRY(exp) {
+                auto e1 = exp;
+                auto e2 = AstNode{};
+                auto has_e2 = false;
+                TRYs(',') {
+                    TRY(exp) {
+                        has_e2 = true;
+                        e2 = exp;
+                    } else ERROR("expected expression after ',' after 'in'");
+                }
+                // exp must evaluate to array, object or function
 
-				TRY(block) {
-					if (has_i2) {
-						if (has_e2) {
-							ERROR("2-ary for must only have one loop expression");
-						}
-						SUCCESS(AstType::ForStat2, i1, i2, exp, block)
-					} else {
-						if (has_e2) {
-							SUCCESS(AstType::ForStatInt, i1, e1, e2, block);
-						} else {
-							SUCCESS(AstType::ForStat, i1, exp, block);
-						}
-					}
-				} else ERROR("expected block");
-			} else ERROR("expected expression");
-		} else ERROR("expected 'in' keyword");
-	} else ERROR("expected identifier");
+                TRY(block) {
+                    if (has_i2) {
+                        if (has_e2) {
+                            ERROR("2-ary for must only have one loop expression");
+                        }
+                        SUCCESS(AstType::ForStat2, i1, i2, exp, block)
+                    } else {
+                        if (has_e2) {
+                            SUCCESS(AstType::ForStatInt, i1, e1, e2, block);
+                        } else {
+                            SUCCESS(AstType::ForStat, i1, exp, block);
+                        }
+                    }
+                } else ERROR("expected block");
+            } else ERROR("expected expression");
+        } else ERROR("expected 'in' keyword");
+    } else ERROR("expected identifier");
 });
 DEFPARSER(stat_list, {
-	out.type = AstType::StatList;
-	out.line_number = _c.line_number;
-	while (true) {
-		auto n = AstNode {};
-		if (0
-			|| parse_const_decl_stat(code, n)
-			|| parse_var_decl_stat(code, n)
-			|| parse_func_decl_stat(code, n)
-			|| parse_assign_stat(code, n)
-			|| parse_if_stat(code, n)
-			|| parse_while_stat(code, n)
-			|| parse_for_stat(code, n)
-			|| parse_return_stat(code, n)
-			|| parse_exp(code, n)
-			) {
-			out.children.emplace_back(n);
-		} else {
-			break;
-		}
-	}
-	return true;
+    out.type = AstType::StatList;
+    out.line_number = _c.line_number;
+    while (true) {
+        auto n = AstNode {};
+        if (0
+            || parse_const_decl_stat(code, n)
+            || parse_var_decl_stat(code, n)
+            || parse_func_decl_stat(code, n)
+            || parse_assign_stat(code, n)
+            || parse_if_stat(code, n)
+            || parse_while_stat(code, n)
+            || parse_for_stat(code, n)
+            || parse_return_stat(code, n)
+            || parse_exp(code, n)
+            ) {
+            out.children.emplace_back(n);
+        } else {
+            break;
+        }
+    }
+    return true;
 });
 DEFPARSER(module, {
-	auto res = parse_stat_list(code, out);
-	if (res) {
-		skip_whitespace(code);
-	}
-	return res;
+    auto res = parse_stat_list(code, out);
+    if (res) {
+        skip_whitespace(code);
+    }
+    return res;
 });
 
 
 bool parse(const std::string& code, AstNode& out_ast) {
-	auto s_code = ParseContext(code);
-	out_ast = AstNode { AstType::Unknown };
-	auto res = parse_module(s_code, out_ast);
-	if (!res) {
-		throw runtime_error("parser error: "s + string(s_code.substr(0, 100)));
-	}
-	if (s_code.size()) {
-		throw runtime_error("expected end of file: "s + string(s_code.substr(0, 100)));
-	}
-	return true;
+    auto s_code = ParseContext(code);
+    out_ast = AstNode { AstType::Unknown };
+    auto res = parse_module(s_code, out_ast);
+    if (!res) {
+        throw runtime_error("parser error: "s + string(s_code.substr(0, 100)));
+    }
+    if (s_code.size()) {
+        throw runtime_error("expected end of file: "s + string(s_code.substr(0, 100)));
+    }
+    return true;
 }

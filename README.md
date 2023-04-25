@@ -52,15 +52,15 @@ make
 - [ ] compile time boxing and move elission
 - [x] ensure const is respected for captures
 - [ ] deduplicate consts
-	- if possible, dedupe across fragments
+    - if possible, dedupe across fragments
 - [x] specialize global lookups, treat it like LOAD_CONST (will want more than 256 global lookups)
 - [ ] review notes and apply optimizations
 - [ ] possibly intern strings - definitely intern/prehash identifiers
 - [ ] replace CONDJUMP with something like CONDSKIP (see notes)
 - [ ] type specialized instructions
 - [ ] poor man's JIT: loop over instructions and emit machine code corresponding to a direct function call per opcode
-	- believe this is called a templating JIT, performance might be OK
-	- for extra points, write/disassembly the ASM for each opcode and emit it inline, elide the calls
+    - believe this is called a templating JIT, performance might be OK
+    - for extra points, write/disassembly the ASM for each opcode and emit it inline, elide the calls
 
 
 

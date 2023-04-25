@@ -2,19 +2,19 @@ let X = 1
 let Y = 2
 
 fn f2() {
-	if 0 {
-		X = 3
-	} else {
-		X = X + 1
-	}
-	X = X + 3
+    if 0 {
+        X = 3
+    } else {
+        X = X + 1
+    }
+    X = X + 3
 }
 fn f1() {
-	if 0 {
-		X = 100
-	} else {
-		X = 200
-	}
+    if 0 {
+        X = 100
+    } else {
+        X = 200
+    }
 }
 
 f1()
