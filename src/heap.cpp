@@ -7,8 +7,8 @@
 #define debug(...)
 #define dump(...)
 
-void Heap::gc_state(GCState state) {
-    this->state = state;
+void Heap::gc_state(GCState new_state) {
+    state = new_state;
 }
 GCState Heap::gc_state() const {
     return state;

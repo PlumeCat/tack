@@ -104,7 +104,7 @@ struct FunctionType {
     GCType()
 };
 
-using CFunctionType = Value(Interpreter*, int, Value*);
+using CFunctionType = Value(*)(Interpreter*, int, Value*);
 
 // TODO: replace
 struct vec2 { float x, y; };
@@ -119,7 +119,7 @@ inline constexpr Value value_false()                    { return { nan_bits | ty
 inline constexpr Value value_true()                     { return { nan_bits | type_bits_boolean | 1 }; }
 
 // create value
-inline Value value_from_boolean(bool b)                 { return { nan_bits | type_bits_boolean | b }; }
+inline Value value_from_boolean(bool b)                 { return { nan_bits | type_bits_boolean | (uint64_t)b }; }
 inline Value value_from_number(double d)                { return { ._d = d }; /* TODO: check for nan and mask off? */}
 inline Value value_from_pointer(void* ptr)              { return { nan_bits | type_bits_pointer | ((uint64_t)ptr & pointer_bits) }; }
 inline Value value_from_function(FunctionType* func)    { return { nan_bits | type_bits_function | uint64_t(func) }; }
@@ -127,7 +127,7 @@ inline Value value_from_boxed(BoxType* box)             { return { nan_bits | ty
 inline Value value_from_string(const StringType* str)   { return { nan_bits | type_bits_string | uint64_t(str) }; }
 inline Value value_from_object(ObjectType* obj)         { return { nan_bits | type_bits_object | uint64_t(obj) }; }
 inline Value value_from_array(ArrayType* arr)           { return { nan_bits | type_bits_array  | uint64_t(arr) }; }
-inline Value value_from_cfunction(CFunctionType* cfunc) { return { nan_bits | type_bits_cfunction | uint64_t(cfunc) }; }
+inline Value value_from_cfunction(CFunctionType cfunc) { return { nan_bits | type_bits_cfunction | uint64_t(cfunc) }; }
 inline Value value_from_vec2(vec2* v2)                  { return { nan_bits | type_bits_vec2   | uint64_t(v2) }; }
 inline Value value_from_vec3(vec3* v3)                  { return { nan_bits | type_bits_vec3   | uint64_t(v3) }; }
 inline Value value_from_vec4(vec4* v4)                  { return { nan_bits | type_bits_vec4   | uint64_t(v4) }; }
@@ -157,7 +157,7 @@ inline ArrayType* value_to_array(Value v)               { check(array);     retu
 inline ObjectType* value_to_object(Value v)             { check(object);    return (ObjectType*)(v._i & pointer_bits); }
 inline BoxType* value_to_boxed(Value v)                 { check(boxed);     return (BoxType*)(v._i & pointer_bits); }
 inline FunctionType* value_to_function(Value v)         { check(function);  return (FunctionType*)(v._i & pointer_bits); }
-inline CFunctionType* value_to_cfunction(Value v)       { check(cfunction); return (CFunctionType*)(v._i & pointer_bits); }
+inline CFunctionType value_to_cfunction(Value v)       { check(cfunction); return (CFunctionType)(v._i & pointer_bits); }
 inline vec2* value_to_vec2(Value v)                     { check(vec2);      return (vec2*)(v._i & pointer_bits); }
 inline vec3* value_to_vec3(Value v)                     { check(vec3);      return (vec3*)(v._i & pointer_bits); }
 inline vec4* value_to_vec4(Value v)                     { check(vec4);      return (vec4*)(v._i & pointer_bits); }

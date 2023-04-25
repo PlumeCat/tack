@@ -36,7 +36,7 @@ public:
     BoxType* alloc_box(Value val);
 
     GCState gc_state() const;
-    void gc_state(GCState state);
+    void gc_state(GCState new_state);
 
     void gc(std::vector<Value>& globals, const Stack& stack, uint32_t stackbase);
 };
@@ -55,8 +55,13 @@ private:
     std::vector<Value> globals;
     std::list<CodeFragment> fragments;
 
+    void* user_pointer = nullptr;
+
 public:
     Interpreter();
+
+    void* get_user_pointer() const;
+    void set_user_pointer(void* ptr);
 
     // used by Compiler
     CodeFragment* create_fragment();
@@ -77,4 +82,9 @@ public:
     Value call(Value fn, std::array<Value, N>& args) {
         return call(fn, args.data(), N);
     }
+
+    ArrayType* alloc_array();
+    ObjectType* alloc_object();
+    FunctionType* alloc_function(CodeFragment* code);
+    BoxType* alloc_box(Value val);
 };

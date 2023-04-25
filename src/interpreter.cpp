@@ -1,3 +1,4 @@
+#include "interpreter.h"
 #include "compiler.h"
 #include "value.h"
 #include "interpreter.h"
@@ -22,6 +23,14 @@ Interpreter::Interpreter() {
     stack.fill(value_null());
 }
 
+void* Interpreter::get_user_pointer() const {
+    return user_pointer;
+}
+
+void Interpreter::set_user_pointer(void* ptr) {
+    user_pointer = ptr;
+}
+
 uint16_t Interpreter::next_gid() {
     if (next_globalid == UINT16_MAX) {
         throw std::runtime_error("too many globals");
@@ -31,6 +40,18 @@ uint16_t Interpreter::next_gid() {
 
 void Interpreter::gc_state(GCState state) {
     heap.gc_state(state);
+}
+ArrayType* Interpreter::alloc_array() {
+    return heap.alloc_array();
+}
+ObjectType* Interpreter::alloc_object() {
+    return heap.alloc_object();
+}
+FunctionType* Interpreter::alloc_function(CodeFragment* code) {
+    return heap.alloc_function(code);
+}
+BoxType* Interpreter::alloc_box(Value val) {
+    return heap.alloc_box(val);
 }
 GCState Interpreter::gc_state() const {
     return heap.gc_state();
@@ -79,6 +100,9 @@ Value Interpreter::load(const std::string& source) {
     auto out_ast = AstNode {};
     parse(source, out_ast);
     auto ast = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
+    if (log_ast) {
+        log(ast.tostring());
+    }
 
     // creates the root fragment
     auto compiler = Compiler { .interpreter = this };
@@ -136,6 +160,9 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
             auto i = _pr->bytecode->instructions[_pc];
             switch (i.opcode) {
             case Opcode::UNKNOWN: break;
+                handle(SETNULL) {
+                    REGISTER_RAW(i.r0) = value_null();
+                }
                 handle(LOAD_I) {
                     REGISTER(i.r0) = value_from_number(i.u1);
                 }
@@ -298,7 +325,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     auto* func = heap.alloc_function(code);
 
                     // capture captures; box inplace if necessary
-                    for (auto c : code->capture_info) {
+                    for (const auto& c : code->capture_info) {
                         auto val = REGISTER_RAW(c.source_register);
                         if (!value_is_boxed(val)) {
                             auto box = value_from_boxed(heap.alloc_box(val));

@@ -17,7 +17,7 @@
     opcode(LOAD_CONST) \
     opcode(LOAD_I) \
     opcode(MOVE) \
-    opcode(READ_CAPTURE)\
+    opcode(READ_CAPTURE) opcode(SETNULL)\
     opcode(READ_GLOBAL) opcode(WRITE_GLOBAL)\
     \
     /* lua allows 200 local variables; safet*/\
@@ -48,7 +48,6 @@ struct Instruction {
     Opcode opcode;
     uint8_t r0;
     union {
-        // TODO: -Wpedantic dislikes anonymous structs :(
         struct { uint8_t r1, r2; } u8;
         int16_t s1;
         uint16_t u1;

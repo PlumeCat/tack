@@ -4,6 +4,9 @@
 
 #include <sstream>
 
+#define JLIB_LOG_VISUALSTUDIO
+#include <jlib/log.h>
+
 // emit an instruction with 3 8 bit operands
 #define emit(op, _0, _1, _2)            output->instructions.emplace_back(Instruction { .opcode = Opcode::op, .r0 = _0, .u8 = { _1, _2 } });
 
@@ -26,17 +29,17 @@
 
 uint16_t CodeFragment::store_number(double d) {
     storage.emplace_back(value_from_number(d));
-    return storage.size() - 1;
+    return (uint16_t)(storage.size() - 1);
 }
 
 uint16_t CodeFragment::store_string(const std::string & data) {
     strings.emplace_back(data);
     storage.emplace_back(value_from_string(strings.back().c_str()));
-    return storage.size() - 1;
+    return (uint16_t)(storage.size() - 1);
 }
 uint16_t CodeFragment::store_fragment(CodeFragment* fragment) {
     storage.emplace_back(value_from_pointer(fragment));
-    return storage.size() - 1;
+    return (uint16_t)(storage.size() - 1);
 }
 
 std::string CodeFragment::str() {
@@ -55,6 +58,13 @@ std::string CodeFragment::str() {
         i++;
     }
 
+    i = 0;
+    s << "  captures:\n";
+    for (auto& c : capture_info) {
+        s << "    " << i << ": " << (uint32_t)c.source_register << " -> " << (uint32_t)c.dest_register << "(" << c.name << ")" "\n";
+        i++;
+    }
+
     return s.str();
 }
 
@@ -68,7 +78,7 @@ uint8_t Compiler::allocate_register() {
         if (registers[i] == RegisterState::FREE) {
             registers[i] = RegisterState::BUSY;
             output->max_register = std::max(output->max_register, (uint32_t)i);
-            return i;
+            return (uint8_t)i;
         }
     }
     error("Ran out of registers!");
@@ -81,7 +91,7 @@ uint8_t Compiler::allocate_register2() {
             registers[i+1] == RegisterState::FREE) {
             registers[i] = RegisterState::BUSY;
             registers[i+1] = RegisterState::BUSY;
-            return i;
+            return (uint8_t)i;
         }
     }
     error("Ran out of registers!");
@@ -91,7 +101,7 @@ uint8_t Compiler::allocate_register2() {
 uint8_t Compiler::get_end_register() {
     for (auto i = 255; i > 0; i--) {
         if (registers[i - 1] != RegisterState::FREE) {
-            return i;
+            return (uint8_t)i;
         }
     }
     return 0;
@@ -103,6 +113,7 @@ Compiler::VariableContext* Compiler::bind_name(const std::string& binding, uint8
         return interpreter->set_global(binding, is_const, value_null());
     } else {
         registers[reg] = RegisterState::BOUND;
+        log("binding: ", binding, (uint32_t)reg);
         return &scopes.back().bindings.try_emplace(binding, VariableContext { reg, is_const }).first->second;
     }
 }
@@ -117,7 +128,7 @@ void Compiler::free_register(uint8_t reg) {
 // free all unbound registers
 void Compiler::free_all_registers() {
     for (auto i = 0u; i < MAX_REGISTERS; i++) {
-        free_register(i);
+        free_register((uint8_t)i);
     }
 }
 
@@ -126,9 +137,17 @@ void Compiler::push_scope(ScopeContext* parent_scope, bool is_top_level) {
 }
 void Compiler::pop_scope() {
     // unbind all bound registers
-    // for (auto& b : scopes.back().bindings) {
+    for (auto& b : scopes.back().bindings) {
+        // TODO: disabled currently because boxes must remain bound forever without nulling the regsiter
+        // and there's no way to disambiguate boxed vs not-boxed at scope exit (might be conditionally captured)
         // registers[b.second.reg] = RegisterState::FREE;
-    // }
+        
+            
+        // HACK: zero out all mirror variables and variables that were captured
+        if (b.second.is_capture || b.second.is_mirror) {
+            emit(SETNULL, b.second.reg, 0, 0);
+        }
+    }
     scopes.pop_back();
 }
 
@@ -146,9 +165,14 @@ void Compiler::compile_func(const AstNode* node, CodeFragment* output, ScopeCont
         bind_name(param.data_s, i, false);
         // NOTE: impossible to be global
     }
+
     child(1);
-    emit(RET, 0, 0, 0);
     pop_scope();
+    emit(RET, 0, 0, 0);
+
+    if (interpreter->log_bytecode) {
+        log(this->output->str());
+    }
 }
 
 
@@ -158,30 +182,31 @@ Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& nam
         return &iter->second;
     }
 
-    // lookup capture in parent scope
+    // in parent scope
     if (parent_scope) {
         if (auto var = parent_scope->lookup(name)) {
-            if (var->is_global) {
-                return var;
-            }
-            if (is_function_scope) { // handle capture scenario
+            // lookup came from a parent function, so it's a capture (unless global)
+            if (is_function_scope && !var->is_global) {
                 // create a mirroring local variable
-                // NOTE: impossible to be global
                 auto mirror_reg = compiler->allocate_register();
-                auto mirror = compiler->bind_name(name, mirror_reg, var->is_const);
+                auto mirror = compiler->bind_name(name, mirror_reg, var->is_const, false);
+
+                var->is_capture = true;
+                mirror->is_mirror = true;
 
                 // record necessary capture into mirror variable
-                compiler->output->capture_info.emplace_back(CaptureInfo { .source_register = var->reg, .dest_register = mirror_reg });
+                compiler->output->capture_info.emplace_back(CaptureInfo { .name = name, .source_register = var->reg, .dest_register = mirror_reg });
 
-                // emit code to read into mirror variable
+                // read into mirror variable
+                // would be optimal to READ_CAPTURE once per function instead of every scope used
                 compiler->emit(READ_CAPTURE, mirror_reg, uint8_t(compiler->output->capture_info.size() - 1), 0);
 
                 // return the MIRROR variable not the original!
                 return mirror;
-            } else {
-                // normal scenario
-                return var;
             }
+            
+            // local variable in same function, or global
+            return var;
         }
     }
     
@@ -198,9 +223,9 @@ uint8_t Compiler::compile(const AstNode* node) {
             push_scope(&scopes.back());
             for (auto& c : node->children) {
                 compile(&c);
-                free_all_registers();
             }
             pop_scope();
+            free_all_registers();
             return 0xff;
         }
         handle(IfStat) {
@@ -260,6 +285,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             child(2); // block
             label(loop_bottom);
             emit(FOR_ITER_NEXT, reg_ptr, reg_iter, 0);
+
             emit_u(JUMPB, 0, uint16_t((loop_bottom + 1) - forloop));
             rewrite_u(skip_loop, JUMPF, 0, uint16_t((loop_bottom + 2) - skip_loop));
             pop_scope();
@@ -290,6 +316,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             child(3);
             label(loop_bottom);
             emit(FOR_ITER_NEXT, reg_ptr, reg_iter, 0);
+
             emit_u(JUMPB, 0, uint16_t((loop_bottom + 1) - forloop));
             rewrite_u(skip_loop, JUMPF, 0, uint16_t((loop_bottom + 2) - skip_loop));
             pop_scope();
@@ -306,12 +333,14 @@ uint8_t Compiler::compile(const AstNode* node) {
             registers[reg_b] = RegisterState::BOUND; // HACK: the block might try and free this register
             bind_name(ident, reg_a, false);
             label(forloop);
+            
             emit(FOR_INT, reg_a, reg_b, 0);
             label(skip_loop);
             emit(JUMPF, 0, 0, 0);
             child(3); // block
             label(loop_bottom);
             emit(INCREMENT, reg_a, 0, 0);
+
             emit_u(JUMPB, 0, uint16_t((loop_bottom + 1) - forloop));
             rewrite_u(skip_loop, JUMPF, 0, uint16_t((loop_bottom + 2) - skip_loop));
             pop_scope();

@@ -1,93 +1,23 @@
-print("test basic")
+let X = 1
+let Y = 2
 
-fn map(array, func) {
-    const result = []
-    const  n = #array
-    let i = 0
-    while i < n {
-        result << func(array[i])
-        i = i + 1
-    }
-    return result
+fn f2() {
+	if 0 {
+		X = 3
+	} else {
+		X = X + 1
+	}
+	X = X + 3
+}
+fn f1() {
+	if 0 {
+		X = 100
+	} else {
+		X = 200
+	}
 }
 
+f1()
+f2()
 
-const foo = [ 1, 2, 3 ]
-foo << 1
-foo << 2
-foo << 3
-const bar = map(foo, fn(x) { return x * 2 })
-print(bar)
-
-print("test recursion (ie self-capture)")
-
-fn factorial(n) {
-    if n < 2 {
-        return 1
-    }
-    return n * factorial(n-1)
-}
-
-print(factorial(5))
-
-print("test multi-level capture")
-
-fn capture2() {
-    let i = 32
-    return fn () {
-        return fn () {
-            print(i * i)
-        }
-    }
-}
-
-capture2()()()
-
-
-print("test array")
-
-fn() {
-    let a = [ 1, 2, 3, 4, 5 ]
-    print(a)
-
-    return fn() {
-        let b = 123
-        let c = [ 1, a, b ]
-        print(c)
-    }
-}()()
-
-print("test object")
-print({ x = 1, y = 2 })
-
-
-print("test globals")
-
-let x = 0
-let y = 1
-if 1 {
-    let z = 2
-    if 2 {
-        let z = 3
-        fn(){
-            print(x + y + z)
-        }()
-    }
-    let w = 4
-
-    print(z + w)
-}
-
-
-print("test call cfunc")
-
-print("HELLO WORLD", 1, 2, 3, "hello", [2, 3, 4 ], { x = 1, y = 2 })
-
-
-print("test for loop")
-
-fn() {
-    for i in 0, 10 {
-        print(i)
-    }
-}()
+print(X, Y)

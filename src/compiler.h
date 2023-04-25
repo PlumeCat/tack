@@ -23,6 +23,7 @@ struct AstNode;
 struct Interpreter;
 
 struct CaptureInfo {
+    std::string name; // for debug
     uint8_t source_register;
     uint8_t dest_register;
 };
@@ -45,6 +46,8 @@ struct Compiler {
         uint8_t reg = 0;
         bool is_const = false;
         bool is_global = false;
+        bool is_capture = false;
+        bool is_mirror = false;
         uint16_t g_id = 0;
     };
     struct ScopeContext {

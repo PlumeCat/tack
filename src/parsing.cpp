@@ -27,6 +27,9 @@ struct ParseContext : private string_view {
 
 #define SUCCESS(...) { out = AstNode(__VA_ARGS__); out.line_number = _c.line_number; return true; }
 #define FAIL(); { code = _c; return false; }
+#ifdef ERROR
+#undef ERROR
+#endif
 #define ERROR(msg) throw runtime_error("parsing error: " msg );// | line: " + to_string(code.line_number) + "\n'" + string(code.substr(0, 32))  + "... '")
 #define EXPECT(s) if (!parse_raw_string(code, s)) { FAIL(); }
 
