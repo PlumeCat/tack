@@ -37,7 +37,9 @@ public:
     ObjectType* alloc_object();
     FunctionType* alloc_function(CodeFragment* code);
     BoxType* alloc_box(Value val);
-    StringType* alloc_string(const char* data);
+
+    // takes ownership of data; data must be allocated with 'new[]'
+    StringType* alloc_string(const char* data, uint32_t len);
 
     GCState gc_state() const;
     void gc_state(GCState new_state);
@@ -98,6 +100,14 @@ public:
     ObjectType* alloc_object();
     FunctionType* alloc_function(CodeFragment* code);
     BoxType* alloc_box(Value val);
+
+    // take a copy of data
     StringType* intern_string(const char* data);
-    StringType* alloc_string(const char* data);
+
+    // take a copy of data
+    StringType* alloc_string(const char* data, uint32_t len);
+
+    // allocate new empty data (caller must overwrite)
+    // len is desired size of string, so actual allocation will be len+1 to account for terminating zero
+    StringType* alloc_string_empty(uint32_t len);
 };

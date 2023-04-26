@@ -1,4 +1,5 @@
 #include "interpreter.h"
+#include "interpreter.h"
 #include "compiler.h"
 #include "value.h"
 #include "interpreter.h"
@@ -31,6 +32,7 @@ Interpreter::~Interpreter() {
     auto key = (const char*)nullptr;
     auto val = (StringType*)nullptr;
     kh_foreach(key_cache, key, val, {
+        delete[] val->data;
         delete val;
     });
     kh_destroy_KeyCache(key_cache);
@@ -71,13 +73,33 @@ StringType* Interpreter::intern_string(const char* data) {
     if (get == kh_end(key_cache)) {
         auto _ = 0;
         auto put = kh_put_KeyCache(key_cache, data, &_);
-        auto str = new StringType{};
+        
+
+        // TODO: ugly c string manipulation, factor out if possible
+        auto len = (uint32_t)strlen(data);
+        auto new_data = new char[len + 1];
+        new_data[len] = 0;
+        std::strncpy(new_data, data, len);
+        
+        auto str = new StringType();
+        str->length = len;
+        str->data = new_data;
+        
         kh_val(key_cache, put) = str;
-        str->data = strdup(data);
-        str->length = (uint32_t)strlen(data);
         return str;
     }
     return kh_val(key_cache, get);
+}
+StringType* Interpreter::alloc_string_empty(uint32_t len) {
+    auto data = new char[len+1];
+    memset(data, 0, len+1);
+    return heap.alloc_string(data, len);
+}
+StringType* Interpreter::alloc_string(const char* data, uint32_t len) {
+    auto new_data = new char[len+1];
+    new_data[len] = 0;
+    std::strncpy(new_data, data, len);
+    return heap.alloc_string(new_data, len);
 }
 GCState Interpreter::gc_state() const {
     return heap.gc_state();
@@ -206,7 +228,28 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.r0)) + 1);
                 }
                 handle(ADD) {
-                    REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.u8.r1)) + value_to_number(REGISTER(i.u8.r2)));
+                    auto lhs = REGISTER(i.u8.r1);
+                    auto lt = value_get_type(lhs);
+                    if (lt == Type::Number) {
+                        // numeric add
+                        REGISTER(i.r0) = value_from_number(value_to_number(lhs) + value_to_number(REGISTER(i.u8.r2)));
+                    } else if (lt == Type::String) {
+                        // string add
+                        auto l = value_to_string(lhs);
+                        auto r = value_to_string(REGISTER(i.u8.r2));
+                        // TODO: ugly string manipulation
+                        auto new_str = std::string(l->data) + std::string(r->data);
+                        REGISTER(i.r0) = value_from_string(alloc_string(new_str.c_str(), new_str.size()));
+                    } else if (lt == Type::Array) {
+                        // array add
+                        auto l = value_to_array(lhs);
+                        auto r = value_to_array(REGISTER(i.u8.r2));
+                        auto n = alloc_array();
+                        std::copy(l->values.begin(), l->values.end(), std::back_inserter(n->values));
+                        std::copy(r->values.begin(), r->values.end(), std::back_inserter(n->values));
+                    } else {
+                        error("operator '+' exected number / array / string");
+                    }
                 }
                 handle(SUB) {
                     REGISTER(i.r0) = value_from_number(value_to_number(REGISTER(i.u8.r1)) - value_to_number(REGISTER(i.u8.r2)));
@@ -386,8 +429,17 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                 handle(JUMPF) { _pc += i.u1 - 1; }
                 handle(JUMPB) { _pc -= i.u1 + 1; }
                 handle(LEN) {
-                    auto* arr = value_to_array(REGISTER(i.u8.r1));
-                    REGISTER(i.r0) = value_from_number(arr->values.size());
+                    auto val = REGISTER(i.u8.r1);
+                    auto type = value_get_type(val);
+                    if (type == Type::Array) {
+                        REGISTER(i.r0) = value_from_number(value_to_array(val)->values.size());
+                    } else if (type == Type::String) {
+                        REGISTER(i.r0) = value_from_number(value_to_string(val)->length);
+                    } else if (type == Type::Object) {
+                        REGISTER(i.r0) = value_from_number(value_to_object(val)->length());
+                    } else {
+                        error("operator '#' expected string / array / object");
+                    }
                 }
                 handle(READ_CAPTURE) {
                     REGISTER_RAW(i.r0) = _pr->captures[i.u8.r1];

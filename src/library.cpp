@@ -1,6 +1,7 @@
 #include "interpreter.h"
 #include "library.h"
 
+#include <sstream>
 #include <jlib/log.h>
 
 #define PRINT log<true,false>
@@ -29,9 +30,14 @@ void setup_standard_library(Interpreter* vm) {
     tack_func("gc_enable", vm->gc_state(GCState::Enabled));
     tack_func("read_file", {}); // read file to string
     tack_func("write_file", {}); // write string to file
+    tack_func("tostring", {
+        auto s = std::stringstream {};
+        s << args[0];
+        auto str = s.str();
+        return value_from_string(vm->alloc_string(str.c_str(), str.size()));
+    });
     
-    // generic
-    tack_func("tostring", {});
+    // generic    
     tack_func("type", {});
     tack_func("slice", {});
     tack_func("find", {});
@@ -67,10 +73,10 @@ void setup_standard_library(Interpreter* vm) {
 
 
     // ===== OPERATORS =====
-    // array << x       => append x to array (returns x)
-    // #array           => length
-    // #string          => length
-    // #object          => length
+    // x array << x       => append x to array (returns x)
+    // x #array           => length
+    // x #string          => length
+    // x #object          => length
     // array + array    => concat arrays
     // string + string  => concat strings
     // object + object  => union objects (right overrides left)

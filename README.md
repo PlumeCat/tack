@@ -51,6 +51,7 @@ make
 - [ ] for loops over functions (null to terminate)
 - [ ] compile time boxing and move elission
 - [x] ensure const is respected for captures
+- [ ] refactor strings to use std::string again (needs a version of khash that can accept std::string as key)
 - [ ] deduplicate consts
     - if possible, dedupe across fragments
 - [x] specialize global lookups, treat it like LOAD_CONST (will want more than 256 global lookups)

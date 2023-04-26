@@ -37,17 +37,13 @@ BoxType* Heap::alloc_box(Value val) {
     return &boxes.emplace_back(BoxType { .value = val });
 }
 
-StringType* Heap::alloc_string(const char* data) {
+StringType* Heap::alloc_string(const char* data, uint32_t len) {
     alloc_count++;
     return &strings.emplace_back(StringType {
-        .data = strdup(data),
-        .length = (uint32_t)strlen(data)
+        .data = data,
+        .length = len
     });
 }
-//StringType* Heap::alloc_key(const char* data) {
-//    alloc_count++;
-//    
-//}
 
 void gc_visit(Value value) {
     dump("visit: ", value);
@@ -136,6 +132,7 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
             if (!i->marker && i->refcount == 0) {
                 dump("collected string: ", value_from_string(&(*i)));
                 num_collections += 1;
+                delete[] i->data;
                 i = strings.erase(i);
             } else {
                 i->marker = false;

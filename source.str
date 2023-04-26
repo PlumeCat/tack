@@ -1,3 +1,6 @@
+
+let x = "hello, " + "world"
+
 fn foo() {
     fn () {
         print("hello world")
