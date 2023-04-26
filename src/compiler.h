@@ -32,12 +32,12 @@ struct CodeFragment {
     std::vector<Instruction> instructions;
     std::vector<uint32_t> line_numbers;
     std::vector<Value> storage; // program constant storage goes at the bottom of the stack for now
-    std::list<std::string> strings; // string constants and literals storage - includes identifiers for objects
+    // std::list<std::string> strings; // string constants and literals storage - includes identifiers for objects
     std::vector<CaptureInfo> capture_info;
     uint32_t max_register = 0;
 
     uint16_t store_number(double d);
-    uint16_t store_string(const std::string& data);
+    uint16_t store_string(StringType* str);
     uint16_t store_fragment(CodeFragment* ptr);
     std::string str();
 };

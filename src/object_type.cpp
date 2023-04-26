@@ -1,12 +1,13 @@
 #include "value.h"
 #include "khash.h"
 
-KHASH_MAP_INIT_STR(SV, Value)
+
+KHASH_MAP_INIT_STR(SV, Value) // expanded inline
 
 ObjectType::ObjectType() {
     refcount = 0;
     marker = false;
-    hash = kh_init(SV);
+    hash = kh_init_SV();
 }
 ObjectType::ObjectType(ObjectType&& from) {
     hash = from.hash;
@@ -19,7 +20,7 @@ ObjectType& ObjectType::operator=(ObjectType&& from) {
 }
 ObjectType::~ObjectType() {
     if (hash) {
-        kh_destroy(SV, hash);
+        kh_destroy_SV(hash);
     }
 }
 
@@ -28,12 +29,12 @@ uint32_t ObjectType::length() {
 }
 void ObjectType::set(const char* key, Value val) {
     auto ret = 0;
-    auto n = kh_put(SV, hash, key, &ret);
+    auto n = kh_put_SV(hash, key, &ret);
     len += (ret >= 1) ? 1 : 0;
     kh_val(hash, n) = val;
 }
 Value ObjectType::get(const char* key, bool& found) {
-    auto n = kh_get(SV, hash, key);
+    auto n = kh_get_SV(hash, key);
     if (n == kh_end(hash)) {
         found = false;
         return value_null();

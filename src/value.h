@@ -86,10 +86,12 @@ struct GCType {
 };
 
 using NullType = nullptr_t;
-using StringType = const char;
 
-#include "object_type.h"
-
+struct StringType {
+    char* data;
+    uint32_t length;
+    GCType()
+};
 struct BoxType {
     Value value;
     GCType()
@@ -103,6 +105,7 @@ struct FunctionType {
     std::vector<Value> captures; // contains boxes
     GCType()
 };
+#include "object_type.h"
 
 using CFunctionType = Value(*)(Interpreter*, int, Value*);
 

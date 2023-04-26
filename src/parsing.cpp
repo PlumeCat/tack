@@ -373,10 +373,10 @@ DEFPARSER(ternary_exp, {
         TRYs('?') {
             TRY(exp) {
                 auto e1 = exp;
-                TRYs(':') {} else throw runtime_error("Expected ':' in ternary expression");
-                TRY(exp) {} else throw runtime_error("Expected expression after ':'");
+                TRYs(':') {} else ERROR("Expected ':' in ternary expression");
+                TRY(exp) {} else ERROR("Expected expression after ':'");
                 SUCCESS(AstType::TernaryExp, or_exp, e1, exp);
-            } else throw runtime_error("Expected expression after '?'");
+            } else ERROR("Expected expression after '?'");
         }
         SUCCESS(or_exp);
     }
@@ -424,7 +424,7 @@ DEFPARSER(assign_stat, {
         TRYs('=') {
             TRY(exp) {
                 SUCCESS(AstType::AssignStat, postfix_exp, exp);
-            } else throw runtime_error("expected expression after '='");
+            } else ERROR("expected expression after '='");
         }
     }
 });

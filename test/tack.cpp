@@ -1,4 +1,5 @@
 ﻿#include "../src/interpreter.h"
+#include "../src/library.h"
 
 #include <iostream>
 #include <sstream>
@@ -17,39 +18,10 @@
 #include <jlib/log.h>
 #include <jlib/text_file.h>
 
-Value tack_gc_disable(Interpreter* vm, int, Value*) {
-    vm->gc_state(GCState::Disabled);
-    return value_null();
-}
-Value tack_gc_enable(Interpreter* vm, int, Value*) {
-    vm->gc_state(GCState::Enabled);
-    return value_null();
-}
-
-Value tack_print(Interpreter*, int nargs, Value* args) {
-    auto ss = std::stringstream{};
-    for (auto i = 0; i < nargs; i++) {
-        ss << args[i] << ' ';
-    }
-    log<true, false>(ss.str());
-    return value_null();
-}
-Value tack_random(Interpreter*, int, Value*) {
-    return value_from_number(rand());
-}
-Value tack_clock(Interpreter*, int, Value*) {
-    return value_from_number(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 1e6);
-}
-Value tack_dofile(Interpreter* vm, int nargs, Value* args) {
-    for (auto i = 0; i < nargs; i++) {
-        auto s = value_to_string(args[i]);
-        vm->call(vm->load(read_text_file(s).value_or("")), nullptr, 0);
-    }
-    return value_null();
-}
-
 int main(int argc, char* argv[]) {
     auto vm = Interpreter {};
+    setup_standard_library(&vm);
+
     auto files = std::vector<std::string>{};
     for (auto i = 1; i < argc; i++) {
         auto arg = std::string(argv[i]);
@@ -69,13 +41,6 @@ int main(int argc, char* argv[]) {
     }
 
     try {
-        vm.set_global("dofile", true, value_from_cfunction(tack_dofile));
-        vm.set_global("print", true, value_from_cfunction(tack_print));
-        vm.set_global("random", true, value_from_cfunction(tack_random));
-        vm.set_global("clock", true, value_from_cfunction(tack_clock));
-        vm.set_global("gc_enable", true, value_from_cfunction(tack_gc_enable));
-        vm.set_global("gc_disable", true, value_from_cfunction(tack_gc_disable));
-
         for (auto& f: files) {
             auto s = read_text_file(f);
             if (!s.has_value()) {

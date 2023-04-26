@@ -14,6 +14,10 @@
 
 #include <cstring>
 
+#include "khash.h"
+
+KHASH_MAP_INIT_STR(KeyCache, StringType*) // HACK:
+
 Interpreter::Interpreter() {
     next_globalid = 0;
     stackbase = STACK_FRAME_OVERHEAD;
@@ -21,6 +25,15 @@ Interpreter::Interpreter() {
     global_scope.parent_scope = nullptr;
     global_scope.is_function_scope = false;
     stack.fill(value_null());
+    key_cache = kh_init_KeyCache();
+}
+Interpreter::~Interpreter() {
+    auto key = (const char*)nullptr;
+    auto val = (StringType*)nullptr;
+    kh_foreach(key_cache, key, val, {
+        delete val;
+    });
+    kh_destroy_KeyCache(key_cache);
 }
 
 void* Interpreter::get_user_pointer() const {
@@ -52,6 +65,19 @@ FunctionType* Interpreter::alloc_function(CodeFragment* code) {
 }
 BoxType* Interpreter::alloc_box(Value val) {
     return heap.alloc_box(val);
+}
+StringType* Interpreter::intern_string(const char* data) {
+    auto get = kh_get_KeyCache(key_cache, data);
+    if (get == kh_end(key_cache)) {
+        auto _ = 0;
+        auto put = kh_put_KeyCache(key_cache, data, &_);
+        auto str = new StringType{};
+        kh_val(key_cache, put) = str;
+        str->data = strdup(data);
+        str->length = (uint32_t)strlen(data);
+        return str;
+    }
+    return kh_val(key_cache, get);
 }
 GCState Interpreter::gc_state() const {
     return heap.gc_state();
@@ -320,7 +346,9 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                         auto it = REGISTER_RAW(i.r0)._i;
                         auto obj = value_to_object(iter_val);
                         if (it != obj->end()) {
-                            REGISTER(i.u8.r2) = value_from_string(obj->key(it));
+                            auto key = obj->key(it);
+                            auto cached = kh_val(key_cache, kh_get(KeyCache, key_cache, key));
+                            REGISTER(i.u8.r2) = value_from_string(cached);
                             _pc++;
                         }
                     // } else if (iter_type == Type::Function) {
@@ -331,7 +359,9 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     auto obj = value_to_object(iter_val);
                     auto it = REGISTER_RAW(i.r0)._i;
                     if (it != obj->end()) {
-                        REGISTER(i.u8.r2) = value_from_string(obj->key(it));
+                        auto key = obj->key(it);
+                        auto cached = kh_val(key_cache, kh_get(KeyCache, key_cache, key)); // should never fail
+                        REGISTER(i.u8.r2) = value_from_string(cached);
                         REGISTER(i.u8.r2 + 1) = obj->value(it);
                         _pc++;
                     }
@@ -399,7 +429,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     for (auto e = 0; e < i.u8.r1; e++) {
                         auto key = value_to_string(REGISTER(i.u8.r2 + e * 2));
                         auto val = REGISTER(i.u8.r2 + e * 2 + 1);
-                        obj->set(key, val);
+                        obj->set(key->data, val);
                     }
                     REGISTER(i.r0) = value_from_object(obj);
                 }
@@ -418,7 +448,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                         auto* obj = value_to_object(arr_val);
                         auto key = value_to_string(ind_val);
                         auto found = false;
-                        auto val = obj->get(key, found);
+                        auto val = obj->get(key->data, found);
                         if (!found) {
                             error("key not found");
                         }
@@ -448,7 +478,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     }
                     auto key = value_to_string(key_val);
                     auto found = false;
-                    auto val = obj->get(key, found);
+                    auto val = obj->get(key->data, found);
                     if (!found) {
                         error("key not found");
                     }
@@ -462,7 +492,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                         error("expected string key");
                     }
                     auto key = value_to_string(key_val);
-                    obj->set(key, REGISTER(i.r0));
+                    obj->set(key->data, REGISTER(i.r0));
                 }
                 handle(CALL) {
                     auto r0 = REGISTER(i.r0);

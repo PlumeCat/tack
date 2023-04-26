@@ -1,22 +1,24 @@
 fn foo() {
-    fn foo1() {
+    fn () {
         print("hello world")
     }
     fn foo2() {
         return 100
     }
-
-    foo1()
-    return foo2() + #[]
+    return foo2() + #[3,4,5,6,7]
 }
 
+let bar = {
 
-fn baz() {
-    fn bar() {
-        return foo()
+    quz = {
+    baz = fn() {
+        fn bar() {
+            return foo()
+        }
+        return bar()
     }
-    return bar()
+    }
+
 }
 
-print(baz())
-
+print(bar.quz.baz())

@@ -24,7 +24,7 @@ make
 - [x] closures
 - [x] consts
 - [x] calling C functions from tack
-- [ ] boolean literals and operations (do as number?)
+- [x] boolean literals and operations (do as number?)
 - [ ] string operations
 - [x] calling tack functions from C
 - [x] garbage collector. must be allowed to retain pointers in C world

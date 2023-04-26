@@ -28,9 +28,7 @@ FunctionType* Heap::alloc_function(CodeFragment* code) {
     alloc_count++;
     return &functions.emplace_back(FunctionType {
         .bytecode = code,
-        .captures = {},
-        .marker = false,
-        .refcount = 0
+        .captures = {}
     });
 }
 
@@ -39,9 +37,26 @@ BoxType* Heap::alloc_box(Value val) {
     return &boxes.emplace_back(BoxType { .value = val });
 }
 
+StringType* Heap::alloc_string(const char* data) {
+    alloc_count++;
+    return &strings.emplace_back(StringType {
+        .data = strdup(data),
+        .length = (uint32_t)strlen(data)
+    });
+}
+//StringType* Heap::alloc_key(const char* data) {
+//    alloc_count++;
+//    
+//}
+
 void gc_visit(Value value) {
     dump("visit: ", value);
     switch ((uint64_t)value_get_type(value)) {
+        case type_bits_string: {
+            auto s = value_to_string(value);
+            s->marker = true;
+            break;
+        }
         case type_bits_boxed: {
             auto b = value_to_boxed(value);
             if (!b->marker) {
@@ -111,6 +126,21 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
     for (auto s = stackbase; stack[s-1]._i != 0; s = stack[s-1]._i) {
         for (auto i = stack[s-1]._i; i < s - (STACK_FRAME_OVERHEAD); i++) {
             gc_visit(stack[i]);
+        }
+    }
+
+    dump("sweeping strings");
+    {
+        auto i = strings.begin();
+        while (i != strings.end()) {
+            if (!i->marker && i->refcount == 0) {
+                dump("collected string: ", value_from_string(&(*i)));
+                num_collections += 1;
+                i = strings.erase(i);
+            } else {
+                i->marker = false;
+                i++;
+            }
         }
     }
 

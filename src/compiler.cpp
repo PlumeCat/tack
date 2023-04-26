@@ -47,9 +47,9 @@ uint16_t CodeFragment::store_number(double d) {
     return (uint16_t)(storage.size() - 1);
 }
 
-uint16_t CodeFragment::store_string(const std::string & data) {
-    strings.emplace_back(data);
-    storage.emplace_back(value_from_string(strings.back().c_str()));
+uint16_t CodeFragment::store_string(StringType* str) {
+    //strings.emplace_back(data);
+    storage.emplace_back(value_from_string(str));
     return (uint16_t)(storage.size() - 1);
 }
 uint16_t CodeFragment::store_fragment(CodeFragment* fragment) {
@@ -342,7 +342,8 @@ uint8_t Compiler::compile(const AstNode* node) {
                 auto obj_reg = compile(&lhs.children[0]);
                 // save identifier as string and load it
                 auto key_reg = allocate_register();
-                auto index = output->store_string(lhs.children[1].data_s);
+                auto key = interpreter->intern_string(lhs.children[1].data_s.c_str());
+                auto index = output->store_string(key);
                 emit_u(LOAD_CONST, key_reg, index);
                 emit(STORE_OBJECT, source_reg, obj_reg, key_reg);
                 free_register(obj_reg);
@@ -678,7 +679,8 @@ uint8_t Compiler::compile(const AstNode* node) {
         handle(StringLiteral) {
             should_allocate(1);
             auto out = allocate_register();
-            auto index = output->store_string(node->data_s);
+            auto str = interpreter->intern_string(node->data_s.c_str());
+            auto index = output->store_string(str);
             emit_u(LOAD_CONST, out, index);
             return out;
         }
@@ -699,6 +701,7 @@ uint8_t Compiler::compile(const AstNode* node) {
 
             return out;
         }
+
         handle(ArrayLiteral) {
             auto array_reg = allocate_register();
             auto n_elems = (uint8_t)node->children.size();
@@ -723,7 +726,8 @@ uint8_t Compiler::compile(const AstNode* node) {
             auto val_regs = std::vector<uint8_t>{};
             for (auto n = 0; n < n_elems; n++) {
                 // each child node is an AssignStat
-                auto key = output->store_string(node->children[n].children[0].data_s);
+                auto str = interpreter->intern_string(node->children[n].children[0].data_s.c_str());
+                auto key = output->store_string(str);
                 auto val = compile(&node->children[n].children[1]);
                 key_indices.emplace_back(key);
                 val_regs.emplace_back(val);
@@ -775,7 +779,8 @@ uint8_t Compiler::compile(const AstNode* node) {
 
             // save identifier as string and load it
             auto key = allocate_register();
-            auto index = output->store_string(node->children[1].data_s);
+            auto str = interpreter->intern_string(node->children[1].data_s.c_str());
+            auto index = output->store_string(str);
             emit_u(LOAD_CONST, key, index);
 
             // load from object

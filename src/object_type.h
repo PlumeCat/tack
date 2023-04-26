@@ -28,6 +28,5 @@ struct ObjectType {
     
     const char* key(iter i);
     Value value(iter i);
-
 };
 

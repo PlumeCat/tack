@@ -1,6 +1,7 @@
 #pragma once
 
 #include "compiler.h"
+#include "library.h"
 #include "value.h"
 
 #include <chrono>
@@ -21,6 +22,8 @@ private:
     std::list<ObjectType> objects;
     std::list<FunctionType> functions;
     std::list<BoxType> boxes;
+    std::list<StringType> strings; // temp strings - garbage collected
+    std::list<StringType> keys; // object keys and string literals - live forever // TODO: deduplicate these
     
     // statistics
     std::chrono::steady_clock::time_point last_gc = std::chrono::steady_clock::now();
@@ -34,13 +37,13 @@ public:
     ObjectType* alloc_object();
     FunctionType* alloc_function(CodeFragment* code);
     BoxType* alloc_box(Value val);
+    StringType* alloc_string(const char* data);
 
     GCState gc_state() const;
     void gc_state(GCState new_state);
 
     void gc(std::vector<Value>& globals, const Stack& stack, uint32_t stackbase);
 };
-
 struct Interpreter {
     bool log_ast = false;
     bool log_bytecode = false;
@@ -55,10 +58,18 @@ private:
     std::vector<Value> globals;
     std::list<CodeFragment> fragments;
 
+    struct kh_KeyCache_s* key_cache;
+
     void* user_pointer = nullptr;
 
 public:
     Interpreter();
+    ~Interpreter();
+
+    Interpreter(const Interpreter&) = delete;
+    Interpreter(Interpreter&&) = delete;
+    Interpreter& operator=(const Interpreter&) = delete;
+    Interpreter& operator=(Interpreter&&) = delete;
 
     void* get_user_pointer() const;
     void set_user_pointer(void* ptr);
@@ -87,4 +98,6 @@ public:
     ObjectType* alloc_object();
     FunctionType* alloc_function(CodeFragment* code);
     BoxType* alloc_box(Value val);
+    StringType* intern_string(const char* data);
+    StringType* alloc_string(const char* data);
 };
