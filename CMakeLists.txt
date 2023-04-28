@@ -18,6 +18,7 @@ message("CMake build type: ${CMAKE_BUILD_TYPE}")
 string(REGEX REPLACE "([\\/\\-]O)3" "\\12" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
 
 include_directories(${TEST_NAME} "${CMAKE_CURRENT_LIST_DIR}/../jlib/")
+include_directories(${TEST_NAME} "${CMAKE_CURRENT_LIST_DIR}/../math3d/")
 
 file(GLOB_RECURSE source_lib src/*.cpp)
 file(GLOB_RECURSE source_test test/*.cpp)

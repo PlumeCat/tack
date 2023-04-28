@@ -3,16 +3,28 @@
 
 #include <sstream>
 #include <jlib/log.h>
+#include <jlib/text_file.h>
 
 #define PRINT log<true,false>
 
+static const float pi = 3.1415926535f;
+static const float degtorad = pi / 180.f;
+static const float radtodeg = 180.f / pi;
+
+double radians(double deg) {
+    return deg * degtorad;
+}
+double degrees(double rad) {
+    return rad * radtodeg;
+}
+
 void setup_standard_library(Interpreter* vm) {
-    tack_func("dofile", {
+    /*tack_func("dofile", {
         for (auto i = 0; i < nargs; i++) {
-            auto s = value_to_string(args[i]);
-            // vm->call(vm->load(read_text_file(s).value_or("")), nullptr, 0);
+            auto s = value_to_string(args[i])->data;
+            vm->call(vm->load(read_text_file(s).value_or("")), nullptr, 0);
         }
-    });
+    });*/
     tack_func("print", {
         auto ss = std::stringstream {};
         for (auto i = 0; i < nargs; i++) {
@@ -34,8 +46,14 @@ void setup_standard_library(Interpreter* vm) {
         auto s = std::stringstream {};
         s << args[0];
         auto str = s.str();
-        return value_from_string(vm->alloc_string(str.c_str(), str.size()));
+        return value_from_string(vm->alloc_string(str));
     });
+
+    // algebraics
+    tack_func("vec2", {});
+    tack_func("vec3", {});
+    tack_func("vec4", {});
+    tack_func("mat4", {});
     
     // generic    
     tack_func("type", {});
@@ -60,6 +78,7 @@ void setup_standard_library(Interpreter* vm) {
     tack_func("foreach", {});
     tack_func("keys", {});
     tack_func("values", {});
+    
     /*
     insert
     push
@@ -70,6 +89,61 @@ void setup_standard_library(Interpreter* vm) {
     */
 
     // math funcs
+    #define tack_math(func) tack_func(#func, return value_from_number(func(value_to_number(args[0]))));
+    #define tack_math2(func) tack_func(#func, return value_from_number(func(value_to_number(args[0]), value_to_number(args[1]))));
+
+    vm->set_global("pi", true, value_from_number(pi));
+
+    tack_math(sin);
+    tack_math(cos);
+    tack_math(tan);
+    tack_math(asin);
+    tack_math(acos);
+    tack_math(atan);
+    tack_math2(atan2);
+
+    tack_math(sinh);
+    tack_math(cosh);
+    tack_math(tanh);
+    tack_math(asinh);
+    tack_math(acosh);
+    tack_math(atanh);
+
+    tack_math(exp);
+    tack_math(exp2);
+    tack_math(sqrt);
+    tack_math(log);
+    tack_math2(pow);
+    tack_math(log2);
+    tack_math(log10);
+
+    tack_math(floor);
+    tack_math(ceil);
+    tack_math(abs);
+    tack_math(round);
+    tack_math(degrees);
+    tack_math(radians);
+
+    // fmod
+    // frexp
+    // ldexp
+    // mod
+    // frac
+    // modf
+    // pow
+    // sign
+    // smoothstep
+    // smootherstep
+    // lerp
+    // slerp
+    // clamp
+    // atan2 in some form
+    // min
+    // max
+
+
+    #undef tack_math
+    #undef tack_math2
 
 
     // ===== OPERATORS =====

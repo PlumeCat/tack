@@ -15,9 +15,12 @@
 
 #include <cstring>
 
-#include "khash.h"
+// #include "khash.h"
+#include "khash2.h"
 
-KHASH_MAP_INIT_STR(KeyCache, StringType*) // HACK:
+using namespace std::literals;
+
+// KHASH_MAP_INIT_STR(KeyCache, StringType*) // HACK:
 
 Interpreter::Interpreter() {
     next_globalid = 0;
@@ -26,16 +29,16 @@ Interpreter::Interpreter() {
     global_scope.parent_scope = nullptr;
     global_scope.is_function_scope = false;
     stack.fill(value_null());
-    key_cache = kh_init_KeyCache();
+    // key_cache = kh_init_KeyCache();
 }
 Interpreter::~Interpreter() {
     auto key = (const char*)nullptr;
     auto val = (StringType*)nullptr;
-    kh_foreach(key_cache, key, val, {
+    /*kh_foreach(key_cache, key, val, {
         delete[] val->data;
         delete val;
     });
-    kh_destroy_KeyCache(key_cache);
+    kh_destroy_KeyCache(key_cache);*/
 }
 
 void* Interpreter::get_user_pointer() const {
@@ -68,38 +71,41 @@ FunctionType* Interpreter::alloc_function(CodeFragment* code) {
 BoxType* Interpreter::alloc_box(Value val) {
     return heap.alloc_box(val);
 }
-StringType* Interpreter::intern_string(const char* data) {
-    auto get = kh_get_KeyCache(key_cache, data);
-    if (get == kh_end(key_cache)) {
-        auto _ = 0;
-        auto put = kh_put_KeyCache(key_cache, data, &_);
-        
+StringType* Interpreter::intern_string(const std::string& data) {
+    // return alloc_string(data);
 
-        // TODO: ugly c string manipulation, factor out if possible
-        auto len = (uint32_t)strlen(data);
-        auto new_data = new char[len + 1];
-        new_data[len] = 0;
-        std::strncpy(new_data, data, len);
-        
-        auto str = new StringType();
-        str->length = len;
-        str->data = new_data;
-        
-        kh_val(key_cache, put) = str;
+    auto get = key_cache.get(data);
+    if (get == key_cache.end()) {
+        auto _ = 0;
+        auto put = key_cache.put(data, &_);
+        auto str = new StringType { data };
+        key_cache.value_at(put) = str;
         return str;
     }
-    return kh_val(key_cache, get);
+    return key_cache.value_at(get);
+
+    //auto get = kh_get_KeyCache(key_cache, data);
+    //if (get == kh_end(key_cache)) {
+    //    auto _ = 0;
+    //    auto put = kh_put_KeyCache(key_cache, data, &_);
+
+    //    // TODO: ugly c string manipulation, factor out if possible
+    //    auto len = (uint32_t)strlen(data);
+    //    auto new_data = new char[len + 1];
+    //    new_data[len] = 0;
+    //    std::strncpy(new_data, data, len);
+    //    
+    //    auto str = new StringType();
+    //    str->length = len;
+    //    str->data = new_data;
+    //    
+    //    kh_val(key_cache, put) = str;
+    //    return str;
+    //}
+    //return kh_val(key_cache, get);
 }
-StringType* Interpreter::alloc_string_empty(uint32_t len) {
-    auto data = new char[len+1];
-    memset(data, 0, len+1);
-    return heap.alloc_string(data, len);
-}
-StringType* Interpreter::alloc_string(const char* data, uint32_t len) {
-    auto new_data = new char[len+1];
-    new_data[len] = 0;
-    std::strncpy(new_data, data, len);
-    return heap.alloc_string(new_data, len);
+StringType* Interpreter::alloc_string(const std::string& data) {
+    return heap.alloc_string(data);
 }
 GCState Interpreter::gc_state() const {
     return heap.gc_state();
@@ -239,7 +245,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                         auto r = value_to_string(REGISTER(i.u8.r2));
                         // TODO: ugly string manipulation
                         auto new_str = std::string(l->data) + std::string(r->data);
-                        REGISTER(i.r0) = value_from_string(alloc_string(new_str.c_str(), new_str.size()));
+                        REGISTER(i.r0) = value_from_string(alloc_string(new_str));
                     } else if (lt == Type::Array) {
                         // array add
                         auto l = value_to_array(lhs);
@@ -390,7 +396,8 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                         auto obj = value_to_object(iter_val);
                         if (it != obj->end()) {
                             auto key = obj->key(it);
-                            auto cached = kh_val(key_cache, kh_get(KeyCache, key_cache, key));
+                            // auto cached = kh_val(key_cache, kh_get(KeyCache, key_cache, key));
+                            auto cached = key_cache.value_at(key_cache.get(key));
                             REGISTER(i.u8.r2) = value_from_string(cached);
                             _pc++;
                         }
@@ -403,7 +410,8 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     auto it = REGISTER_RAW(i.r0)._i;
                     if (it != obj->end()) {
                         auto key = obj->key(it);
-                        auto cached = kh_val(key_cache, kh_get(KeyCache, key_cache, key)); // should never fail
+                        // auto cached = kh_val(key_cache, kh_get(KeyCache, key_cache, key)); // should never fail
+                        auto cached = key_cache.value_at(key_cache.get(key));
                         REGISTER(i.u8.r2) = value_from_string(cached);
                         REGISTER(i.u8.r2 + 1) = obj->value(it);
                         _pc++;
@@ -434,7 +442,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     if (type == Type::Array) {
                         REGISTER(i.r0) = value_from_number(value_to_array(val)->values.size());
                     } else if (type == Type::String) {
-                        REGISTER(i.r0) = value_from_number(value_to_string(val)->length);
+                        REGISTER(i.r0) = value_from_number(value_to_string(val)->data.size());
                     } else if (type == Type::Object) {
                         REGISTER(i.r0) = value_from_number(value_to_object(val)->length());
                     } else {
@@ -502,7 +510,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                         auto found = false;
                         auto val = obj->get(key->data, found);
                         if (!found) {
-                            error("key not found");
+                            error("key not found"s + key->data);
                         }
                         REGISTER(i.r0) = val;
                     }
@@ -532,7 +540,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     auto found = false;
                     auto val = obj->get(key->data, found);
                     if (!found) {
-                        error("key not found");
+                        error("key not found"s + key->data);
                     }
                     REGISTER(i.r0) = val;
                 }

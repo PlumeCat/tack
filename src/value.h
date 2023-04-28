@@ -88,8 +88,7 @@ struct GCType {
 using NullType = nullptr_t;
 
 struct StringType {
-    const char* data;
-    uint32_t length;
+    std::string data;
     GCType()
 };
 struct BoxType {
@@ -107,14 +106,12 @@ struct FunctionType {
 };
 #include "object_type.h"
 
-using CFunctionType = Value(*)(Interpreter*, int, Value*);
-
-// TODO: replace
 struct vec2 { float x, y; };
 struct vec3 { float x, y, z; };
 struct vec4 { float x, y, z, w; };
 struct mat4 { float m[16]; };
 
+using CFunctionType = Value(*)(Interpreter*, int, Value*);
 
 // create value
 inline constexpr Value value_null()                     { return { UINT64_MAX }; }

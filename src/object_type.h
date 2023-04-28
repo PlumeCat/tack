@@ -4,10 +4,14 @@
 #include <string>
 
 // HACK:
-struct kh_SV_s;
+// struct kh_SV_s;
+// struct ObjectHash;
+#include "khash2.h"
 
 struct ObjectType {
-    kh_SV_s* hash; // HACK:
+    // kh_SV_s* hash; // HACK:
+    KHash<std::string, Value> hash;
+
     uint32_t len = 0;
     GCType()
     using iter = unsigned int; // HACK:
@@ -15,18 +19,18 @@ struct ObjectType {
     ObjectType();
     ObjectType(const ObjectType&) = delete;
     ObjectType& operator=(const ObjectType&) = delete;
-    ObjectType(ObjectType&& from);
-    ObjectType& operator=(ObjectType&& from);
+    ObjectType(ObjectType&& from) = delete;
+    ObjectType& operator=(ObjectType&& from) = delete;
     ~ObjectType();
 
-    void set(const char* key, Value val);
-    Value get(const char* key, bool& found);
+    void set(const std::string& key, Value val);
+    Value get(const std::string& key, bool& found);
     iter begin();
     iter end();
     iter next(iter i);
     uint32_t length();
     
-    const char* key(iter i);
+    const std::string& key(iter i);
     Value value(iter i);
 };
 
