@@ -4,26 +4,25 @@
 #include <jlib/log.h>
 
 // parsing utils
-using namespace std;
 using namespace std::string_literals;
 
-struct ParseContext : private string_view {
+struct ParseContext : private std::string_view {
     uint32_t line_number = 1;
     
-    ParseContext(const string& s) : string_view(s) {}
-    void remove_prefix(string_view::size_type s) noexcept {
+    ParseContext(const std::string& s) : std::string_view(s) {}
+    void remove_prefix(std::string_view::size_type s) noexcept {
         for (auto i = 0u; i < s; i++) {
             if ((*this)[i] == '\n') {
                 line_number += 1;
             }
         }
-        string_view::remove_prefix(s);
+        std::string_view::remove_prefix(s);
     }
 
-    using string_view::operator[];
-    using string_view::size;
-    using string_view::data;
-    using string_view::substr;
+    using std::string_view::operator[];
+    using std::string_view::size;
+    using std::string_view::data;
+    using std::string_view::substr;
 };
 
 #define SUCCESS(...) { out = AstNode(__VA_ARGS__); out.line_number = _c.line_number; return true; }
@@ -31,7 +30,7 @@ struct ParseContext : private string_view {
 #ifdef ERROR
 #undef ERROR
 #endif
-#define ERROR(msg) throw runtime_error("parsing error "s + msg + " | line: " + to_string(code.line_number) + "\n'" + string(code.substr(0, 32))  + "... '");
+#define ERROR(msg) throw std::runtime_error("parsing error "s + msg + " | line: " + std::to_string(code.line_number) + "\n'" + std::string(code.substr(0, 32))  + "... '");
 #define EXPECT(s) if (!parse_raw_string(code, s)) { FAIL(); }
 
 #define paste(a, b) a##b
@@ -556,10 +555,10 @@ bool parse(const std::string& code, AstNode& out_ast) {
     out_ast = AstNode { AstType::Unknown };
     auto res = parse_module(s_code, out_ast);
     if (!res) {
-        throw runtime_error("parser error: "s + string(s_code.substr(0, 100)));
+        throw std::runtime_error("parser error: "s + std::string(s_code.substr(0, 100)));
     }
     if (s_code.size()) {
-        throw runtime_error("expected end of file: "s + string(s_code.substr(0, 100)));
+        throw std::runtime_error("expected end of file: "s + std::string(s_code.substr(0, 100)));
     }
     return true;
 }

@@ -8,6 +8,7 @@ ObjectType::ObjectType() {
     marker = false;
     // hash = kh_init_SV();
 }
+
 //ObjectType::ObjectType(ObjectType&& from) {
 //    hash = from.hash;
 //    from.hash = nullptr;
@@ -29,6 +30,7 @@ uint32_t ObjectType::length() {
 void ObjectType::set(const std::string& key, Value val) {
     auto ret = 0;
     auto n = hash.put(key, &ret);
+
     len += (ret >= 1) ? 1 : 0;
     hash.value_at(n) = val;
 }
@@ -44,14 +46,14 @@ Value ObjectType::get(const std::string& key, bool& found) {
 
 ObjectType::iter ObjectType::begin() {
     auto i = hash.begin();
-    while (!hash.exist(i) && i != end()) {
+    while (i != end() && !hash.exist(i)) {
         i++;
     }
     return i;
 }
 ObjectType::iter ObjectType::next(ObjectType::iter i) {
     i++;
-    while (!hash.exist(i) && i != end()) {
+    while (i != end() && !hash.exist(i)) {
         i++;
     }
     return i;

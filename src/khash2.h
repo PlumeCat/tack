@@ -58,8 +58,6 @@ static inline uint32_t hash_string(const std::string& s)
     return h;
 }
 
-
-
 template<typename KeyType,typename ValType>
 struct KHash {
     using Iterator = uint32_t;
@@ -120,7 +118,7 @@ public:
         if (new_n_buckets < 4) {
             new_n_buckets = 4;
         }
-        if (size_ >= (new_n_buckets * __ac_HASH_UPPER + 0.5)) {
+        if (size_ >= uint32_t(new_n_buckets * __ac_HASH_UPPER + 0.5)) {
             // requested size is too small
             rehash_needed = false;
         } else {
@@ -179,15 +177,17 @@ public:
     }
 
     Iterator put(const KeyType& key, int* ret) {
-        if (n_occupied > upper_bound) {
+        if (n_occupied >= upper_bound) {
             if (n_buckets > (size_ << 1)) {
+                if (resize(n_buckets - 1) < 0) {
+                    *ret = -1;
+                    return n_buckets;
+                }
+            } else if (resize(n_buckets + 1) < 0) {
                 *ret = -1;
                 return n_buckets;
             }
-        } else if (resize(n_buckets + 1) < 0) {
-            *ret = -1;
-            return n_buckets;
-        }
+        } 
 
 
         uint32_t step = 0;
