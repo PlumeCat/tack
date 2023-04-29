@@ -4,6 +4,9 @@
 #include <string>
 #include <utility>
 
+// Adapted from khash (commit: 5fc2090) to have a more C++-friendly 
+// Uses std::vector instead of realloc
+
 /* The MIT License
 
    Copyright (c) 2008, 2009, 2011 by Attractive Chaos <attractor@live.co.uk>
@@ -42,12 +45,9 @@
 #define kroundup32(x) (--(x), (x)|=(x)>>1, (x)|=(x)>>2, (x)|=(x)>>4, (x)|=(x)>>8, (x)|=(x)>>16, ++(x))
 #endif
 
-// static const double __ac_HASH_UPPER = 0.77;
 static const double __ac_HASH_UPPER = 0.77;
 
-
-static inline uint32_t hash_string(const std::string& s)
-{
+static inline uint32_t hash_string(const std::string& s) {
     if (!s.size()) {
         return 0;
     }
@@ -71,8 +71,10 @@ private:
     std::vector<KeyType> keys;
     std::vector<ValType> vals;
     
-    using HashFunc = std::hash<std::string>;
-    HashFunc hash_func;
+    // using HashFunc = std::hash<std::string>;
+    // HashFunc hash_func;
+    
+    #define hash_func(s) hash_string(s)
     #define cmp_func(a, b) ((a) == (b))
 
 public:

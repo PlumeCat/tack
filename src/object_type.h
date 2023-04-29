@@ -4,12 +4,9 @@
 #include <string>
 
 // HACK:
-// struct kh_SV_s;
-// struct ObjectHash;
 #include "khash2.h"
 
 struct ObjectType {
-    // kh_SV_s* hash; // HACK:
     KHash<std::string, Value> hash;
 
     uint32_t len = 0;
