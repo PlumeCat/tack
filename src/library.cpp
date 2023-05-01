@@ -21,15 +21,18 @@ template<typename ...Args> void print(const Args&... args) {
 }
 
 void setup_standard_library(Interpreter* vm) {
-    tack_func("print", {
 
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-parameter"
+
+    // system/io
+    tack_func("print", {
         auto ss = std::stringstream {};
         for (auto i = 0; i < nargs; i++) {
             ss << args[i] << ' ';
         }
         print(ss.str());
     });
-    // });
     tack_func("random", {
         return value_from_number(rand());
     });
@@ -83,6 +86,7 @@ void setup_standard_library(Interpreter* vm) {
     // math funcs
     #define tack_math(func) tack_func(#func, return value_from_number(func(value_to_number(args[0]))));
     #define tack_math2(func) tack_func(#func, return value_from_number(func(value_to_number(args[0]), value_to_number(args[1]))));
+    #define tack_math3(func) tack_func(#func, return value_from_number(func(value_to_number(args[0]), value_to_number(args[1]), value_to_number(args[2])));
 
     vm->set_global("pi", true, value_from_number(pi));
 
@@ -116,22 +120,65 @@ void setup_standard_library(Interpreter* vm) {
     tack_math(degrees);
     tack_math(radians);
 
-    // fmod
-    // frexp
-    // ldexp
-    // mod
-    // frac
-    // modf
+    tack_math2(fmod);
+    tack_func("lerp", {
+        auto a = value_to_number(args[0]);
+        auto b = value_to_number(args[1]);
+        auto c = value_to_number(args[2]);
+        return value_from_number(a + (b - a) * c);
+    });
+    tack_func("clamp", return value_from_number(std::max(value_to_number(args[2]), std::min(value_to_number(args[1]), value_to_number(args[0])))));
+    tack_func("saturate", return value_from_number(std::max(0.0, std::min(1.0, value_to_number(args[0])))));
+    
+    tack_func("min", {
+        if (nargs == 0) {
+            return value_null();
+        }
+        else if (nargs == 1) {
+            auto arr = value_to_array(args[0]);
+            if (!arr->size()) {
+                return value_null();
+            }
+            auto m = value_to_number((*arr)[0]);
+            for (auto i = 1u; i < arr->size(); i++) {
+                m = std::min(m, value_to_number((*arr)[i]));
+            }
+            return value_from_number(m);
+        } else {
+            auto m = value_to_number(args[0]);
+            for (auto i = 1; i < nargs; i++) {
+                m = std::min(m, value_to_number(args[i]));
+            }
+            return value_from_number(m);
+        }
+    });
+    tack_func("max", {
+        if (nargs == 0) {
+            return value_null();
+        } else if (nargs == 1) {
+            auto arr = value_to_array(args[0]);
+            if (!arr->size()) {
+                return value_null();
+            }
+            auto m = value_to_number((*arr)[0]);
+            for (auto i = 1u; i < arr->size(); i++) {
+                m = std::max(m, value_to_number((*arr)[i]));
+            }
+            return value_from_number(m);
+        } else {
+            auto m = value_to_number(args[0]);
+            for (auto i = 1; i < nargs; i++) {
+                m = std::max(m, value_to_number(args[i]));
+            }
+            return value_from_number(m);
+        }
+    });
+    
     // pow
     // sign
     // smoothstep
     // smootherstep
-    // lerp
     // slerp
-    // clamp
-    // atan2 in some form
-    // min
-    // max
 
 
     #undef tack_math
@@ -146,5 +193,7 @@ void setup_standard_library(Interpreter* vm) {
     // array + array    => concat arrays
     // string + string  => concat strings
     // object + object  => union objects (right overrides left)
+
+    #pragma GCC diagnostic pop
 }
 

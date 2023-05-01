@@ -130,7 +130,7 @@ public:
         }
 
         if (rehash_needed) {
-            for (auto j = 0; j != n_buckets; ++j) {
+            for (auto j = 0u; j != n_buckets; ++j) {
                 if (__ac_iseither(flags, j) == 0) {
                     auto key = keys[j];
                     auto new_mask = new_n_buckets - 1;
@@ -253,4 +253,28 @@ public:
     Iterator begin() const { return 0; }
     Iterator end() const { return n_buckets; }
     uint32_t size() const { return size_; }
+
+    // Convenience methods (on top of what was provided by khash)
+
+    void set(const KeyType& key, const ValType& val) {
+        auto ret = 0;
+        auto n = put(key, &ret);
+        value_at(n) = val;
+    }
+    ValType get(const KeyType& key, bool& found) {
+        auto n = get(key);
+        if (n == end()) {
+            found = false;
+            return ValType();
+        }
+        found = true;
+        return value_at(n);
+    }
+    Iterator next(Iterator i) const {
+        i++;
+        while (i != end() && !exist(i)) {
+            i++;
+        }
+        return i;
+    }
 };

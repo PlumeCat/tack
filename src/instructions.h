@@ -81,8 +81,6 @@ enum class Opcode : uint8_t { opcodes() };
 inline std::string to_string(Opcode opcode) {
     static const std::unordered_map<Opcode, std::string> opcode_to_string = { opcodes() };
     return opcode_to_string.at(opcode);
-
-    Opcode::OPCODE_MAX;
 }
 #undef opcode
 

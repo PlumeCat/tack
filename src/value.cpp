@@ -3,12 +3,9 @@
 #include <iostream>
 #include <iomanip>
 
-std::ostream& operator<<(std::ostream& o, const mat4& v) { return o << "mat4 { " << v.m[0] << " }"; }
-std::ostream& operator<<(std::ostream& o, const vec2& v) { return o << "vec2 { " << v.x << ", " << v.y << " }"; }
-std::ostream& operator<<(std::ostream& o, const vec3& v) { return o << "vec2 { " << v.x << ", " << v.y << ", " << v.z << " }"; }
-std::ostream& operator<<(std::ostream& o, const vec4& v) { return o << "vec2 { " << v.x << ", " << v.y << ", " << v.z << ", " << v.w << " }"; }
-std::ostream& operator<<(std::ostream& o, const ArrayType& arr);
-std::ostream& operator<<(std::ostream& o, ObjectType& obj);
+std::ostream& operator<<(std::ostream& o, ArrayType* arr);
+std::ostream& operator<<(std::ostream& o, ObjectType* obj);
+
 std::ostream& operator<<(std::ostream& o, const Value& v) {
     if (!std::isnan(v._d)) {
         if (v._d == trunc(v._d)) {
@@ -21,12 +18,8 @@ std::ostream& operator<<(std::ostream& o, const Value& v) {
         case (uint64_t)Type::Boolean:   return o << (value_to_boolean(v) ? "true" : "false");
         case (uint64_t)Type::String:    return o << value_to_string(v)->data;
         case (uint64_t)Type::Pointer:   return o << value_to_pointer(v);
-        case (uint64_t)Type::Object:    return o << *value_to_object(v);
-        case (uint64_t)Type::Array:     return o << *value_to_array(v);
-        case (uint64_t)Type::Mat4:      return o << *value_to_mat4(v);
-        case (uint64_t)Type::Vec2:      return o << *value_to_vec2(v);
-        case (uint64_t)Type::Vec3:      return o << *value_to_vec3(v);
-        case (uint64_t)Type::Vec4:      return o << *value_to_vec4(v);
+        case (uint64_t)Type::Object:    return o << value_to_object(v);
+        case (uint64_t)Type::Array:     return o << value_to_array(v);
         case (uint64_t)Type::Function:  return o << "function: " << std::hex << v._p;
         case (uint64_t)Type::CFunction: return o << "c-func:   " << std::hex << v._p;
         case type_bits_boxed:           return o << "box:      " << std::hex << v._p << "(" << std::hex << value_to_boxed(v)->value._p << ")";
@@ -40,25 +33,26 @@ bool value_get_truthy(Value v) {
         ((v._i & type_bits) == type_bits_boolean)   ? (v._i & boolean_bits) :
         true;
 }
-std::ostream& operator<<(std::ostream& o, const ArrayType& arr) {
+std::ostream& operator<<(std::ostream& o, ArrayType* arr) {
     o << "array [";
-    if (arr.values.size()) {
-        o << ' ' << arr.values[0];
-        for (auto i = 1u; i < arr.values.size(); i++) {
-            o << ", " << arr.values[i];
+    if (arr->size()) {
+        o << ' ' << (*arr)[0];
+        for (auto i = 1u; i < arr->size(); i++) {
+            o << ", " << (*arr)[i];
         }
         o << ' ';
     }
     return o << ']';
 }
-std::ostream& operator<<(std::ostream& o, ObjectType& obj) {
+std::ostream& operator<<(std::ostream& o, ObjectType* obj) {
     o << "object {";
-    if (obj.length()) {
-        auto i = obj.begin();
-        o << ' ' << obj.key(i) << " = " << obj.value(i);
-        i = obj.next(i);
-        for (auto e = obj.end(); i != e; i = obj.next(i)) {
-            o << ", " << obj.key(i) << " = " << obj.value(i);
+    if (obj->size()) {
+        auto i = obj->begin();
+        o << ' ' << obj->key_at(i) << " = " << obj->value_at(i);
+        // i = obj->next(i);
+        i = obj->next(i);
+        for (auto e = obj->end(); i != e; i = obj->next(i)) {
+            o << ", " << obj->key_at(i) << " = " << obj->value_at(i);
         }
         o << ' ';
     }

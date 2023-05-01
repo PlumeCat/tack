@@ -63,7 +63,7 @@ void gc_visit(Value value) {
             if (!o->marker) {
                 o->marker = true;
                 for (auto i = o->begin(); i != o->end(); i = o->next(i)) {
-                    gc_visit(o->value(i));
+                    gc_visit(o->value_at(i));
                 }
             }
             break;
@@ -72,7 +72,7 @@ void gc_visit(Value value) {
             auto a = value_to_array(value);
             if (!a->marker) {
                 a->marker = true;
-                for (auto v: a->values) {
+                for (auto v: *a) {
                     gc_visit(v);
                 }
             }

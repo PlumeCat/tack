@@ -30,10 +30,7 @@ Interpreter::Interpreter() {
     global_scope.is_function_scope = false;
     stack.fill(value_null());
 }
-Interpreter::~Interpreter() {
-    auto key = (const char*)nullptr;
-    auto val = (StringType*)nullptr;
-}
+Interpreter::~Interpreter() {}
 
 void* Interpreter::get_user_pointer() const {
     return user_pointer;
@@ -223,8 +220,8 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                         auto l = value_to_array(lhs);
                         auto r = value_to_array(REGISTER(i.u8.r2));
                         auto n = alloc_array();
-                        std::copy(l->values.begin(), l->values.end(), std::back_inserter(n->values));
-                        std::copy(r->values.begin(), r->values.end(), std::back_inserter(n->values));
+                        std::copy(l->begin(), l->end(), std::back_inserter(*n));
+                        std::copy(r->begin(), r->end(), std::back_inserter(*n));
                     } else {
                         error("operator '+' exected number / array / string");
                     }
@@ -248,7 +245,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     auto rhs = REGISTER(i.u8.r2);
                     if (value_is_array(lhs)) {
                         auto* arr = value_to_array(lhs);
-                        arr->values.emplace_back(rhs);
+                        arr->emplace_back(rhs);
                         // put the appended value into r0
                         REGISTER(i.r0) = rhs;
                     } else if (value_is_number(lhs)) {
@@ -266,8 +263,8 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     if (value_is_array(lhs)) {
                         auto* arr = value_to_array(lhs);
                         // put the popped value into r0
-                        REGISTER(i.r0) = arr->values.back();
-                        arr->values.pop_back();
+                        REGISTER(i.r0) = arr->back();
+                        arr->pop_back();
                     } else if (value_is_number(lhs)) {
                         REGISTER(i.r0) = value_from_number(
                             (uint32_t)value_to_number(lhs) >>
@@ -359,15 +356,15 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     if (iter_type == Type::Array) {
                         auto ind = REGISTER_RAW(i.r0)._i;
                         auto arr = value_to_array(iter_val);
-                        if (ind < arr->values.size()) {
-                            REGISTER(i.u8.r2) = arr->values[ind];
+                        if (ind < arr->size()) {
+                            REGISTER(i.u8.r2) = (*arr)[ind];
                             _pc++;
                         }
                     } else if (iter_type == Type::Object) {
                         auto it = REGISTER_RAW(i.r0)._i;
                         auto obj = value_to_object(iter_val);
                         if (it != obj->end()) {
-                            auto key = obj->key(it);
+                            auto key = obj->key_at(it);
                             auto cached = key_cache.value_at(key_cache.get(key));
                             REGISTER(i.u8.r2) = value_from_string(cached);
                             _pc++;
@@ -380,10 +377,10 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     auto obj = value_to_object(iter_val);
                     auto it = REGISTER_RAW(i.r0)._i;
                     if (it != obj->end()) {
-                        auto key = obj->key(it);
+                        auto key = obj->key_at(it);
                         auto cached = key_cache.value_at(key_cache.get(key));
                         REGISTER(i.u8.r2) = value_from_string(cached);
-                        REGISTER(i.u8.r2 + 1) = obj->value(it);
+                        REGISTER(i.u8.r2 + 1) = obj->value_at(it);
                         _pc++;
                     }
                 }
@@ -410,11 +407,11 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     auto val = REGISTER(i.u8.r1);
                     auto type = value_get_type(val);
                     if (type == Type::Array) {
-                        REGISTER(i.r0) = value_from_number(value_to_array(val)->values.size());
+                        REGISTER(i.r0) = value_from_number(value_to_array(val)->size());
                     } else if (type == Type::String) {
                         REGISTER(i.r0) = value_from_number(value_to_string(val)->data.size());
                     } else if (type == Type::Object) {
-                        REGISTER(i.r0) = value_from_number(value_to_object(val)->length());
+                        REGISTER(i.r0) = value_from_number(value_to_object(val)->size());
                     } else {
                         error("operator '#' expected string / array / object");
                     }
@@ -447,7 +444,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
 
                     // emplace child elements
                     for (auto e = 0; e < i.u8.r1; e++) {
-                        arr->values.emplace_back(REGISTER(i.u8.r2 + e));
+                        arr->emplace_back(REGISTER(i.u8.r2 + e));
                     }
 
                     REGISTER(i.r0) = value_from_array(arr);
@@ -470,10 +467,10 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     if (arr_type == Type::Array) {
                         auto* arr = value_to_array(arr_val);
                         auto ind = value_to_number(ind_val);
-                        if (ind >= arr->values.size()) {
+                        if (ind >= arr->size()) {
                             error("outof range index");
                         }
-                        REGISTER(i.r0) = arr->values[ind];
+                        REGISTER(i.r0) = (*arr)[ind];
                     } else if (arr_type == Type::Object) {
                         auto* obj = value_to_object(arr_val);
                         auto key = value_to_string(ind_val);
@@ -494,10 +491,10 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     auto ind_val = REGISTER(i.u8.r2);
                     auto ind = value_to_number(ind_val);
 
-                    if (ind > arr->values.size()) {
+                    if (ind > arr->size()) {
                         error("outof range index");
                     }
-                    arr->values[ind] = REGISTER(i.r0);
+                    (*arr)[ind] = REGISTER(i.r0);
                 }
                 handle(LOAD_OBJECT) {
                     auto obj_val = REGISTER(i.u8.r1);

@@ -31,13 +31,15 @@ fn quicksort(arr) {
     if n <= 1 { return arr }
 
     " min and max "
-    let min = arr[0]
+    let min = min(arr)
+    let max = max(arr)
+    "let min = arr[0]
     let max = arr[0]
     for i in 1, n {
         let ai = arr[i]
         if ai > max { max = ai }
         if ai < min { min = ai }
-    }
+    }"
 
     " midpoint "
     if min == max { return arr }
