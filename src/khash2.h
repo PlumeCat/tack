@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <utility>
+#include <assert.h>
 
 // Adapted from khash (commit: 5fc2090) to have a more C++-friendly 
 // Uses std::vector instead of realloc
@@ -89,7 +90,9 @@ public:
         }
     }
 
-    Iterator get(const KeyType& key) const {
+    // find element
+    // if not found, returns end()
+    Iterator find(const KeyType& key) const {
         if (n_buckets) {
             uint32_t step = 0;
             uint32_t mask = n_buckets - 1;
@@ -226,6 +229,7 @@ public:
         } else if (__ac_isdel(flags, x)) {
             keys[x] = key;
             ++size_;
+            __ac_set_isboth_false(flags, x);
             *ret = 2;
         } else {
             *ret = 0;
@@ -245,24 +249,35 @@ public:
         return !__ac_iseither(flags, x);
     }
 
-    KeyType& key_at(Iterator x) { return keys[x]; }
-    const KeyType& key_at(Iterator x) const { return keys[x]; }
-    ValType& value_at(Iterator x) { return vals[x]; }
-    const ValType& value_at(Iterator x) const { return vals[x]; }
+    KeyType& key_at(Iterator x) {
+        assert(x < end());
+        return keys[x];
+    }
+    const KeyType& key_at(Iterator x) const {
+        assert(x < end());
+        return keys[x];
+    }
+    ValType& value_at(Iterator x) {
+        assert(x < end());
+        return vals[x];
+    }
+    const ValType& value_at(Iterator x) const {
+        assert(x < end());
+        return vals[x];
+    }
 
     Iterator begin() const { return 0; }
     Iterator end() const { return n_buckets; }
     uint32_t size() const { return size_; }
 
     // Convenience methods (on top of what was provided by khash)
-
     void set(const KeyType& key, const ValType& val) {
         auto ret = 0;
         auto n = put(key, &ret);
         value_at(n) = val;
     }
     ValType get(const KeyType& key, bool& found) {
-        auto n = get(key);
+        auto n = find(key);
         if (n == end()) {
             found = false;
             return ValType();

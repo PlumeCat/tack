@@ -63,15 +63,15 @@ BoxType* Interpreter::alloc_box(Value val) {
     return heap.alloc_box(val);
 }
 StringType* Interpreter::intern_string(const std::string& data) {
-    auto get = key_cache.get(data);
-    if (get == key_cache.end()) {
+    auto got = key_cache.find(data);
+    if (got == key_cache.end()) {
         auto _ = 0;
         auto put = key_cache.put(data, &_);
         auto str = new StringType { data };
         key_cache.value_at(put) = str;
         return str;
     }
-    return key_cache.value_at(get);
+    return key_cache.value_at(got);
 }
 StringType* Interpreter::alloc_string(const std::string& data) {
     return heap.alloc_string(data);
@@ -365,7 +365,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                         auto obj = value_to_object(iter_val);
                         if (it != obj->end()) {
                             auto key = obj->key_at(it);
-                            auto cached = key_cache.value_at(key_cache.get(key));
+                            auto cached = key_cache.value_at(key_cache.find(key));
                             REGISTER(i.u8.r2) = value_from_string(cached);
                             _pc++;
                         }
@@ -378,7 +378,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     auto it = REGISTER_RAW(i.r0)._i;
                     if (it != obj->end()) {
                         auto key = obj->key_at(it);
-                        auto cached = key_cache.value_at(key_cache.get(key));
+                        auto cached = key_cache.value_at(key_cache.find(key));
                         REGISTER(i.u8.r2) = value_from_string(cached);
                         REGISTER(i.u8.r2 + 1) = obj->value_at(it);
                         _pc++;
