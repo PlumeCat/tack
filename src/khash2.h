@@ -58,7 +58,7 @@ static inline uint32_t hash_string(const std::string& s) {
     return h;
 }
 
-template<typename KeyType,typename ValType>
+template<typename KeyType, typename ValType, typename HashFunc = std::hash<KeyType>>
 struct KHash {
     using Iterator = uint32_t;
     
@@ -70,11 +70,7 @@ private:
     std::vector<uint32_t> flags;
     std::vector<KeyType> keys;
     std::vector<ValType> vals;
-    
-    // using HashFunc = std::hash<std::string>;
-    // HashFunc hash_func;
-    
-    #define hash_func(s) hash_string(s)
+    HashFunc hash_func;
     #define cmp_func(a, b) ((a) == (b))
 
 public:
@@ -241,7 +237,7 @@ public:
     void del(Iterator x) {
         if (x != n_buckets && !__ac_iseither(flags, x)) {
             __ac_set_isdel_true(flags, x);
-            --size;
+            --size_;
         }
     }
 
@@ -256,5 +252,5 @@ public:
 
     Iterator begin() const { return 0; }
     Iterator end() const { return n_buckets; }
-    uint32_t size() const { return size; }
+    uint32_t size() const { return size_; }
 };

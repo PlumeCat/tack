@@ -12,14 +12,13 @@ fn foo() {
 }
 
 let bar = {
-
     quz = {
-    baz = fn() {
-        fn bar() {
-            return foo()
+        baz = fn() {
+            fn bar() {
+                return foo()
+            }
+            return bar()
         }
-        return bar()
-    }
     }
 
 }

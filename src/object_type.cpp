@@ -9,29 +9,15 @@ ObjectType::ObjectType() {
     // hash = kh_init_SV();
 }
 
-//ObjectType::ObjectType(ObjectType&& from) {
-//    hash = from.hash;
-//    from.hash = nullptr;
-//}
-//ObjectType& ObjectType::operator=(ObjectType&& from) {
-//    hash = from.hash;
-//    from.hash = nullptr;
-//    return *this;
-//}
-ObjectType::~ObjectType() {
-    /*if (hash) {
-        kh_destroy_SV(hash);
-    }*/
-}
+ObjectType::~ObjectType() {}
 
 uint32_t ObjectType::length() {
-    return len;
+    return hash.size();
 }
 void ObjectType::set(const std::string& key, Value val) {
     auto ret = 0;
     auto n = hash.put(key, &ret);
-
-    len += (ret >= 1) ? 1 : 0;
+    // len += (ret >= 1) ? 1 : 0;
     hash.value_at(n) = val;
 }
 Value ObjectType::get(const std::string& key, bool& found) {

@@ -8,9 +8,8 @@
 
 struct ObjectType {
     KHash<std::string, Value> hash;
-
-    uint32_t len = 0;
     GCType()
+
     using iter = unsigned int; // HACK:
     
     ObjectType();

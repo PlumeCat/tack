@@ -5,8 +5,6 @@
 #include <jlib/log.h>
 #include <jlib/text_file.h>
 
-#define PRINT log<true,false>
-
 static const float pi = 3.1415926535f;
 static const float degtorad = pi / 180.f;
 static const float radtodeg = 180.f / pi;
@@ -18,20 +16,20 @@ double degrees(double rad) {
     return rad * radtodeg;
 }
 
+template<typename ...Args> void print(const Args&... args) {
+    log<true, false>(args...);
+}
+
 void setup_standard_library(Interpreter* vm) {
-    /*tack_func("dofile", {
-        for (auto i = 0; i < nargs; i++) {
-            auto s = value_to_string(args[i])->data;
-            vm->call(vm->load(read_text_file(s).value_or("")), nullptr, 0);
-        }
-    });*/
     tack_func("print", {
+
         auto ss = std::stringstream {};
         for (auto i = 0; i < nargs; i++) {
             ss << args[i] << ' ';
         }
-        PRINT(ss.str());
+        print(ss.str());
     });
+    // });
     tack_func("random", {
         return value_from_number(rand());
     });
@@ -49,12 +47,6 @@ void setup_standard_library(Interpreter* vm) {
         return value_from_string(vm->alloc_string(str));
     });
 
-    // algebraics
-    tack_func("vec2", {});
-    tack_func("vec3", {});
-    tack_func("vec4", {});
-    tack_func("mat4", {});
-    
     // generic    
     tack_func("type", {});
     tack_func("slice", {});
