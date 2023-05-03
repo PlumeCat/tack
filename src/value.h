@@ -83,23 +83,30 @@ struct GCType {
 
 using NullType = nullptr_t;
 
-struct StringType {
-    std::string data;
-    GCType()
+struct Vtable {
+    KHash<std::string, CFunctionType> functions;
 };
 struct BoxType {
     Value value;
     GCType()
 };
-struct FunctionType {
-    CodeFragment* bytecode;
-    std::vector<Value> captures; // contains boxes
+struct StringType {
+    std::string data;
     GCType()
 };
 struct ArrayType : std::vector<Value> {
     GCType()
 };
 struct ObjectType : KHash<std::string, Value> {
+    GCType()
+};
+struct CObjectType {
+    void* data;
+    GCType()
+};
+struct FunctionType {
+    CodeFragment* bytecode;
+    std::vector<Value> captures; // contains boxes
     GCType()
 };
 
@@ -121,6 +128,7 @@ inline Value value_from_string(StringType* str)         { return { nan_bits | ty
 inline Value value_from_object(ObjectType* obj)         { return { nan_bits | type_bits_object | uint64_t(obj) }; }
 inline Value value_from_array(ArrayType* arr)           { return { nan_bits | type_bits_array  | uint64_t(arr) }; }
 inline Value value_from_cfunction(CFunctionType cfunc)  { return { nan_bits | type_bits_cfunction | uint64_t(cfunc) }; }
+inline Value value_from_cobject(CObjectType* obj)       { return { nan_bits | type_bits_cobject | uint64_t(obj) }; }
 // type checks
 
 /*
@@ -139,6 +147,7 @@ inline bool value_is_cfunction(Value v)                 { return (v._i & type_bi
 inline bool value_is_string(Value v)                    { return (v._i & type_bits) == type_bits_string;  }
 inline bool value_is_object(Value v)                    { return (v._i & type_bits) == type_bits_object;  }
 inline bool value_is_array(Value v)                     { return (v._i & type_bits) == type_bits_array;   }
+inline bool value_is_cobject(Value v)                   { return (v._i & type_bits) == type_bits_cobject; }
 
 #define check(ty) if (!value_is_##ty(v)) throw std::runtime_error("type error: expected " #ty);
 inline StringType* value_to_string(Value v)             { check(string);    return (StringType*)(v._i & pointer_bits); }
@@ -151,5 +160,6 @@ inline uint64_t value_to_null(Value v)                  { check(null);      retu
 inline bool value_to_boolean(Value v)                   { check(boolean);   return (bool)(v._i & boolean_bits); }
 inline double value_to_number(Value v)                  { check(number);    return v._d; } // ???
 inline void* value_to_pointer(Value v)                  { check(pointer);   return (void*)(v._i & pointer_bits); }
+inline CObjectType* value_to_cobject(Value v)           { check(cobject);   return (CObjectType*)(v._i & pointer_bits); }
 
 std::ostream& operator<<(std::ostream& o, const Value& v);

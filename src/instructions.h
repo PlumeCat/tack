@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <string>
 
 #define opcodes() \
     opcode(UNKNOWN)\
@@ -84,11 +85,12 @@ inline std::string to_string(Opcode opcode) {
 }
 #undef opcode
 
+struct InputRegister { uint8_t r1, r2; };
 struct Instruction {
     Opcode opcode;
     uint8_t r0;
     union {
-        struct { uint8_t r1, r2; } u8;
+        InputRegister u8;
         int16_t s1;
         uint16_t u1;
     };

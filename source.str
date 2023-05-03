@@ -1,26 +1,16 @@
-
-let x = "hello, " + "world"
-
-fn foo() {
-    fn () {
-        print("hello world")
-    }
-    fn foo2() {
-        return 100
-    }
-    return foo2() + #[3,4,5,6,7]
+let MyType = type {
+    x = 1,
+    y = 2,
+    
+    foo = fn() {
+        self.x = 0
+    },
+    bar = fn() {
+        self.y = 0
+    },
 }
+let a = MyType()
+let b = MyType(3)
+let c = MyType(4, 5)
 
-let bar = {
-    quz = {
-        baz = fn() {
-            fn bar() {
-                return foo()
-            }
-            return bar()
-        }
-    }
-
-}
-
-print(bar.quz.baz())
+a.foo()

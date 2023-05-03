@@ -212,7 +212,6 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                         // string add
                         auto l = value_to_string(lhs);
                         auto r = value_to_string(REGISTER(i.u8.r2));
-                        // TODO: ugly string manipulation
                         auto new_str = std::string(l->data) + std::string(r->data);
                         REGISTER(i.r0) = value_from_string(alloc_string(new_str));
                     } else if (lt == Type::Array) {
@@ -462,62 +461,51 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                 }
                 handle(LOAD_ARRAY) {
                     auto arr_val = REGISTER(i.u8.r1);
-                    auto ind_val = REGISTER(i.u8.r2);
-                    auto arr_type = value_get_type(arr_val);
-                    if (arr_type == Type::Array) {
-                        auto* arr = value_to_array(arr_val);
-                        auto ind = value_to_number(ind_val);
-                        if (ind >= arr->size()) {
-                            error("outof range index");
-                        }
-                        REGISTER(i.r0) = (*arr)[ind];
-                    } else if (arr_type == Type::Object) {
-                        auto* obj = value_to_object(arr_val);
-                        auto key = value_to_string(ind_val);
-                        auto found = false;
-                        auto val = obj->get(key->data, found);
-                        if (!found) {
-                            error("key not found"s + key->data);
-                        }
-                        REGISTER(i.r0) = val;
+                    auto ind_val = REGISTER(i.u8.r2);{
+                    auto* arr = value_to_array(arr_val);
+                    auto ind = value_to_number(ind_val);
+                    if (ind >= arr->size()) {
+                        error("index out of range");
                     }
+                    REGISTER(i.r0) = (*arr)[ind];
                 }
                 handle(STORE_ARRAY) {
                     auto arr_val = REGISTER(i.u8.r1);
-                    if (value_get_type(arr_val) != Type::Array) {
-                        error("expected array");
-                    }
-                    auto* arr = value_to_array(arr_val);
                     auto ind_val = REGISTER(i.u8.r2);
+                    auto* arr = value_to_array(arr_val);
                     auto ind = value_to_number(ind_val);
-
                     if (ind > arr->size()) {
-                        error("outof range index");
+                        error("index out of range");
                     }
                     (*arr)[ind] = REGISTER(i.r0);
                 }
                 handle(LOAD_OBJECT) {
-                    auto obj_val = REGISTER(i.u8.r1);
-                    auto key_val = REGISTER(i.u8.r2);
-                    auto* obj = value_to_object(obj_val);
-                    if (value_get_type(key_val) != Type::String) {
-                        error("expected string key");
-                    }
-                    auto key = value_to_string(key_val);
+                    auto lhs = REGISTER(i.u8.r1);
+                    auto key = value_to_string(REGISTER(i.u8.r2));
+                    auto lhs_type = value_get_type(lhs);
                     auto found = false;
-                    auto val = obj->get(key->data, found);
-                    if (!found) {
-                        error("key not found"s + key->data);
+                    if (lhs_type == Type::Object) {
+                        auto* obj = value_to_object(lhs);
+                        auto val = obj->get(key->data, found);
+                        REGISTER(i.r0) = val;
                     }
-                    REGISTER(i.r0) = val;
+                    if (!found) {
+                        // check vtable for type
+                        auto vtable = vtables[(uint32_t)lhs_type];
+                        if (vtable) {
+                            auto func = vtable->functions.get(key->data, found);
+                            if (!found) {
+                                REGISTER(i.r0) = func;
+                            }
+                        }
+                                error("key not found"s + key->data);
+
+                    }
                 }
                 handle(STORE_OBJECT) {
-                    auto obj_val = REGISTER(i.u8.r1);
+                    auto lhs = REGISTER(i.u8.r1);
                     auto key_val = REGISTER(i.u8.r2);
-                    auto* obj = value_to_object(obj_val);
-                    if (value_get_type(key_val) != Type::String) {
-                        error("expected string key");
-                    }
+                    auto* obj = value_to_object(lhs);
                     auto key = value_to_string(key_val);
                     obj->set(key->data, REGISTER(i.r0));
                 }
