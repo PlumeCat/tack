@@ -2,6 +2,7 @@
 #include "library.h"
 
 #include <sstream>
+#define JLIB_LOG_VISUALSTUDIO
 #include <jlib/log.h>
 #include <jlib/text_file.h>
 
@@ -71,17 +72,16 @@ void setup_standard_library(Interpreter* vm) {
     tack_func("reduce", {});
     tack_func("map", {});
     tack_func("foreach", {});
-    tack_func("keys", {});
-    tack_func("values", {});
     
-    /*
-    insert
-    push
-    pop
-    push_front
-    pop_front
-    sort
-    */
+    tack_func("keys", {});
+    tack_func("values", {});    
+
+    tack_func("insert", {});
+    tack_func("push", {});
+    tack_func("pop", {});
+    tack_func("push_front", {});
+    tack_func("pop_front", {});
+    tack_func("sort", {});
 
     // math funcs
     #define tack_math(func) tack_func(#func, return value_from_number(func(value_to_number(args[0]))));

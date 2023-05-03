@@ -15,12 +15,9 @@
 
 #include <cstring>
 
-// #include "khash.h"
 #include "khash2.h"
 
 using namespace std::string_literals;
-
-// KHASH_MAP_INIT_STR(KeyCache, StringType*) // HACK:
 
 Interpreter::Interpreter() {
     next_globalid = 0;
@@ -65,8 +62,7 @@ BoxType* Interpreter::alloc_box(Value val) {
 StringType* Interpreter::intern_string(const std::string& data) {
     auto got = key_cache.find(data);
     if (got == key_cache.end()) {
-        auto _ = 0;
-        auto put = key_cache.put(data, &_);
+        auto put = key_cache.put(data);
         auto str = new StringType { data };
         key_cache.value_at(put) = str;
         return str;
@@ -170,12 +166,12 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
         auto ln = _pr->bytecode->line_numbers[_pc];
         log("encountered at line:", ln, "in", _pr->bytecode->name);
         auto s = stackbase;
-        while (stack[s-1]._i != 0) {
-            auto retpc = stack[s-3]._i;
-            auto func = ((FunctionType*)stack[s-2]._p)->bytecode;
+        while (stack[s - 1]._i != 0) {
+            auto retpc = stack[s - 3]._i;
+            auto func = ((FunctionType*)stack[s - 2]._p)->bytecode;
             auto retln = func->line_numbers[retpc];
             log(" - called from line:", retln, "in", func->name);
-            s = stack[s-1]._i;
+            s = stack[s - 1]._i;
         }
     };
 
@@ -422,7 +418,6 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     // create closure
                     auto code = (CodeFragment*)value_to_pointer(_pr->bytecode->storage[i.u1]);
                     auto* func = heap.alloc_function(code);
-
                     // capture captures; box inplace if necessary
                     for (const auto& c : code->capture_info) {
                         auto val = REGISTER_RAW(c.source_register);
@@ -434,23 +429,19 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                             func->captures.emplace_back(val);
                         }
                     }
-
                     // done
                     REGISTER(i.r0) = value_from_function(func);
                 }
                 handle(ALLOC_ARRAY) {
                     auto* arr = heap.alloc_array();
-
                     // emplace child elements
                     for (auto e = 0; e < i.u8.r1; e++) {
                         arr->emplace_back(REGISTER(i.u8.r2 + e));
                     }
-
                     REGISTER(i.r0) = value_from_array(arr);
                 }
                 handle(ALLOC_OBJECT) {
                     auto* obj = heap.alloc_object();
-
                     // emplace child elements
                     for (auto e = 0; e < i.u8.r1; e++) {
                         auto key = value_to_string(REGISTER(i.u8.r2 + e * 2));
@@ -461,7 +452,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                 }
                 handle(LOAD_ARRAY) {
                     auto arr_val = REGISTER(i.u8.r1);
-                    auto ind_val = REGISTER(i.u8.r2);{
+                    auto ind_val = REGISTER(i.u8.r2);
                     auto* arr = value_to_array(arr_val);
                     auto ind = value_to_number(ind_val);
                     if (ind >= arr->size()) {
@@ -482,24 +473,13 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                 handle(LOAD_OBJECT) {
                     auto lhs = REGISTER(i.u8.r1);
                     auto key = value_to_string(REGISTER(i.u8.r2));
-                    auto lhs_type = value_get_type(lhs);
+                    auto* obj = value_to_object(lhs);
                     auto found = false;
-                    if (lhs_type == Type::Object) {
-                        auto* obj = value_to_object(lhs);
-                        auto val = obj->get(key->data, found);
-                        REGISTER(i.r0) = val;
-                    }
+                    auto val = obj->get(key->data, found);
                     if (!found) {
-                        // check vtable for type
-                        auto vtable = vtables[(uint32_t)lhs_type];
-                        if (vtable) {
-                            auto func = vtable->functions.get(key->data, found);
-                            if (!found) {
-                                REGISTER(i.r0) = func;
-                            }
-                        }
-                                error("key not found"s + key->data);
-
+                        error("key not found"s + key->data);
+                    } else {
+                        REGISTER(i.r0) = val;
                     }
                 }
                 handle(STORE_OBJECT) {
