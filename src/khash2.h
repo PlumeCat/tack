@@ -33,13 +33,13 @@
    SOFTWARE.
 */
 
-#define __ac_isempty(flag, i) ((flag[i>>4]>>((i&0xfU)<<1))&2)
-#define __ac_isdel(flag, i) ((flag[i>>4]>>((i&0xfU)<<1))&1)
-#define __ac_iseither(flag, i) ((flag[i>>4]>>((i&0xfU)<<1))&3)
-#define __ac_set_isdel_false(flag, i) (flag[i>>4]&=~(1ul<<((i&0xfU)<<1)))
+#define __ac_isempty(flag, i)           ((flag[i>>4]>>((i&0xfU)<<1))&2)
+#define __ac_isdel(flag, i)             ((flag[i>>4]>>((i&0xfU)<<1))&1)
+#define __ac_iseither(flag, i)          ((flag[i>>4]>>((i&0xfU)<<1))&3)
+#define __ac_set_isdel_false(flag, i)   (flag[i>>4]&=~(1ul<<((i&0xfU)<<1)))
 #define __ac_set_isempty_false(flag, i) (flag[i>>4]&=~(2ul<<((i&0xfU)<<1)))
-#define __ac_set_isboth_false(flag, i) (flag[i>>4]&=~(3ul<<((i&0xfU)<<1)))
-#define __ac_set_isdel_true(flag, i) (flag[i>>4]|=1ul<<((i&0xfU)<<1))
+#define __ac_set_isboth_false(flag, i)  (flag[i>>4]&=~(3ul<<((i&0xfU)<<1)))
+#define __ac_set_isdel_true(flag, i)    (flag[i>>4]|=1ul<<((i&0xfU)<<1))
 #define __ac_fsize(m) ((m) < 16? 1 : (m)>>4)
 
 #ifndef kroundup32
@@ -68,6 +68,7 @@ private:
     uint32_t size_;
     uint32_t n_occupied;
     uint32_t upper_bound;
+    
     std::vector<uint32_t> flags;
     std::vector<KeyType> keys;
     std::vector<ValType> vals;
@@ -177,7 +178,9 @@ public:
         return 0;
     }
 
-    Iterator put(const KeyType& key, int* ret) {
+    Iterator put(const KeyType& key, int* ret = nullptr) {
+        auto unused = 0;
+        if (!ret) ret = &unused;
         if (n_occupied >= upper_bound) {
             if (n_buckets > (size_ << 1)) {
                 if (resize(n_buckets - 1) < 0) {
@@ -266,7 +269,13 @@ public:
         return vals[x];
     }
 
-    Iterator begin() const { return 0; }
+    Iterator begin() const {
+        auto i = 0;
+        if (!exist(i)) {
+            i = next(i);
+        }
+        return i;
+    }
     Iterator end() const { return n_buckets; }
     uint32_t size() const { return size_; }
 

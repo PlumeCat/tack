@@ -30,9 +30,9 @@ fn quicksort(arr) {
     const n = #arr
     if n <= 1 { return arr }
 
-    " min and max "
     let min = min(arr)
     let max = max(arr)
+    " min and max "
     "let min = arr[0]
     let max = arr[0]
     for i in 1, n {

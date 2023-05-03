@@ -4,7 +4,7 @@
             "type": "lldb",
             "request": "launch",
             "name": "Launch Debug",
-            "program": "${workspaceFolder}/build/Debug/tack",
+            "program": "${workspaceFolder}/build/gcc-debug/tack",
             "args": [ "source.str" ],
             // "args": [ "test/test_pingpong.str" ],
             // "args": [ "test/test_gc.str" ],
@@ -18,7 +18,7 @@
             "type": "lldb",
             "request": "launch",
             "name": "Launch Release",
-            "program": "${workspaceFolder}/build/Release/tack",
+            "program": "${workspaceFolder}/build/gcc-release/tack",
             "args": [ "source.str", "-D", "-A" ],
             "preLaunchTask": "Build - Release",
             "cwd": "${workspaceFolder}"

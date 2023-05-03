@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
                     value_from_number(4),
                     value_from_number(5)
                 };
-                auto retval = vm.call<3>(foo, args);
+                auto retval = vm.call(foo, args.data(), 3);
                 log("RETVAL: ", value_to_number(retval));
             }
         }

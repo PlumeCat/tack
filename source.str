@@ -1,16 +1,11 @@
-let MyType = type {
+print("source.str")
+
+let foo = {
     x = 1,
     y = 2,
-    
-    foo = fn() {
-        self.x = 0
-    },
-    bar = fn() {
-        self.y = 0
-    },
+    z = 3
 }
-let a = MyType()
-let b = MyType(3)
-let c = MyType(4, 5)
 
-a.foo()
+for a in foo {
+    print(a)
+}

@@ -82,10 +82,8 @@ struct GCType {
 };
 
 using NullType = nullptr_t;
+using CFunctionType = Value(*)(Interpreter*, int, Value*);
 
-struct Vtable {
-    KHash<std::string, CFunctionType> functions;
-};
 struct BoxType {
     Value value;
     GCType()
@@ -110,8 +108,6 @@ struct FunctionType {
     GCType()
 };
 
-
-using CFunctionType = Value(*)(Interpreter*, int, Value*);
 
 // create value
 inline constexpr Value value_null()                     { return { UINT64_MAX }; }

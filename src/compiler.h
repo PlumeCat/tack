@@ -41,9 +41,6 @@ struct CodeFragment {
     uint16_t store_fragment(CodeFragment* ptr);
     std::string str();
 };
-
-
-
 struct Compiler {
     struct VariableContext {
         uint8_t reg = 0;

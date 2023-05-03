@@ -8,7 +8,7 @@
             "args": [ "-j8" ],
             "problemMatcher": "$gcc",
             "options": {
-                "cwd": "${workspaceFolder}/build/Debug"
+                "cwd": "${workspaceFolder}/build/gcc-debug"
             },
             "group": {
                 "kind": "build",
@@ -22,7 +22,7 @@
             "args": [ "-j8" ],
             "problemMatcher": "$gcc",
             "options": {
-                "cwd": "${workspaceFolder}/build/Release",
+                "cwd": "${workspaceFolder}/build/gcc-release",
             },
             "group": {
                 "kind": "build",
@@ -34,7 +34,7 @@
             "type": "shell",
             "command": "cmake -DCMAKE_BUILD_TYPE=Debug ../.. -G 'Unix Makefiles'",
             "options": {
-                "cwd": "${workspaceFolder}/build/Debug",
+                "cwd": "${workspaceFolder}/build/gcc-debug",
                 "env": { "CMAKE_BUILD_TYPE": "Debug" }
             },
             "problemMatcher": []
@@ -44,7 +44,7 @@
             "type": "shell",
             "command": "cmake -DCMAKE_BUILD_TYPE=Release ../.. -G 'Unix Makefiles'",
             "options": {
-                "cwd": "${workspaceFolder}/build/Release",
+                "cwd": "${workspaceFolder}/build/gcc-release",
                 "env": { "CMAKE_BUILD_TYPE": "Release" }
             },
             "problemMatcher": []

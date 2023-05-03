@@ -61,7 +61,6 @@ private:
     std::list<CodeFragment> fragments;
 
     KHash<std::string, StringType*> key_cache;
-    std::vector<Vtable*> vtables;
 
     void* user_pointer = nullptr;
 
@@ -90,13 +89,6 @@ public:
 
     GCState gc_state() const;
     void gc_state(GCState state);
-    Vtable* get_vtable(Value value);
-    
-    // convenience wrapper
-    template<size_t N>
-    Value call(Value fn, std::array<Value, N>& args) {
-        return call(fn, args.data(), N);
-    }
 
     ArrayType* alloc_array();
     ObjectType* alloc_object();
