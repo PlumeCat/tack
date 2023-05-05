@@ -3,8 +3,8 @@
 #include <jlib/log.h>
 
 // TODO: proper debug logging / diagnostics / monitoring system
-// #define debug log
-#define debug(...)
+#define debug log
+// #define debug(...)
 #define dump(...)
 
 void Heap::gc_state(GCState new_state) {
@@ -107,6 +107,7 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
     debug("===== GC: START ===");
     debug("  prev alloc count: ", prev_alloc_count);
     debug("  cur alloc count:  ", alloc_count);
+    debug("  last gc:          ", last_gc.time_since_epoch().count());
     auto num_collections = 0;
 
     // mark globals
@@ -207,6 +208,6 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
     debug("===== GC: END =====");
     debug("  collected:       ", num_collections);
     debug("  new alloc count: ", alloc_count);
-    debug("  time taken:      ", ms);
+    debug("  time taken (ms): ", ms);
 
 }

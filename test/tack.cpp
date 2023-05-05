@@ -42,24 +42,7 @@ int main(int argc, char* argv[]) {
 
     try {
         for (auto& f: files) {
-            auto s = read_text_file(f);
-            if (!s.has_value()) {
-                log("error opening source file:", f);
-                return 2;
-            }
-            auto& source = s.value();
-            vm.call(vm.load(source), nullptr, 0);
-            
-            auto foo = vm.get_global("foo");
-            if (value_is_function(foo)) {
-                auto args = std::array<Value,3> {
-                    value_from_number(3),
-                    value_from_number(4),
-                    value_from_number(5)
-                };
-                auto retval = vm.call(foo, args.data(), 3);
-                log("RETVAL: ", value_to_number(retval));
-            }
+            vm.load_module(f);
         }
     } catch (std::exception& e) {
         log(e.what());

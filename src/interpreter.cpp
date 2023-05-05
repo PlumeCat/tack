@@ -1,5 +1,4 @@
 #include "interpreter.h"
-#include "interpreter.h"
 #include "compiler.h"
 #include "value.h"
 #include "interpreter.h"
@@ -7,24 +6,31 @@
 
 #define JLIB_LOG_VISUALSTUDIO
 #include <jlib/log.h>
+#include <jlib/text_file.h>
 
 #include <list>
 #include <vector>
 #include <array>
 #include <exception>
-
 #include <cstring>
+#include <filesystem>
 
 #include "khash2.h"
 
 using namespace std::string_literals;
 
+static const std::string GLOBAL_NAMESPACE = "[global]";
+
 Interpreter::Interpreter() {
     next_globalid = 0;
     stackbase = STACK_FRAME_OVERHEAD;
+
+    // create the true global scope
     global_scope.compiler = nullptr;
     global_scope.parent_scope = nullptr;
     global_scope.is_function_scope = false;
+    modules.value_at(modules.put(GLOBAL_NAMESPACE)) = &global_scope;
+
     stack.fill(value_null());
 }
 Interpreter::~Interpreter() {}
@@ -77,7 +83,16 @@ GCState Interpreter::gc_state() const {
 }
 
 Value Interpreter::get_global(const std::string& name) {
-    auto* var = global_scope.lookup(name);
+    return get_global(name, GLOBAL_NAMESPACE);
+}
+Value Interpreter::get_global(const std::string& name, const std::string& module_name) {
+    auto mod = modules.find(module_name);
+    if (mod == modules.end()) {
+        return value_null();
+    }
+    auto* module = modules.value_at(mod);
+
+    auto* var = module->lookup(name);
     if (!var) {
         return value_null();
     }
@@ -86,13 +101,24 @@ Value Interpreter::get_global(const std::string& name) {
 }
 
 Compiler::VariableContext* Interpreter::set_global(const std::string& name, bool is_const, Value value) {
+    return set_global(name, GLOBAL_NAMESPACE, is_const, value);
+}
+
+Compiler::VariableContext* Interpreter::set_global(const std::string& name, const std::string& module_name, bool is_const, Value value) {
+    auto iter = modules.find(module_name);
+    if (iter == modules.end()) {
+        log("Error: module not found:", module_name);
+        return nullptr;
+    }
+    auto scope = modules.value_at(iter);
+
     // lookup binding
-    auto* var = global_scope.lookup(name);
+    auto* var = scope->lookup(name);
 
     // create binding if not exist
     if (!var) {
         // HACK:
-        var = &global_scope.bindings.try_emplace(name, Compiler::VariableContext {
+        var = &scope->bindings.try_emplace(name, Compiler::VariableContext {
             .reg = 0xff,
             .is_const = is_const,
             .is_global = true,
@@ -115,24 +141,65 @@ CodeFragment* Interpreter::create_fragment() {
     return &fragments.emplace_back();
 }
 
-Value Interpreter::load(const std::string& source) {
-    auto out_ast = AstNode {};
-    parse(source, out_ast);
-    auto ast = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
-    if (log_ast) {
-        log(ast.tostring());
+void Interpreter::add_module_dir_cwd() {
+    module_dirs.push_back(std::filesystem::current_path().string());
+}
+void Interpreter::add_module_dir(const std::string& dir) {
+    module_dirs.push_back(dir);
+}
+
+Compiler::ScopeContext* Interpreter::load_module(const std::string& module_name) {
+    auto iter = modules.find(module_name);
+    if (iter == modules.end()) {
+        auto filename = module_name + ".tack";
+        auto file_data = read_text_file(filename);
+        for (auto& d : module_dirs) {
+            auto path = std::filesystem::path(d).append(filename).string();
+            file_data = read_text_file(std::filesystem::path(d).append(filename).string());
+            if (file_data.has_value()) {
+                break;
+            }
+        }
+        if (!file_data.has_value()) {
+            log("Unable to load module: ", module_name);
+            return nullptr;
+        }
+    
+        // parse
+        auto out_ast = AstNode {};
+        parse(file_data.value(), out_ast);
+        auto ast = AstNode(AstType::FuncLiteral, AstNode(AstType::ParamDef), out_ast);
+        if (log_ast) {
+            log(ast.tostring());
+        }
+
+        // create the top level scope for the module
+        auto scope = new Compiler::ScopeContext {};
+        scope->compiler = nullptr;
+        scope->parent_scope = &global_scope;
+        scope->is_function_scope = false;
+        modules.value_at(modules.put(module_name)) = scope;
+
+        // compile root fragment
+        auto compiler = Compiler { .interpreter = this };
+        auto* fragment = create_fragment();
+        fragment->name = module_name;
+        compiler.compile_func(&ast, fragment, scope);
+        auto* func = heap.alloc_function(fragment);
+
+        // immediately call function
+        func->refcount += 1; // HACK:
+        call(value_from_function(func), nullptr, 0);
+        func->refcount -= 1;
+
+        return scope;
+
+    } else {
+        // already loaded
+        // log("Module already loaded: ", module_name, " - already loaded");
+        return modules.value_at(iter);
     }
-
-    // creates the root fragment
-    auto compiler = Compiler { .interpreter = this };
-    auto* fragment = create_fragment();
-    fragment->name = "[global]";
-    compiler.compile_func(&ast, fragment, &global_scope);
-    auto* func = heap.alloc_function(fragment);
-
-    // func is unreachable - addref it so it won't get deleted
-    func->refcount = 1;
-    return value_from_function(func);
+    
 }
 
 #define handle(opcode)  break; case Opcode::opcode:
@@ -455,7 +522,7 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     auto ind_val = REGISTER(i.u8.r2);
                     auto* arr = value_to_array(arr_val);
                     auto ind = value_to_number(ind_val);
-                    if (ind >= arr->size()) {
+                    if (ind >= arr->size() || ind < 0) {
                         error("index out of range");
                     }
                     REGISTER(i.r0) = (*arr)[ind];

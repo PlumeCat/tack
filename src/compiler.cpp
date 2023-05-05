@@ -148,13 +148,12 @@ uint8_t Compiler::get_end_register() {
 }
 
 // set a register as bound by a variable
-Compiler::VariableContext* Compiler::bind_name(const std::string& binding, uint8_t reg, bool is_const, bool is_export) {
-    if (is_export) {
-        return interpreter->set_global(binding, is_const, value_null());
-    } else {
-        registers[reg] = RegisterState::BOUND;
-        return &scopes.back().bindings.try_emplace(binding, VariableContext { reg, is_const }).first->second;
-    }
+Compiler::VariableContext* Compiler::bind_name(const std::string& binding, uint8_t reg, bool is_const) {
+    registers[reg] = RegisterState::BOUND;
+    return &scopes.back().bindings.try_emplace(binding, VariableContext { reg, is_const }).first->second;
+}
+Compiler::VariableContext* Compiler::bind_export(const std::string& binding, const std::string& module_name, bool is_const) {
+    return interpreter->set_global(binding, module_name, is_const, value_null());
 }
 
 // free a register if it's not bound
@@ -225,9 +224,9 @@ Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& nam
         if (auto var = parent_scope->lookup(name)) {
             // lookup came from a parent function, so it's a capture (unless global)
             if (is_function_scope && !var->is_global) {
-                // create a mirroring local variable
+                // create a mirroring local variable (impossible to be global)
                 auto mirror_reg = compiler->allocate_register();
-                auto mirror = compiler->bind_name(name, mirror_reg, var->is_const, false);
+                auto mirror = compiler->bind_name(name, mirror_reg, var->is_const);
 
                 var->is_capture = true;
                 mirror->is_mirror = true;
@@ -248,7 +247,14 @@ Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& nam
             return var;
         }
     }
-    
+
+    // TODO: check modules
+    for (auto i : imports) {
+        if (auto v = i->lookup(name)) {
+            return v;
+        }
+    }
+
     return nullptr;
 }
 
@@ -257,6 +263,14 @@ uint8_t Compiler::compile(const AstNode* node) {
     switch (node->type) {
     case AstType::Unknown: {} break;
         // statements
+        handle(ImportStat) {
+            // run the imported function
+            // it will only execute the first time it is imported
+            // subsequent imports will be able to access the exports
+            auto mod = interpreter->load_module(node->children[0].data_s);
+            scopes.back().imports.push_back(mod);
+            return 0xff;
+        }
         handle(StatList) {
             should_allocate(0);
             push_scope(&scopes.back());
@@ -270,22 +284,24 @@ uint8_t Compiler::compile(const AstNode* node) {
         handle(ConstDeclStat) {
             should_allocate(1);
             auto reg = child(1);
-
             auto is_export = node->children[0].data_d;
-            auto var = bind_name(node->children[0].data_s, reg, true, is_export);
             if (is_export) {
+                auto var = bind_export(node->children[0].data_s, output->name, true);
                 emit_u(WRITE_GLOBAL, reg, var->g_id);
+            } else {
+                bind_name(node->children[0].data_s, reg, true);
             }
             return 0xff;
         }
         handle(VarDeclStat) {
             should_allocate(1);
-            auto reg = child(1);
-            
+            auto reg = child(1);            
             auto is_export = node->children[0].data_d;
-            auto var = bind_name(node->children[0].data_s, reg, false, is_export);
             if (is_export) {
+                auto var = bind_export(node->children[0].data_s, output->name, false);
                 emit_u(WRITE_GLOBAL, reg, var->g_id);
+            } else {
+                bind_name(node->children[0].data_s, reg, false);
             }
             return 0xff;
         }
@@ -302,7 +318,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             auto index = output->store_fragment(func);
             
             /* interleaved from ConstDeclStat */ auto is_export = node->children[0].data_d;
-            /* interleaved from ConstDeclStat */ auto var = bind_name(ident, out, true, is_export);
+            /* interleaved from ConstDeclStat */ auto var = is_export ? bind_export(ident, output->name, true) : bind_name(ident, out, true);
             
             auto compiler = Compiler { .interpreter = interpreter };
             compiler.compile_func(&node->children[1], func, &scopes.back());

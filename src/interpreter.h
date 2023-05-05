@@ -56,6 +56,9 @@ private:
     uint32_t stackbase;
 
     Compiler::ScopeContext global_scope; // c-provided globals go here
+    KHash<std::string, Compiler::ScopeContext*> modules; // all loaded modules; "" is global module and is always implicitly imported
+    std::vector<std::string> module_dirs;
+    
     uint16_t next_globalid;
     std::vector<Value> globals;
     std::list<CodeFragment> fragments;
@@ -78,13 +81,19 @@ public:
 
     // used by Compiler
     CodeFragment* create_fragment();
-    // equivalent to "export name = value"
+    // used by host programs
     Compiler::VariableContext* set_global(const std::string& name, bool is_const, Value value);
+    // used by Compiler from load_module (not to be used by host programs; TODO: make it private)
+    Compiler::VariableContext* set_global(const std::string& name, const std::string& module_name, bool is_const, Value value);
     Value get_global(const std::string& name);
+    Value get_global(const std::string& name, const std::string& module_name);
     uint16_t next_gid();
 
-    // returns the file-level scope as a callable function
-    Value load(const std::string& source);
+    // load a module and return the export scope context
+    // note: the module will only ever run once per interpreter, if it was already loaded, the existing scope context is returned
+    void add_module_dir_cwd();
+    void add_module_dir(const std::string& dir);
+    Compiler::ScopeContext* load_module(const std::string& module_name);    
     Value call(Value fn, Value* args, int nargs);
 
     GCState gc_state() const;

@@ -32,7 +32,6 @@ struct CodeFragment {
     std::vector<Instruction> instructions;
     std::vector<uint32_t> line_numbers;
     std::vector<Value> storage; // program constant storage goes at the bottom of the stack for now
-    // std::list<std::string> strings; // string constants and literals storage - includes identifiers for objects
     std::vector<CaptureInfo> capture_info;
     uint32_t max_register = 0;
 
@@ -55,6 +54,7 @@ struct Compiler {
         ScopeContext* parent_scope = nullptr;
         bool is_function_scope = false;
         std::unordered_map<std::string, VariableContext> bindings = {}; // variables
+        std::list<ScopeContext*> imports = {}; // imported modules
 
         // lookup a variable
         // if it lives in a parent function, code will be emitted to capture it
@@ -65,7 +65,6 @@ struct Compiler {
     const AstNode* node = nullptr;
     // current output as of last compile_func() call, included here for convenience
     CodeFragment* output = nullptr;
-    // bool is_global = false; // variable bindings become global instead of stack
 
     // compiler state
     std::array<RegisterState, MAX_REGISTERS> registers = {};
@@ -86,7 +85,8 @@ struct Compiler {
     // set a register or global as bound by a variable with given name
     // NOTE: if it's global, make sure to emit WRITE_GLOBAL when relevant
     // this method can't currently do it automatically - see FuncLiteral compiler
-    VariableContext* bind_name(const std::string& binding, uint8_t reg, bool is_const = false, bool is_export = false);
+    VariableContext* bind_name(const std::string& binding, uint8_t reg, bool is_const = false);
+    VariableContext* bind_export(const std::string& binding, const std::string& module_name, bool is_const = false);
     
     // free a register if it's not bound
     void free_register(uint8_t reg);

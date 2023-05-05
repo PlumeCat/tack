@@ -4,9 +4,11 @@
 #include <unordered_map>
 #include <vector>
 
-#define ast_type() ast(Unknown)\
-    ast(StatList)\
+#define ast_type()\
+    ast(Unknown)\
     \
+    ast(StatList)\
+    ast(ImportStat)\
     ast(ConstDeclStat)\
     ast(VarDeclStat)\
     ast(FuncDeclStat)\
@@ -75,7 +77,7 @@ inline std::string to_string(AstType type) {
 #undef ast
 
 struct AstNode {
-    AstType type;
+    AstType type = AstType::Unknown;
     std::vector<AstNode> children = {};
     std::string data_s = "";
     double data_d = 0.f;

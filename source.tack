@@ -1,3 +1,6 @@
+import source2
+import source3
+
 print("source.str")
 
 let foo = {
@@ -9,3 +12,7 @@ let foo = {
 for a in foo {
     print(a)
 }
+
+print(foo)
+print(foo_func())
+print(bar_func())

@@ -1,0 +1,6 @@
+export fn foo_func() {
+    return "foo 3"
+}
+export fn bar_func() {
+    return "bar 3"
+}
