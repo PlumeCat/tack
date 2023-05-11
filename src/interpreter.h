@@ -23,12 +23,11 @@ private:
     std::list<FunctionType> functions;
     std::list<BoxType> boxes;
     std::list<StringType> strings; // temp strings - garbage collected
-    std::list<StringType> keys; // object keys and string literals - live forever // TODO: deduplicate these
     
     // statistics
     std::chrono::steady_clock::time_point last_gc = std::chrono::steady_clock::now();
-    uint32_t prev_alloc_count;
-    uint32_t alloc_count; // a bit clumsy - counts all allocations
+    uint32_t prev_alloc_count = 0;
+    uint32_t alloc_count = 0; // a bit clumsy - counts all allocations
     float last_gc_ms = 0.f;
     GCState state = GCState::Enabled;
 
@@ -51,19 +50,18 @@ struct Interpreter {
     bool log_bytecode = false;
 
 private:
+    std::vector<std::string> module_dirs;
+    
     Heap heap;
     Stack stack;
     uint32_t stackbase;
+    std::vector<Value> globals;
+    uint16_t next_globalid;
+    KHash<std::string, StringType*> key_cache; // TODO: move this into heap and use the refcount mechanism
 
     Compiler::ScopeContext global_scope; // c-provided globals go here
     KHash<std::string, Compiler::ScopeContext*> modules; // all loaded modules; "" is global module and is always implicitly imported
-    std::vector<std::string> module_dirs;
-    
-    uint16_t next_globalid;
-    std::vector<Value> globals;
     std::list<CodeFragment> fragments;
-
-    KHash<std::string, StringType*> key_cache;
 
     void* user_pointer = nullptr;
 
@@ -94,7 +92,7 @@ public:
     void add_module_dir_cwd();
     void add_module_dir(const std::string& dir);
     Compiler::ScopeContext* load_module(const std::string& module_name);    
-    Value call(Value fn, Value* args, int nargs);
+    Value call(Value fn, int nargs, Value* args);
 
     GCState gc_state() const;
     void gc_state(GCState state);

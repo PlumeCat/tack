@@ -4,6 +4,7 @@
 
 // TODO: proper debug logging / diagnostics / monitoring system
 #define debug log
+//#define dump log
 // #define debug(...)
 #define dump(...)
 
@@ -43,7 +44,7 @@ StringType* Heap::alloc_string(const std::string& data) {
 }
 
 void gc_visit(Value value) {
-    dump("visit: ", value);
+    // dump("visit: ", value);
     switch ((uint64_t)value_get_type(value)) {
         case type_bits_string: {
             auto s = value_to_string(value);
@@ -110,17 +111,17 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
     debug("  last gc:          ", last_gc.time_since_epoch().count());
     auto num_collections = 0;
 
-    // mark globals
+    // visit globals
     for (const auto& v: globals) {
         gc_visit(v);
     }
 
-    // mark stack
-    gc_visit(stack[stackbase - STACK_FRAME_OVERHEAD]); // visit return value
-    for (auto s = stackbase; stack[s-1]._i != 0; s = stack[s-1]._i) {
-        for (auto i = stack[s-1]._i; i < s - (STACK_FRAME_OVERHEAD); i++) {
-            gc_visit(stack[i]);
-        }
+    // visit stack
+    // assume this is being called from a return site,
+    // so the contents of the stack above stackbase are no longer needed
+    for (auto i = 0; i < stackbase; i++) {
+        //debug("stack[", i, "]: ", value_get_string(stack[i]));
+        gc_visit(stack[i]);
     }
 
     dump("sweeping strings");
@@ -158,7 +159,7 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
         auto i = arrays.begin();
         while (i != arrays.end()) {
             if (!i->marker && i->refcount == 0) {
-                dump("collected array: ", *i);
+                dump("collected array: ", value_from_array(&(*i)));
                 num_collections += 1;
                 i = arrays.erase(i);
             } else {

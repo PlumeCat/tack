@@ -1,18 +1,21 @@
-import source2
-import source3
+let a = [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]
 
-print("source.str")
+print(filter(a, fn(x) { return x % 2 - 1 }))
+print(reduce(a, fn(x, v) { return x + v }, 0))
+print(sum(a))
 
-let foo = {
-    x = 1,
-    y = 2,
-    z = 3
-}
+let s = [ 1, 3, 2, 4, 3, 56, 3 ]
+print(sort(s))
+print(sort(s, fn(x, y) { return x > y }))
 
-for a in foo {
-    print(a)
-}
+print(sort(split("hello world this  is a   tack program")))
 
-print(foo)
-print(foo_func())
-print(bar_func())
+print(map([ 1, 2, 3 ], fn(x) { return x * 2 }))
+print(map([], fn(){}))
+
+foreach([ 1, 2, 3, 4, 5 ], print)
+
+remove(a, 10, 20)
+remove_value(a, 8)
+remove_if(a, fn(x) { return x % 2 == 0 })
+print(a)

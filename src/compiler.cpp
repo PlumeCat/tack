@@ -72,7 +72,7 @@ std::string CodeFragment::str() {
         s << "  storage:\n";
         auto i = 0;
         for (auto& x : storage) {
-            s << "    " << i << ": " << x << '\n';
+            s << "    " << i << ": " << value_get_string(x) << '\n';
             i++;
         }
     }
@@ -219,7 +219,7 @@ Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& nam
         return &iter->second;
     }
 
-    // in parent scope
+    // check in parent scope
     if (parent_scope) {
         if (auto var = parent_scope->lookup(name)) {
             // lookup came from a parent function, so it's a capture (unless global)
@@ -248,7 +248,7 @@ Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& nam
         }
     }
 
-    // TODO: check modules
+    // check modules
     for (auto i : imports) {
         if (auto v = i->lookup(name)) {
             return v;
@@ -659,6 +659,13 @@ uint8_t Compiler::compile(const AstNode* node) {
             return out;
         }
         
+        handle(NegateExp) {
+            auto in = child(0);
+            auto out = allocate_register();
+            emit(NEGATE, out, in, 0);
+            free_register(in);
+            return out;
+        }
         handle(LenExp) {
             auto in = child(0);
             auto out = allocate_register();
@@ -732,6 +739,9 @@ uint8_t Compiler::compile(const AstNode* node) {
                 emit(MOVE, uint8_t(end_reg + n), elem_regs[n], 0);
             }
 
+            // TODO: inefficient use of registers
+            // would be better to have a "target register" approach when evaluating expressions
+            // and then MOVE can be emitted for variable reads, everything else can be inlined
             emit(ALLOC_ARRAY, array_reg, n_elems, end_reg);
             return array_reg;
         }

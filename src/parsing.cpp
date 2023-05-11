@@ -32,6 +32,7 @@ struct ParseContext : private std::string_view {
 #endif
 #define ERROR(msg) throw std::runtime_error("parsing error "s + msg + " | line: " + std::to_string(code.line_number) + "\n'" + std::string(code.substr(0, 32))  + "... '");
 #define EXPECT(s) if (!parse_raw_string(code, s)) { FAIL(); }
+#define EXPECT_WS(s) if (!(parse_raw_string(code, s) && (isspace(code[0]) || !code.size()))) { FAIL(); }
 
 #define paste(a, b) a##b
 #define DECLPARSER(name) bool paste(parse_, name)(ParseContext& code, AstNode& out)
@@ -62,7 +63,7 @@ bool is_identifier_char(char c) {
 bool is_identifier_start_char(char c) {
     return isalpha(c) || c == '_';
 }
-void skip_whitespace(ParseContext& code) {
+bool skip_whitespace(ParseContext& code) {
     auto n = 0u;
     for (; n < code.size(); n++) {
         if (!isspace(code[n])) {
@@ -70,11 +71,12 @@ void skip_whitespace(ParseContext& code) {
         }
     }
     code.remove_prefix(n);
+    return n > 0;
 }
 
 bool parse_raw_number(ParseContext& code, double& out) {
     auto end = (char*)nullptr;
-    auto result = strtod(code.data(), &end);
+    auto result = std::strtod(code.data(), &end);
     auto dist = end - code.data();
     if (dist != 0) {
         code.remove_prefix(dist);
@@ -384,8 +386,8 @@ DEFPARSER(ternary_exp, {
 DEFPARSER(exp, { TRY(ternary_exp) SUCCESS(ternary_exp); });
 
 DEFPARSER(const_decl_stat, {
-    auto is_export = parse_raw_string(code, "export");
-    EXPECT("const")
+    auto is_export = parse_raw_string(code, "export") && skip_whitespace(code);
+    EXPECT_WS("const")
     TRY(identifier) {
         identifier.data_d = is_export;
         EXPECT('=')
@@ -393,8 +395,8 @@ DEFPARSER(const_decl_stat, {
     }
 });
 DEFPARSER(var_decl_stat, {
-    auto is_export = parse_raw_string(code, "export");
-    EXPECT("let")
+    auto is_export = parse_raw_string(code, "export") && skip_whitespace(code);
+    EXPECT_WS("let")
     TRY(identifier) {
         identifier.data_d = is_export;
         EXPECT('=')
@@ -404,8 +406,8 @@ DEFPARSER(var_decl_stat, {
     }
 });
 DEFPARSER(func_decl_stat, {
-    auto is_export = parse_raw_string(code, "export");
-    EXPECT("fn")
+    auto is_export = parse_raw_string(code, "export") && skip_whitespace(code);
+    EXPECT_WS("fn")
     TRY(identifier) { identifier.data_d = is_export; } else { FAIL(); } // parsing failure not an error - could be a freestanding anonymous fn
     TRYs('(') {} else ERROR("expected parameter definition after identifier");
     TRY(param_def) {
@@ -445,16 +447,16 @@ DEFPARSER(return_stat, {
 
 DEFPARSER(if_stat, {
     SUBPARSER(else_block, {
-        EXPECT("else")
+        EXPECT_WS("else")
         TRY(if_stat) {
             SUCCESS(if_stat);
         }
-        TRY(block) {
+        TRY(block) { // TODO: can't parse 'else{' without the whitespace
             SUCCESS(block);
         }
     });
 
-    EXPECT("if")
+    EXPECT_WS("if")
     TRY2(exp, block) {
         TRY(else_block) {
             SUCCESS(AstType::IfStat, exp, block, else_block)
@@ -463,7 +465,7 @@ DEFPARSER(if_stat, {
     }
 });
 DEFPARSER(while_stat, {
-    EXPECT("while");
+    EXPECT_WS("while");
     TRY2(exp, block) {
         SUCCESS(AstType::WhileStat, exp, block)
     }
@@ -474,7 +476,7 @@ DEFPARSER(for_stat, {
     // "for i, v in object { ... }"
     // "for i in 1, 10 { ... }"
 
-    EXPECT("for");
+    EXPECT_WS("for");
     TRY(identifier) {
         auto i1 = identifier;
         auto i2 = AstNode{};
@@ -520,7 +522,7 @@ DEFPARSER(for_stat, {
 });
 
 DEFPARSER(import_stat, {
-    EXPECT("import");
+    EXPECT_WS("import");
     TRY(identifier) {
         SUCCESS(AstType::ImportStat, identifier);
     }

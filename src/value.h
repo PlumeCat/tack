@@ -108,6 +108,12 @@ struct FunctionType {
     GCType()
 };
 
+inline bool operator== (const Value& l, const Value& r) {
+    if (std::isnan(l._d) && std::isnan(r._d)) {
+        return l._i == r._i;
+    }
+    return l._d == r._d;
+}
 
 // create value
 inline constexpr Value value_null()                     { return { UINT64_MAX }; }
@@ -127,12 +133,14 @@ inline Value value_from_cfunction(CFunctionType cfunc)  { return { nan_bits | ty
 inline Value value_from_cobject(CObjectType* obj)       { return { nan_bits | type_bits_cobject | uint64_t(obj) }; }
 // type checks
 
-/*
-0, null, false are falsy
-everything else is truthy, including empty string, empty object, null pointer, etc
-*/
+// 0, null, false are falsy
+// everything else is truthy, including empty string, empty object, null pointer, etc
 bool value_get_truthy(Value v);
+
+// get the string representation (not to be confused with 'value_to_string' !)
+std::string value_get_string(Value v);
 inline Type value_get_type(Value v)                     { return std::isnan(v._d) ? (Type)(v._i & type_bits) : Type::Number; }
+
 inline bool value_is_null(Value v)                      { return v._i == UINT64_MAX; }
 inline bool value_is_boolean(Value v)                   { return (v._i & type_bits) == type_bits_boolean; }
 inline bool value_is_number(Value v)                    { return !std::isnan(v._d); }
@@ -158,4 +166,4 @@ inline double value_to_number(Value v)                  { check(number);    retu
 inline void* value_to_pointer(Value v)                  { check(pointer);   return (void*)(v._i & pointer_bits); }
 inline CObjectType* value_to_cobject(Value v)           { check(cobject);   return (CObjectType*)(v._i & pointer_bits); }
 
-std::ostream& operator<<(std::ostream& o, const Value& v);
+

@@ -33,6 +33,7 @@ make
 - [x] initialization for array and object literals
 - [ ] proper module system
 - [ ] python style slice syntax for arrays
+- [ ] python style for comprehensions
 - [x] allow more than 256 constants
 - [ ] language standard library, doesn't have to be massive
 - [ ] write a small game / opengl binding to test
@@ -40,7 +41,8 @@ make
 ### Undecided
 - [ ] comparisons; '==' vs python style 'is'
 - [ ] type coercions
-- [ ] separate type for integers worth it? complicates number handling and can only do 32 or 48 bit
+- [x] separate type for integers worth it? complicates number handling and can only do 32 or 48 bit
+    not going to do it
 - [ ] deleting keys from objects (currently impossible have to generate a new object)
 
 
@@ -51,7 +53,7 @@ make
 - [ ] for loops over functions (null to terminate)
 - [ ] compile time boxing and move elission
 - [x] ensure const is respected for captures
-- [ ] refactor strings to use std::string again (needs a version of khash that can accept std::string as key)
+- [x] refactor strings to use std::string again (needs a version of khash that can accept std::string as key)
 - [ ] deduplicate consts
     - if possible, dedupe across fragments
 - [x] specialize global lookups, treat it like LOAD_CONST (will want more than 256 global lookups)
