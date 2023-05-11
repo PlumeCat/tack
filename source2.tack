@@ -1,3 +1,0 @@
-export fn foo_func() {
-    return "foo 2"
-}
