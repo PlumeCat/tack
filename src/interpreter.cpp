@@ -14,6 +14,7 @@
 #include <exception>
 #include <cstring>
 #include <filesystem>
+#include <signal.h>
 
 #include "khash2.h"
 
@@ -23,7 +24,7 @@ static const std::string GLOBAL_NAMESPACE = "[global]";
 
 Interpreter::Interpreter() {
     next_globalid = 0;
-    stackbase = STACK_FRAME_OVERHEAD;
+    stackbase = 0;
 
     // create the true global scope
     global_scope.compiler = nullptr;
@@ -189,7 +190,7 @@ Compiler::ScopeContext* Interpreter::load_module(const std::string& module_name)
 
         // immediately call function
         func->refcount += 1; // HACK:
-        call(value_from_function(func), nullptr, 0);
+        call(value_from_function(func), 0, nullptr);
         func->refcount -= 1;
 
         return scope;
@@ -207,7 +208,7 @@ Compiler::ScopeContext* Interpreter::load_module(const std::string& module_name)
 #define REGISTER_RAW(n) stack[stackbase+n]
 #define REGISTER(n)     *(value_is_boxed(REGISTER_RAW(n)) ? &value_to_boxed(REGISTER_RAW(n))->value : &REGISTER_RAW(n))
 
-Value Interpreter::call(Value fn, Value* args, int nargs) {
+Value Interpreter::call(Value fn, int nargs, Value* args) {
     auto* func = value_to_function(fn);
 
     // program counter
@@ -220,26 +221,26 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
     stackbase += STACK_FRAME_OVERHEAD;
 
     // copy arguments to stack
-    if (nargs) {
+    if (nargs && args != &stack[stackbase]) {
         std::memcpy(&stack[stackbase], args, sizeof(Value) * nargs);
     }
 
     // set up initial call frame
     REGISTER_RAW(-3)._i = _pr->bytecode->instructions.size();
     REGISTER_RAW(-2)._p = (void*)func;
-    REGISTER_RAW(-1)._i = 0; // special case
+    REGISTER_RAW(-1)._i = initial_stackbase; // special case
 
     auto dumpstack = [&]() {
         auto ln = _pr->bytecode->line_numbers[_pc];
         log("encountered at line:", ln, "in", _pr->bytecode->name);
-        auto s = stackbase;
+        /*auto s = stackbase;
         while (stack[s - 1]._i != 0) {
             auto retpc = stack[s - 3]._i;
             auto func = ((FunctionType*)stack[s - 2]._p)->bytecode;
             auto retln = func->line_numbers[retpc];
             log(" - called from line:", retln, "in", func->name);
             s = stack[s - 1]._i;
-        }
+        }*/
     };
 
     try {
@@ -348,21 +349,15 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     );
                 }
                 
+                handle(EQUAL) {
+                    REGISTER(i.r0) = value_from_boolean(REGISTER(i.u8.r1) == REGISTER(i.u8.r2));
+                }
+                handle(NEQUAL) {
+                    REGISTER(i.r0) = value_from_boolean(REGISTER(i.u8.r1) != REGISTER(i.u8.r2));
+                }
                 handle(LESS) {
                     REGISTER(i.r0) = value_from_boolean(
                         value_to_number(REGISTER(i.u8.r1)) <
-                        value_to_number(REGISTER(i.u8.r2))
-                    );
-                }
-                handle(EQUAL) {
-                    REGISTER(i.r0) = value_from_boolean(
-                        value_to_number(REGISTER(i.u8.r1)) ==
-                        value_to_number(REGISTER(i.u8.r2))
-                    );
-                }
-                handle(NEQUAL) {
-                    REGISTER(i.r0) = value_from_boolean(
-                        value_to_number(REGISTER(i.u8.r1)) !=
                         value_to_number(REGISTER(i.u8.r2))
                     );
                 }
@@ -478,6 +473,9 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                         error("operator '#' expected string / array / object");
                     }
                 }
+                handle(NEGATE) {
+                    REGISTER(i.r0) = value_from_number(-value_to_number(REGISTER(i.u8.r1)));
+                }
                 handle(READ_CAPTURE) {
                     REGISTER_RAW(i.r0) = _pr->captures[i.u8.r1];
                 }
@@ -584,8 +582,12 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     } else if (value_is_cfunction(r0)) {
                         auto cfunc = value_to_cfunction(r0);
                         auto nargs = i.u8.r1;
-                        auto new_base = i.u8.r2 + STACK_FRAME_OVERHEAD;
-                        REGISTER_RAW(i.u8.r2) = cfunc(this, nargs, &stack[stackbase + new_base]);
+                        
+                        auto old_base = stackbase;
+                        stackbase = stackbase + i.u8.r2 + STACK_FRAME_OVERHEAD;                        
+                        auto retval = cfunc(this, nargs, &stack[stackbase]);
+                        stackbase = old_base;
+                        REGISTER_RAW(i.u8.r2) = retval;
                     } else {
                         error("tried to call non-function");
                     }
@@ -604,12 +606,12 @@ Value Interpreter::call(Value fn, Value* args, int nargs) {
                     std::memset(stack.data() + stackbase, 0xffffffff, MAX_REGISTERS * sizeof(Value));
                     
                     REGISTER_RAW(-3) = return_val;
-                    heap.gc(globals, stack, stackbase);
                     REGISTER_RAW(-2) = value_null();
                     REGISTER_RAW(-1) = value_null();
+                    heap.gc(globals, stack, stackbase);
+                    
                     stackbase = return_stack._i;
-                    if (stackbase == 0) {
-                        stackbase = initial_stackbase;
+                    if (stackbase == initial_stackbase) {
                         return return_val;
                     }
                 }
