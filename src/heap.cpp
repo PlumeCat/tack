@@ -1,11 +1,7 @@
-#include "value.h"
 #include "interpreter.h"
-#include <jlib/log.h>
 
 // TODO: proper debug logging / diagnostics / monitoring system
-#define debug log
-//#define dump log
-// #define debug(...)
+#define debug(...)
 #define dump(...)
 
 void Heap::gc_state(GCState new_state) {
@@ -15,19 +11,19 @@ GCState Heap::gc_state() const {
     return state;
 }
 
-ArrayType* Heap::alloc_array() {
+Value::ArrayType* Heap::alloc_array() {
     alloc_count++;
     return &arrays.emplace_back();
 }
 
-ObjectType* Heap::alloc_object() {
+Value::ObjectType* Heap::alloc_object() {
     alloc_count++;
     return &objects.emplace_back();
 }
 
-FunctionType* Heap::alloc_function(CodeFragment* code) {
+Value::FunctionType* Heap::alloc_function(CodeFragment* code) {
     alloc_count++;
-    return &functions.emplace_back(FunctionType {
+    return &functions.emplace_back(Value::FunctionType {
         .bytecode = code,
         .captures = {}
     });
@@ -38,65 +34,62 @@ BoxType* Heap::alloc_box(Value val) {
     return &boxes.emplace_back(BoxType { .value = val });
 }
 
-StringType* Heap::alloc_string(const std::string& data) {
+Value::StringType* Heap::alloc_string(const std::string& data) {
     alloc_count++;
-    return &strings.emplace_back(StringType { data });
+    return &strings.emplace_back(Value::StringType { data });
+}
+
+void gc_visit(Value value);
+
+void gc_visit(Value::StringType* str) {
+    str->marker = true;
+}
+void gc_visit(BoxType* box) {
+    if (!box->marker) {
+        box->marker = true;
+        gc_visit(box->value);
+    }
+}
+void gc_visit(Value::ObjectType* obj) {
+    if (!obj->marker) {
+        obj->marker = true;
+        for (auto i = obj->data.begin(); i != obj->data.end(); i = obj->data.next(i)) {
+            gc_visit(obj->data.value_at(i));
+        }
+    }
+}
+void gc_visit(Value::ArrayType* arr) {
+    if (!arr->marker) {
+        arr->marker = true;
+        for (auto v : arr->data) {
+            gc_visit(v);
+        }
+    }
+}
+void gc_visit(Value::FunctionType* func) {
+    if (!func->marker) {
+        func->marker = true;
+        for (auto v : func->captures) {
+            gc_visit(v);
+        }
+    }
 }
 
 void gc_visit(Value value) {
     // dump("visit: ", value);
-    switch ((uint64_t)value_get_type(value)) {
-        case type_bits_string: {
-            auto s = value_to_string(value);
-            s->marker = true;
-            break;
-        }
-        case type_bits_boxed: {
-            auto b = value_to_boxed(value);
-            if (!b->marker) {
-                b->marker = true;
-                gc_visit(b->value);
-            }
-            break;
-        }
-        case type_bits_object: {
-            auto o = value_to_object(value);
-            if (!o->marker) {
-                o->marker = true;
-                for (auto i = o->begin(); i != o->end(); i = o->next(i)) {
-                    gc_visit(o->value_at(i));
-                }
-            }
-            break;
-        }
-        case type_bits_array: {
-            auto a = value_to_array(value);
-            if (!a->marker) {
-                a->marker = true;
-                for (auto v: *a) {
-                    gc_visit(v);
-                }
-            }
-            break;
-        }
-        case type_bits_function: {
-            auto f = value_to_function(value);
-            if (!f->marker) {
-                f->marker = true;
-                for (auto v: f->captures) {
-                    gc_visit(v);
-                }
-            }
-            break;
-        }
+    switch ((uint64_t)value.get_type()) {
+        case (uint64_t)Type::String: return gc_visit(value.string());
+        case (uint64_t)Type::Object: return gc_visit(value.object());
+        case (uint64_t)Type::Array: return gc_visit(value.array());
+        case (uint64_t)Type::Function: return gc_visit(value.function());
+        case type_bits_boxed: return gc_visit(value_to_boxed(value));
         default:break;
     }
 }
 
 void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbase) {
     // Basic mark-n-sweep garbage collector
-    // Doesn't handle strings just yet
-    // TODO: bad code style everywhere
+    // TODO: improve code style everywhere
     if (state == GCState::Disabled
         || alloc_count < prev_alloc_count * 2 
         || alloc_count <= MIN_GC_ALLOCATIONS) {
@@ -117,19 +110,40 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
     }
 
     // visit stack
-    // assume this is being called from a return site,
-    // so the contents of the stack above stackbase are no longer needed
-    for (auto i = 0; i < stackbase; i++) {
-        //debug("stack[", i, "]: ", value_get_string(stack[i]));
+    // assume this is being called from a return site, so the contents of the stack above stackbase are no longer needed
+    // visiting the stack frame data (return pc, etc) seems messy but is intentional - we should visit the functions in the call stack anyway
+    for (auto i = 0u; i < stackbase; i++) {
         gc_visit(stack[i]);
     }
 
+    // visit any refcounted functions, objects, arrays
+    // TODO: inefficient? might be better to have a separate list
+    // and transfer objects to it when refcount > 0
+    // can use std::list::splice for this
+    for (auto& o : objects) {
+        if (o.refcount) {
+            gc_visit(&o);
+        }
+    }
+    for (auto& a : arrays) {
+        if (a.refcount) {
+            gc_visit(&a);
+        }
+    }
+    for (auto& f : functions) {
+        if (f.refcount) {
+            gc_visit(&f);
+        }
+    }
+
+
+    // "sweep up" (ie deallocate) anything that wasn't visited
     dump("sweeping strings");
     {
         auto i = strings.begin();
         while (i != strings.end()) {
             if (!i->marker && i->refcount == 0) {
-                dump("collected string: ", value_from_string(&(*i)));
+                dump("collected string: ", Value::string(&(*i)));
                 num_collections += 1;
                 i = strings.erase(i);
             } else {
@@ -144,7 +158,7 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
         auto i = objects.begin();
         while (i != objects.end()) {
             if (!i->marker && i->refcount == 0) {
-                dump("collected object: ", value_from_object(&(*i)));
+                dump("collected object: ", Value::object(&(*i)));
                 num_collections += 1;
                 i = objects.erase(i);
             } else {
@@ -159,7 +173,7 @@ void Heap::gc(std::vector<Value>& globals, const Stack &stack, uint32_t stackbas
         auto i = arrays.begin();
         while (i != arrays.end()) {
             if (!i->marker && i->refcount == 0) {
-                dump("collected array: ", value_from_array(&(*i)));
+                dump("collected array: ", Value::array(&(*i)));
                 num_collections += 1;
                 i = arrays.erase(i);
             } else {

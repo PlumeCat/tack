@@ -41,22 +41,20 @@ bool is_small_integer(double d, int16_t& out_si) {
     return false;
 }
 
-
 uint16_t CodeFragment::store_number(double d) {
-    storage.emplace_back(value_from_number(d));
+    storage.emplace_back(Value::number(d));
     return (uint16_t)(storage.size() - 1);
 }
 
-uint16_t CodeFragment::store_string(StringType* str) {
+uint16_t CodeFragment::store_string(Value::StringType* str) {
     //strings.emplace_back(data);
-    storage.emplace_back(value_from_string(str));
+    storage.emplace_back(Value::string(str));
     return (uint16_t)(storage.size() - 1);
 }
 uint16_t CodeFragment::store_fragment(CodeFragment* fragment) {
-    storage.emplace_back(value_from_pointer(fragment));
+    storage.emplace_back(Value::pointer(fragment));
     return (uint16_t)(storage.size() - 1);
 }
-
 std::string CodeFragment::str() {
     auto s = std::stringstream {};
     {
@@ -72,7 +70,7 @@ std::string CodeFragment::str() {
         s << "  storage:\n";
         auto i = 0;
         for (auto& x : storage) {
-            s << "    " << i << ": " << value_get_string(x) << '\n';
+            s << "    " << i << ": " << x.get_string() << '\n';
             i++;
         }
     }
@@ -153,7 +151,7 @@ Compiler::VariableContext* Compiler::bind_name(const std::string& binding, uint8
     return &scopes.back().bindings.try_emplace(binding, VariableContext { reg, is_const }).first->second;
 }
 Compiler::VariableContext* Compiler::bind_export(const std::string& binding, const std::string& module_name, bool is_const) {
-    return interpreter->set_global(binding, module_name, is_const, value_null());
+    return interpreter->set_global_v(binding, module_name, Value::null(), is_const);
 }
 
 // free a register if it's not bound
@@ -177,11 +175,11 @@ void Compiler::pop_scope() {
     // unbind all bound registers
     for (auto& b : scopes.back().bindings) {
         // TODO: disabled currently because boxes must remain bound forever without nulling the regsiter
-        // and there's no way to disambiguate boxed vs not-boxed at scope exit (might be conditionally captured)
-        // registers[b.second.reg] = RegisterState::FREE;
-            
-        // HACK: zero out all mirror variables and variables that were captured
+        // and there's no way to know at scope pop time whether a variable is boxed or not-boxed
+        // registers[b.second.reg] = RegisterState::FREE;            
         if (b.second.is_capture || b.second.is_mirror) {
+            // HACK: zero out all mirror variables and variables that were captured in this scope
+            // if there;s a loop then READ_CAPTURE will be run again which is a bit inefficient
             emit_z(ZERO_CAPTURE, b.second.reg, 0, 0);
         }
     }
@@ -206,10 +204,6 @@ void Compiler::compile_func(const AstNode* node, CodeFragment* output, ScopeCont
     child(1);
     pop_scope();
     emit_z(RET, 0, 0, 0);
-
-    if (interpreter->log_bytecode) {
-        log(this->output->str());
-    }
 }
 
 
@@ -235,8 +229,7 @@ Compiler::VariableContext* Compiler::ScopeContext::lookup(const std::string& nam
                 compiler->output->capture_info.emplace_back(CaptureInfo { .name = name, .source_register = var->reg, .dest_register = mirror_reg });
 
                 // read into mirror variable
-                // would be optimal to READ_CAPTURE once per function instead of every scope used
-                // compiler->emit(READ_CAPTURE, mirror_reg, );
+                // TODO: would be optimal to READ_CAPTURE once per function instead of every scope used
                 compiler->emit_z(READ_CAPTURE, mirror_reg, uint8_t(compiler->output->capture_info.size() - 1), 0);
 
                 // return the MIRROR variable not the original!
@@ -267,7 +260,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             // run the imported function
             // it will only execute the first time it is imported
             // subsequent imports will be able to access the exports
-            auto mod = interpreter->load_module(node->children[0].data_s);
+            auto mod = interpreter->load_module_s(node->children[0].data_s + ".tack");
             scopes.back().imports.push_back(mod);
             return 0xff;
         }
@@ -654,6 +647,15 @@ uint8_t Compiler::compile(const AstNode* node) {
             auto in2 = child(1);
             auto out = allocate_register();
             emit(MOD, out, in1, in2);
+            free_register(in1);
+            free_register(in2);
+            return out;
+        }
+        handle(PowExp) {
+            auto in1 = child(0);
+            auto in2 = child(1);
+            auto out = allocate_register();
+            emit(POW, out, in1, in2);
             free_register(in1);
             free_register(in2);
             return out;

@@ -21,11 +21,11 @@ include_directories(${TEST_NAME} "${CMAKE_CURRENT_LIST_DIR}/../jlib/")
 include_directories(${TEST_NAME} "${CMAKE_CURRENT_LIST_DIR}/../math3d/")
 
 file(GLOB_RECURSE source_lib src/*.cpp)
-file(GLOB_RECURSE source_test test/*.cpp)
+file(GLOB_RECURSE source_cli cli/*.cpp)
 
 add_library(${LIB_NAME} ${source_lib})
 set_property(TARGET ${LIB_NAME} PROPERTY OUTPUT_NAME ${PROJECT_NAME})
-add_executable(${TEST_NAME} ${source_test})
+add_executable(${TEST_NAME} ${source_cli})
 
 target_link_libraries(${TEST_NAME} ${LIB_NAME})
 

@@ -1,0 +1,66 @@
+Grammar:
+    block: '{' stat-list '}'
+    
+    var-decl: 'let' ident '=' exp
+
+    assign-stat: access-exp '=' exp
+               | index-exp  '=' exp
+               | ident '=' exp
+
+    exp: binary-exp
+
+    binary-exp:
+        or-exp		and-exp [ || or-exp ]			// left-assoc because of short circuiting
+        and-exp		bit-or-exp [ && and-exp ]		// left-assoc because of short circuiting
+
+        bit-or-exp	bit-xor-exp [ | bit-or-exp ]	// left assoc
+        bit-xor-exp	bit-and-exp [ ^ bit-xor-exp ]	// associative
+        bit-and-exp cmp-exp [ & bit-and-exp ]		// associative
+
+        cmp-exp		shl-exp [ cmp-op cmp-exp ]		// TODO: don't allow chained comparisons a == b == c
+
+        shl-exp		shr-exp [ << shl-exp ]			// left associative
+        shr-exp		add-exp [ >> adr-exp ]			// left associative
+
+        add-exp		sub-exp [ + add-exp ]			// associative
+        sub-exp		mul-exp	[ - sub-exp ]			// left associative
+        mul-exp		div-exp [ * mul-exp ]			// associative
+        div-exp		mod-exp [ / div-exp ]			// left associative
+        mod-exp		pow-exp [ % mod-exp ]			// left associative
+        pow-exp		unary-exp [ ** pow-exp ]		// left associative
+        
+    unary-exp
+        '-' unary-exp
+        '!' unary-exp
+        '~' unary-exp
+        postfix-exp
+
+    postfix-exp
+        call-exp
+        access-exp
+        index-exp
+        primary-exp
+
+        call-exp
+            postfix-exp '(' args-list ')'
+
+        access-exp
+            postfix-exp '.' identifier
+        
+        index-exp
+            postfix-exp '[' exp ']'
+
+    primary-exp
+        literal
+        identifier
+        '(' exp ')'
+
+    literal
+        'null'
+        'true'
+        'false'
+        literal-number
+        literal-string
+        literal-object
+        literal-array
+        literal-function

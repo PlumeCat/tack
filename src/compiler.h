@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "instructions.h"
-#include "value.h"
+#include "../include/tack.h"
 
 static const uint32_t MAX_REGISTERS = 256;
 static const uint32_t STACK_FRAME_OVERHEAD = 3;
@@ -36,7 +36,7 @@ struct CodeFragment {
     uint32_t max_register = 0;
 
     uint16_t store_number(double d);
-    uint16_t store_string(StringType* str);
+    uint16_t store_string(Value::StringType* str);
     uint16_t store_fragment(CodeFragment* ptr);
     std::string str();
 };

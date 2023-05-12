@@ -1,44 +1,45 @@
-#include "value.h"
+#include "interpreter.h"
+#include "compiler.h"
 
 #include <iostream>
 #include <sstream>
 #include <iomanip>
 
-bool value_get_truthy(Value v) {
+bool Value::get_truthy() {
     return
-        (!std::isnan(v._d))                         ? (v._d != 0.0) : // number -> compare to 0
-        (v._i == UINT64_MAX)                        ? false :
-        ((v._i & type_bits) == type_bits_boolean)   ? (v._i & boolean_bits) :
+        (!std::isnan(_d))                             ? (_d != 0.0) : // number -> compare to 0
+        (_i == UINT64_MAX)                            ? false :
+        ((_i & type_bits) == (uint64_t)Type::Boolean) ? (_i & boolean_bits) :
         true;
 }
-std::string value_get_string(Value v) {
+std::string Value::get_string() {
     auto s = std::stringstream {};
-    if (!std::isnan(v._d)) {
-        if (v._d == trunc(v._d)) {
-            s << (int64_t)v._d;
+    if (!std::isnan(_d)) {
+        if (_d == trunc(_d)) {
+            s << (int64_t)_d;
         } else {
-            s << v._d;
+            s << _d;
         }
         return s.str();
     }
-    switch (v._i & type_bits) {
+    switch (_i & type_bits) {
         case (uint64_t)Type::Null:      { s << "null"; break; }
-        case (uint64_t)Type::Boolean:   { s << (value_to_boolean(v) ? "true" : "false"); break; }
-        case (uint64_t)Type::String:    { s << value_to_string(v)->data; break; }
-        case (uint64_t)Type::Pointer:   { s << value_to_pointer(v); break; }
-        case (uint64_t)Type::Function:  { s << "function: " << std::hex << v._p; break; }
-        case (uint64_t)Type::CFunction: { s << "c-func:   " << std::hex << v._p; break; }
-        case type_bits_boxed:           { s << "box:      " << std::hex << v._p << "(" << std::hex << value_to_boxed(v)->value._p << ")"; break; }
+        case (uint64_t)Type::Boolean:   { s << (boolean() ? "true" : "false"); break; }
+        case (uint64_t)Type::String:    { s << string()->data; break; }
+        case (uint64_t)Type::Pointer:   { s << pointer(); break; }
+        case (uint64_t)Type::Function:  { s << "function: " << function()->bytecode->name; break; }
+        case (uint64_t)Type::CFunction: { s << "c-func:   " << std::hex << _p; break; }
+        case type_bits_boxed:           { s << "box:      " << std::hex << _p << "(" << std::hex << value_to_boxed(*this)->value._p << ")"; break; }
         case (uint64_t)Type::Object: { 
-            auto* obj = value_to_object(v);
+            auto* obj = object();
             s << "object {";
-            if (obj->size()) {
-                auto i = obj->begin();
-                s << ' ' << obj->key_at(i) << " = " << value_get_string(obj->value_at(i));
-                // i = obj->next(i);
-                i = obj->next(i);
-                for (auto e = obj->end(); i != e; i = obj->next(i)) {
-                    s << ", " << obj->key_at(i) << " = " << value_get_string(obj->value_at(i));
+            if (obj->data.size()) {
+                auto i = obj->data.begin();
+                s << ' ' << obj->data.key_at(i) << " = " << obj->data.value_at(i).get_string();
+                // i = obj->data.next(i);
+                i = obj->data.next(i);
+                for (auto e = obj->data.end(); i != e; i = obj->data.next(i)) {
+                    s << ", " << obj->data.key_at(i) << " = " << obj->data.value_at(i).get_string();
                 }
                 s << ' ';
             }
@@ -47,19 +48,19 @@ std::string value_get_string(Value v) {
             break;
         }
         case (uint64_t)Type::Array: {
-            auto* arr = value_to_array(v);
+            auto* arr = array();
             s << "array [";
-            if (arr->size()) {
-                s << " " << value_get_string(arr->at(0));
-                for (auto i = 1u; i < arr->size(); i++) {
-                    s << ", " << value_get_string(arr->at(i));
+            if (arr->data.size()) {
+                s << " " << arr->data.at(0).get_string();
+                for (auto i = 1u; i < arr->data.size(); i++) {
+                    s << ", " << arr->data.at(i).get_string();
                 }
                 s << ' ';
             }
             s << ']';
             break;
         }
-        default: { s << "(unknown) " << std::hex << v._i; break; }
+        default: { s << "(unknown) " << std::hex << _i; break; }
     }
     return s.str();
 }

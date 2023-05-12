@@ -1,8 +1,8 @@
-fn madness() {
+fn test_closure() {
     let i = 100
-    if 1 {
+    if true {
         let i = 200
-        if 0 {
+        if false {
             let i = 300
         } else {
             i = i + 1
@@ -21,8 +21,5 @@ fn madness() {
     }
 }
 
-let a = madness()
-print(a)
-let b = a()
-let c = b()
-print([ a, b, c ])
+let a = test_closure()()()
+print("Expect 203: ", a)

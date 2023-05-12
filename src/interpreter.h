@@ -1,28 +1,30 @@
 #pragma once
 
+#include "../include/tack.h"
 #include "compiler.h"
-#include "library.h"
-#include "value.h"
 
 #include <chrono>
 
-struct Stack : std::array<Value, MAX_STACK> {
-    // void push_frame(CodeFragment* current_pr, uint32_t current_pc, uint32_t current_sb, Value* newcap);
-    // void pop_frame();
+// Hidden box type
+struct BoxType {
+    Value value;
+    uint32_t refcount = 0;
+    bool marker = false;
 };
 
-enum class GCState : uint8_t {
-    Disabled = 0,
-    Enabled = 1,
-};
+static inline Value value_from_boxed(BoxType* box)             { return { nan_bits | type_bits_boxed | uint64_t(box) }; }
+static inline bool value_is_boxed(Value v)                     { return std::isnan(v._d) && (v._i & type_bits) == type_bits_boxed; }
+static inline BoxType* value_to_boxed(Value v)                 { return (BoxType*)(v._i & pointer_bits); }
+
+struct Stack : std::array<Value, MAX_STACK> {};
 struct Heap {
 private:
     // heap
-    std::list<ArrayType> arrays;
-    std::list<ObjectType> objects;
-    std::list<FunctionType> functions;
+    std::list<Value::ArrayType> arrays;
+    std::list<Value::ObjectType> objects;
+    std::list<Value::FunctionType> functions;
     std::list<BoxType> boxes;
-    std::list<StringType> strings; // temp strings - garbage collected
+    std::list<Value::StringType> strings; // temp strings - garbage collected
     
     // statistics
     std::chrono::steady_clock::time_point last_gc = std::chrono::steady_clock::now();
@@ -32,24 +34,20 @@ private:
     GCState state = GCState::Enabled;
 
 public:
-    ArrayType* alloc_array();
-    ObjectType* alloc_object();
-    FunctionType* alloc_function(CodeFragment* code);
+    Value::ArrayType* alloc_array();
+    Value::ObjectType* alloc_object();
+    Value::FunctionType* alloc_function(CodeFragment* code);
     BoxType* alloc_box(Value val);
 
     // takes ownership of data; data must be allocated with 'new[]'
-    StringType* alloc_string(const std::string& data);
+    Value::StringType* alloc_string(const std::string& data);
 
     GCState gc_state() const;
     void gc_state(GCState new_state);
 
     void gc(std::vector<Value>& globals, const Stack& stack, uint32_t stackbase);
 };
-struct Interpreter {
-    bool log_ast = false;
-    bool log_bytecode = false;
-
-private:
+class Interpreter: public TackVM {
     std::vector<std::string> module_dirs;
     
     Heap heap;
@@ -57,7 +55,7 @@ private:
     uint32_t stackbase;
     std::vector<Value> globals;
     uint16_t next_globalid;
-    KHash<std::string, StringType*> key_cache; // TODO: move this into heap and use the refcount mechanism
+    KHash<std::string, Value::StringType*> key_cache; // TODO: move this into heap and use the refcount mechanism
 
     Compiler::ScopeContext global_scope; // c-provided globals go here
     KHash<std::string, Compiler::ScopeContext*> modules; // all loaded modules; "" is global module and is always implicitly imported
@@ -74,37 +72,36 @@ public:
     Interpreter& operator=(const Interpreter&) = delete;
     Interpreter& operator=(Interpreter&&) = delete;
 
-    void* get_user_pointer() const;
-    void set_user_pointer(void* ptr);
+    void* get_user_pointer() const override;
+    void set_user_pointer(void* ptr) override;
 
-    // used by Compiler
     CodeFragment* create_fragment();
-    // used by host programs
-    Compiler::VariableContext* set_global(const std::string& name, bool is_const, Value value);
-    // used by Compiler from load_module (not to be used by host programs; TODO: make it private)
-    Compiler::VariableContext* set_global(const std::string& name, const std::string& module_name, bool is_const, Value value);
+
+    inline void set_global(const std::string& name, Value value, bool is_const) override {
+        set_global_v(name, value, is_const);
+    }
+    inline void set_global(const std::string& name, const std::string& module_name, Value value, bool is_const) override {
+        set_global_v(name, module_name, value, is_const);
+    }
+    inline void load_module(const std::string& module_name) override {
+        load_module_s(module_name);
+    }
+
+    Compiler::VariableContext* set_global_v(const std::string& name, Value value, bool is_const);
+    Compiler::VariableContext* set_global_v(const std::string& name, const std::string& module_name, Value value, bool is_const);
     Value get_global(const std::string& name);
     Value get_global(const std::string& name, const std::string& module_name);
     uint16_t next_gid();
-
-    // load a module and return the export scope context
-    // note: the module will only ever run once per interpreter, if it was already loaded, the existing scope context is returned
     void add_module_dir_cwd();
     void add_module_dir(const std::string& dir);
-    Compiler::ScopeContext* load_module(const std::string& module_name);    
+    Compiler::ScopeContext* load_module_s(const std::string& filename);
     Value call(Value fn, int nargs, Value* args);
-
-    GCState gc_state() const;
-    void gc_state(GCState state);
-
-    ArrayType* alloc_array();
-    ObjectType* alloc_object();
-    FunctionType* alloc_function(CodeFragment* code);
+    GCState get_gc_state() const;
+    void set_gc_state(GCState state);
+    Value::ArrayType* alloc_array();
+    Value::ObjectType* alloc_object();
+    Value::FunctionType* alloc_function(CodeFragment* code);
     BoxType* alloc_box(Value val);
-
-    // take a copy of data
-    StringType* intern_string(const std::string& data);
-
-    // take a copy of data
-    StringType* alloc_string(const std::string& data);
+    Value::StringType* alloc_string(const std::string& data);
+    Value::StringType* intern_string(const std::string& data);
 };
