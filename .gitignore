@@ -3,5 +3,7 @@
 main
 /**/.DS_Store
 /build
+/.vscode/
 /.vs/
+CMakeSettings.json
 /doc/html/
