@@ -116,6 +116,7 @@ uint8_t Compiler::allocate_register() {
         }
     }
     interpreter->error("Ran out of registers!");
+    return 0xff;
 }
 
 // get 2 registers next to each other
@@ -129,6 +130,7 @@ uint8_t Compiler::allocate_register2() {
         }
     }
     interpreter->error("Ran out of registers!");
+    return 0xff;
 }
 
 // get the register immediately after the highest non-free register
@@ -426,7 +428,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             auto& i1 = node->children[0].data_s;
             auto& i2 = node->children[1].data_s;
             push_scope(&scopes.back());
-            auto r1 = allocate_register2(); // loop variables
+            auto r1 = allocate_register2(); // TODO: remove allocate_register2 (this is the only call site)
             auto r2 = r1 + 1;
             auto reg_iter = child(2);
             auto reg_ptr = allocate_register();

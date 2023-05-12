@@ -85,14 +85,14 @@ struct Value {
     inline bool is_array()                          { return (_i & type_bits) == (uint64_t)Type::Array; }
 
     // convert to actual type. result will be undefined (most likely crash) if the value's type does not match, so check first
-    inline StringType*      __string()                { return (StringType*)(_i & pointer_bits); }
-    inline ArrayType*       __array()                 { return (ArrayType*)(_i & pointer_bits); }
-    inline ObjectType*      __object()                { return (ObjectType*)(_i & pointer_bits); }
-    inline FunctionType*    __function()              { return (FunctionType*)(_i & pointer_bits); }
-    inline CFunctionType    __cfunction()             { return (CFunctionType)(_i & pointer_bits); }
-    inline bool             __boolean()               { return (bool)(_i & boolean_bits); }
-    inline double           __number()                { return _d; }
-    inline void*            __pointer()               { return (void*)(_i & pointer_bits); }
+    inline StringType*      string()                { return (StringType*)(_i & pointer_bits); }
+    inline ArrayType*       array()                 { return (ArrayType*)(_i & pointer_bits); }
+    inline ObjectType*      object()                { return (ObjectType*)(_i & pointer_bits); }
+    inline FunctionType*    function()              { return (FunctionType*)(_i & pointer_bits); }
+    inline CFunctionType    cfunction()             { return (CFunctionType)(_i & pointer_bits); }
+    inline bool             boolean()               { return (bool)(_i & boolean_bits); }
+    inline double           number()                { return _d; }
+    inline void*            pointer()               { return (void*)(_i & pointer_bits); }
     
     // create value
     static inline constexpr Value null()            { return { UINT64_MAX }; }

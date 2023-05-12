@@ -215,7 +215,7 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
     if (!fn.is_function()) {
         error("type error: call() expects function type");
     }
-    auto* func = fn.__function();
+    auto* func = fn.function();
 
     // program counter
     auto _pr = func; // current program
@@ -272,7 +272,7 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                 handle(INCREMENT) {
                     auto r0 = REGISTER(i.r0);
                     check(r0, number);
-                    REGISTER(i.r0) = Value::number(REGISTER(i.r0).__number() + 1);
+                    REGISTER(i.r0) = Value::number(REGISTER(i.r0).number() + 1);
                 }
                 handle(ADD) {
                     auto lhs = REGISTER(i.u8.r1);
@@ -281,19 +281,19 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     if (lt == Type::Number) {
                         // numeric add
                         check(rhs, number);
-                        REGISTER(i.r0) = Value::number(lhs.__number() + rhs.__number());
+                        REGISTER(i.r0) = Value::number(lhs.number() + rhs.number());
                     } else if (lt == Type::String) {
                         // string add
                         check(rhs, string);
-                        auto l = lhs.__string();
-                        auto r = rhs.__string();
+                        auto l = lhs.string();
+                        auto r = rhs.string();
                         auto new_str = std::string(l->data) + std::string(r->data);
                         REGISTER(i.r0) = Value::string(alloc_string(new_str));
                     } else if (lt == Type::Array) {
                         // array add
                         check(rhs, array);
-                        auto l = lhs.__array();
-                        auto r = rhs.__array();
+                        auto l = lhs.array();
+                        auto r = rhs.array();
                         auto n = alloc_array();
                         std::copy(l->data.begin(), l->data.end(), std::back_inserter(n->data));
                         std::copy(r->data.begin(), r->data.end(), std::back_inserter(n->data));
@@ -306,50 +306,50 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     auto rhs = REGISTER(i.u8.r2);
                     check(lhs, number);
                     check(rhs, number);
-                    REGISTER(i.r0) = Value::number(lhs.__number() - rhs.__number());
+                    REGISTER(i.r0) = Value::number(lhs.number() - rhs.number());
                 }
                 handle(MUL) {
                     auto lhs = REGISTER(i.u8.r1);
                     auto rhs = REGISTER(i.u8.r2);
                     check(lhs, number);
                     check(rhs, number);
-                    REGISTER(i.r0) = Value::number(lhs.__number() * rhs.__number());
+                    REGISTER(i.r0) = Value::number(lhs.number() * rhs.number());
                 }
                 handle(DIV) {
                     auto lhs = REGISTER(i.u8.r1);
                     auto rhs = REGISTER(i.u8.r2);
                     check(lhs, number);
                     check(rhs, number);
-                    REGISTER(i.r0) = Value::number(lhs.__number() / rhs.__number());
+                    REGISTER(i.r0) = Value::number(lhs.number() / rhs.number());
                 }
                 handle(MOD) {
                     auto lhs = REGISTER(i.u8.r1);
                     auto rhs = REGISTER(i.u8.r2);
                     check(lhs, number);
                     check(rhs, number);
-                    REGISTER(i.r0) = Value::number(fmod(lhs.__number(), rhs.__number()));
+                    REGISTER(i.r0) = Value::number(fmod(lhs.number(), rhs.number()));
                 }
                 handle(POW) {
                     auto lhs = REGISTER(i.u8.r1);
                     auto rhs = REGISTER(i.u8.r2);
                     check(lhs, number);
                     check(rhs, number);
-                    REGISTER(i.r0) = Value::number(pow(lhs.__number(), rhs.__number()));
+                    REGISTER(i.r0) = Value::number(pow(lhs.number(), rhs.number()));
                 }
                 
                 handle(SHL) {
                     auto lhs = REGISTER(i.u8.r1);
                     auto rhs = REGISTER(i.u8.r2);
                     if (lhs.is_array()) {
-                        auto* arr = lhs.__array();
+                        auto* arr = lhs.array();
                         arr->data.emplace_back(rhs);
                         // put the appended value into r0
                         REGISTER(i.r0) = rhs;
                     } else if (lhs.is_number()) {
                         check(rhs, number);
                         REGISTER(i.r0) = Value::number(
-                            (uint32_t)lhs.__number() << 
-                            (uint32_t)rhs.__number()
+                            (uint32_t)lhs.number() << 
+                            (uint32_t)rhs.number()
                         );
                     } else {
                         error("expected number or array");
@@ -359,15 +359,15 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     auto lhs = REGISTER(i.u8.r1);
                     auto rhs = REGISTER(i.u8.r2);
                     if (lhs.is_array()) {
-                        auto* arr = lhs.__array();
+                        auto* arr = lhs.array();
                         // put the popped value into r0
                         REGISTER(i.r0) = arr->data.back();
                         arr->data.pop_back();
                     } else if (lhs.is_number()) {
                         check(rhs, number);
                         REGISTER(i.r0) = Value::number(
-                            (uint32_t)lhs.__number() >>
-                            (uint32_t)rhs.__number()
+                            (uint32_t)lhs.number() >>
+                            (uint32_t)rhs.number()
                         );
                     } else {
                         error("expected number or array");
@@ -392,28 +392,28 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     auto rhs = REGISTER(i.u8.r2);
                     check(lhs, number);
                     check(rhs, number);
-                    REGISTER(i.r0) = Value::boolean(lhs.__number() < rhs.__number());
+                    REGISTER(i.r0) = Value::boolean(lhs.number() < rhs.number());
                 }
                 handle(LESSEQ) {
                     auto lhs = REGISTER(i.u8.r1);
                     auto rhs = REGISTER(i.u8.r2);
                     check(lhs, number);
                     check(rhs, number);
-                    REGISTER(i.r0) = Value::boolean(lhs.__number() <= rhs.__number());
+                    REGISTER(i.r0) = Value::boolean(lhs.number() <= rhs.number());
                 }
                 handle(GREATER) {
                     auto lhs = REGISTER(i.u8.r1);
                     auto rhs = REGISTER(i.u8.r2);
                     check(lhs, number);
                     check(rhs, number);
-                    REGISTER(i.r0) = Value::boolean(lhs.__number() > rhs.__number());
+                    REGISTER(i.r0) = Value::boolean(lhs.number() > rhs.number());
                 }
                 handle(GREATEREQ) {
                     auto lhs = REGISTER(i.u8.r1);
                     auto rhs = REGISTER(i.u8.r2);
                     check(lhs, number);
                     check(rhs, number);
-                    REGISTER(i.r0) = Value::boolean(lhs.__number() >= rhs.__number());
+                    REGISTER(i.r0) = Value::boolean(lhs.number() >= rhs.number());
                 }
                 handle(MOVE) {
                     REGISTER(i.r0) = REGISTER(i.u8.r1);
@@ -429,7 +429,7 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     auto end = REGISTER(i.u8.r1);
                     check(var, number);
                     check(end, number);
-                    if (var.__number() < end.__number()) {
+                    if (var.number() < end.number()) {
                         _pc++;
                     }
                 }
@@ -439,7 +439,7 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     if (iter_type == Type::Array) {
                         REGISTER_RAW(i.r0)._i = 0;
                     } else if (iter_type == Type::Object) {
-                        REGISTER_RAW(i.r0)._i = iter_val.__object()->data.begin();
+                        REGISTER_RAW(i.r0)._i = iter_val.object()->data.begin();
                     // } else if (iter_type == Type::Function) {
                     } else {
                         error("for loop expected array or object");
@@ -450,14 +450,14 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     auto iter_type = iter_val.get_type();
                     if (iter_type == Type::Array) {
                         auto ind = REGISTER_RAW(i.r0)._i;
-                        auto arr = iter_val.__array();
+                        auto arr = iter_val.array();
                         if (ind < arr->data.size()) {
                             REGISTER(i.u8.r2) = arr->data.at(ind);
                             _pc++;
                         }
                     } else if (iter_type == Type::Object) {
                         auto it = REGISTER_RAW(i.r0)._i;
-                        auto obj = iter_val.__object();
+                        auto obj = iter_val.object();
                         if (it != obj->data.end()) {
                             auto& key = obj->data.key_at(it);
                             auto cached = intern_string(key);
@@ -470,7 +470,7 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                 handle(FOR_ITER2) {
                     auto iter_val = REGISTER(i.u8.r1);
                     check(iter_val, object);
-                    auto obj = iter_val.__object();
+                    auto obj = iter_val.object();
                     auto it = REGISTER_RAW(i.r0)._i;
                     if (it != obj->data.end()) {
                         auto& key = obj->data.key_at(it);
@@ -488,7 +488,7 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                         REGISTER_RAW(i.r0)._i += 1;
                     } else if (iter_type == Type::Object) {
                         // next key
-                        auto obj = iter_val.__object();
+                        auto obj = iter_val.object();
                         REGISTER_RAW(i.r0)._i = obj->data.next(REGISTER_RAW(i.r0)._i);
                     }
                 }
@@ -503,11 +503,11 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     auto val = REGISTER(i.u8.r1);
                     auto type = val.get_type();
                     if (type == Type::Array) {
-                        REGISTER(i.r0) = Value::number(val.__array()->data.size());
+                        REGISTER(i.r0) = Value::number(val.array()->data.size());
                     } else if (type == Type::String) {
-                        REGISTER(i.r0) = Value::number(val.__string()->data.size());
+                        REGISTER(i.r0) = Value::number(val.string()->data.size());
                     } else if (type == Type::Object) {
-                        REGISTER(i.r0) = Value::number(val.__object()->data.size());
+                        REGISTER(i.r0) = Value::number(val.object()->data.size());
                     } else {
                         error("operator '#' expected string / array / object");
                     }
@@ -515,14 +515,14 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                 handle(NEGATE) {
                     auto val = REGISTER(i.u8.r1);
                     check(val, number);
-                    REGISTER(i.r0) = Value::number(-(val.__number()));
+                    REGISTER(i.r0) = Value::number(-(val.number()));
                 }
                 handle(READ_CAPTURE) {
                     REGISTER_RAW(i.r0) = _pr->captures[i.u8.r1];
                 }
                 handle(ALLOC_FUNC) {
                     // create closure
-                    auto code = (CodeFragment*)_pr->bytecode->storage[i.u1].__pointer(); // assumed correct type due to compiler
+                    auto code = (CodeFragment*)_pr->bytecode->storage[i.u1].pointer(); // assumed correct type due to compiler
                     auto* func = heap.alloc_function(code);
                     // capture captures; box inplace if necessary
                     for (const auto& c : code->capture_info) {
@@ -550,7 +550,7 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     auto* obj = heap.alloc_object();
                     // emplace child elements
                     for (auto e = 0; e < i.u8.r1; e++) {
-                        auto key = REGISTER(i.u8.r2 + e * 2).__string(); // assumed correct type due to compiler
+                        auto key = REGISTER(i.u8.r2 + e * 2).string(); // assumed correct type due to compiler
                         auto val = REGISTER(i.u8.r2 + e * 2 + 1);
                         obj->data.set(key->data, val);
                     }
@@ -561,8 +561,8 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     auto ind_val = REGISTER(i.u8.r2);
                     check(arr_val, array);
                     check(ind_val, number);
-                    auto* arr = arr_val.__array();
-                    auto ind = ind_val.__number();
+                    auto* arr = arr_val.array();
+                    auto ind = ind_val.number();
                     if (ind >= arr->data.size() || ind < 0) {
                         error("index out of range");
                     }
@@ -573,8 +573,8 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     auto ind_val = REGISTER(i.u8.r2);
                     check(arr_val, array);
                     check(ind_val, number);
-                    auto* arr = arr_val.__array();
-                    auto ind = ind_val.__number();
+                    auto* arr = arr_val.array();
+                    auto ind = ind_val.number();
                     if (ind > arr->data.size()) {
                         error("index out of range");
                     }
@@ -585,8 +585,8 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     auto rhs = REGISTER(i.u8.r2);
                     check(lhs, object);
                     check(rhs, string);
-                    auto key = rhs.__string();
-                    auto* obj = lhs.__object();
+                    auto key = rhs.string();
+                    auto* obj = lhs.object();
                     auto found = false;
                     auto val = obj->data.get(key->data, found);
                     if (!found) {
@@ -600,14 +600,14 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     auto key_val = REGISTER(i.u8.r2);
                     check(lhs, object);
                     check(key_val, string);
-                    auto* obj = lhs.__object();
-                    auto key = key_val.__string();
+                    auto* obj = lhs.object();
+                    auto key = key_val.string();
                     obj->data.set(key->data, REGISTER(i.r0));
                 }
                 handle(CALL) {
                     auto r0 = REGISTER(i.r0);
                     if (r0.is_function()) {
-                        auto func = r0.__function();
+                        auto func = r0.function();
                         auto nargs = i.u8.r1;
                         auto correct_nargs = 0; // func->bytecode->nargs;
                         // TODO: arity checking
@@ -630,7 +630,7 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                         _pc = -1;
                         stackbase = stackbase + new_base; // new stack frame
                     } else if (r0.is_cfunction()) {
-                        auto cfunc = r0.__cfunction();
+                        auto cfunc = r0.cfunction();
                         auto nargs = i.u8.r1;
                         
                         auto old_base = stackbase;

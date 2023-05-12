@@ -78,10 +78,10 @@ void gc_visit(Value::FunctionType* func) {
 void gc_visit(Value value) {
     // dump("visit: ", value);
     switch ((uint64_t)value.get_type()) {
-        case (uint64_t)Type::String: return gc_visit(value.__string());
-        case (uint64_t)Type::Object: return gc_visit(value.__object());
-        case (uint64_t)Type::Array: return gc_visit(value.__array());
-        case (uint64_t)Type::Function: return gc_visit(value.__function());
+        case (uint64_t)Type::String: return gc_visit(value.string());
+        case (uint64_t)Type::Object: return gc_visit(value.object());
+        case (uint64_t)Type::Array: return gc_visit(value.array());
+        case (uint64_t)Type::Function: return gc_visit(value.function());
         case type_bits_boxed: return gc_visit(value_to_boxed(value));
         default:break;
     }

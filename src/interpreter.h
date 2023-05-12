@@ -11,7 +11,7 @@ struct BoxType {
     uint32_t refcount = 0;
     bool marker = false;
 };
-
+#define type_bits_boxed (0x00'0b'00'00'00'00'00'00)
 static inline Value value_from_boxed(BoxType* box)             { return { nan_bits | type_bits_boxed | uint64_t(box) }; }
 static inline bool value_is_boxed(Value v)                     { return std::isnan(v._d) && (v._i & type_bits) == type_bits_boxed; }
 static inline BoxType* value_to_boxed(Value v)                 { return (BoxType*)(v._i & pointer_bits); }
