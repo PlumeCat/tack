@@ -69,9 +69,10 @@ struct Value {
     // 0, null, false are falsy
     // everything else is truthy, including empty string, empty object, null pointer, etc
     bool get_truthy();
-    // get the string representation (not to be confused with 'value_to_string' !)
+    // get the string representation (not to be confused with 'to_string' !)
     std::string get_string();
     
+    // check type
     inline Type get_type()                          { return std::isnan(_d) ? (Type)(_i & type_bits) : Type::Number; }
     inline bool is_null()                           { return _i == UINT64_MAX; }
     inline bool is_boolean()                        { return (_i & type_bits) == (uint64_t)Type::Boolean; }
@@ -83,16 +84,15 @@ struct Value {
     inline bool is_object()                         { return (_i & type_bits) == (uint64_t)Type::Object; }
     inline bool is_array()                          { return (_i & type_bits) == (uint64_t)Type::Array; }
 
-    #define check(ty) if (!is_##ty()) throw std::runtime_error("type error: expected " #ty);
-    // convert to actual type
-    inline StringType*      string()                { check(string);    return (StringType*)(_i & pointer_bits); }
-    inline ArrayType*       array()                 { check(array);     return (ArrayType*)(_i & pointer_bits); }
-    inline ObjectType*      object()                { check(object);    return (ObjectType*)(_i & pointer_bits); }
-    inline FunctionType*    function()              { check(function);  return (FunctionType*)(_i & pointer_bits); }
-    inline CFunctionType    cfunction()             { check(cfunction); return (CFunctionType)(_i & pointer_bits); }
-    inline bool             boolean()               { check(boolean);   return (bool)(_i & boolean_bits); }
-    inline double           number()                { check(number);    return _d; }
-    inline void*            pointer()               { check(pointer);   return (void*)(_i & pointer_bits); }
+    // convert to actual type. result will be undefined (most likely crash) if the value's type does not match, so check first
+    inline StringType*      __string()                { return (StringType*)(_i & pointer_bits); }
+    inline ArrayType*       __array()                 { return (ArrayType*)(_i & pointer_bits); }
+    inline ObjectType*      __object()                { return (ObjectType*)(_i & pointer_bits); }
+    inline FunctionType*    __function()              { return (FunctionType*)(_i & pointer_bits); }
+    inline CFunctionType    __cfunction()             { return (CFunctionType)(_i & pointer_bits); }
+    inline bool             __boolean()               { return (bool)(_i & boolean_bits); }
+    inline double           __number()                { return _d; }
+    inline void*            __pointer()               { return (void*)(_i & pointer_bits); }
     
     // create value
     static inline constexpr Value null()            { return { UINT64_MAX }; }
@@ -132,7 +132,7 @@ public:
     virtual Value get_global(const std::string& name, const std::string& module_name) = 0;
 
     // set up the standard library
-    void add_libs();
+    virtual void add_libs() = 0;
     
     // add a module directory to be searched when an import statement is encountered
     // if dir is empty, will add the current working directory
@@ -140,6 +140,7 @@ public:
     // load and execute a file
     virtual void load_module(const std::string& module_name) = 0;
     virtual Value call(Value fn, int nargs, Value* args) = 0;
+    virtual void error(const std::string& msg) = 0;
 
     // Allocate a new array and return a pointer to it
     // Make sure to addref to prevent the array from being garbage collected

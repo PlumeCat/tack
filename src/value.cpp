@@ -24,14 +24,14 @@ std::string Value::get_string() {
     }
     switch (_i & type_bits) {
         case (uint64_t)Type::Null:      { s << "null"; break; }
-        case (uint64_t)Type::Boolean:   { s << (boolean() ? "true" : "false"); break; }
-        case (uint64_t)Type::String:    { s << string()->data; break; }
-        case (uint64_t)Type::Pointer:   { s << pointer(); break; }
-        case (uint64_t)Type::Function:  { s << "function: " << function()->bytecode->name; break; }
+        case (uint64_t)Type::Boolean:   { s << (__boolean() ? "true" : "false"); break; }
+        case (uint64_t)Type::String:    { s << __string()->data; break; }
+        case (uint64_t)Type::Pointer:   { s << __pointer(); break; }
+        case (uint64_t)Type::Function:  { s << "function: " << __function()->bytecode->name; break; }
         case (uint64_t)Type::CFunction: { s << "c-func:   " << std::hex << _p; break; }
         case type_bits_boxed:           { s << "box:      " << std::hex << _p << "(" << std::hex << value_to_boxed(*this)->value._p << ")"; break; }
         case (uint64_t)Type::Object: { 
-            auto* obj = object();
+            auto* obj = __object();
             s << "object {";
             if (obj->data.size()) {
                 auto i = obj->data.begin();
@@ -48,7 +48,7 @@ std::string Value::get_string() {
             break;
         }
         case (uint64_t)Type::Array: {
-            auto* arr = array();
+            auto* arr = __array();
             s << "array [";
             if (arr->data.size()) {
                 s << " " << arr->data.at(0).get_string();

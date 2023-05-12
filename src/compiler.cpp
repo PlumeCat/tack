@@ -4,9 +4,6 @@
 
 #include <sstream>
 
-#define JLIB_LOG_VISUALSTUDIO
-#include <jlib/log.h>
-
 // emit an instruction with 3 8 bit operands
 #define emit(op, _0, _1, _2)            emit_ins(Opcode::op, _0, _1, _2, node->line_number);
 
@@ -28,7 +25,6 @@
 #define label(name)                     auto name = output->instructions.size();
 #define should_allocate(n)
 #define handle(x)                       break; case AstType::x:
-#define error(msg)                      throw std::runtime_error("compiler error: " msg)
 #define child(n)                        compile(&node->children[n]);
 
 
@@ -119,7 +115,7 @@ uint8_t Compiler::allocate_register() {
             return (uint8_t)i;
         }
     }
-    error("Ran out of registers!");
+    interpreter->error("Ran out of registers!");
 }
 
 // get 2 registers next to each other
@@ -132,7 +128,7 @@ uint8_t Compiler::allocate_register2() {
             return (uint8_t)i;
         }
     }
-    error("Ran out of registers!");
+    interpreter->error("Ran out of registers!");
 }
 
 // get the register immediately after the highest non-free register
@@ -330,7 +326,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             if (lhs.type == AstType::Identifier) {
                 if (auto var = lookup(node->children[0].data_s)) {
                     if (var->is_const) {
-                        error("can't reassign const variable");
+                        interpreter->error("can't reassign const variable");
                     } else {
                         if (var->is_global) {
                             emit_u(WRITE_GLOBAL, source_reg, var->g_id);
@@ -339,7 +335,7 @@ uint8_t Compiler::compile(const AstNode* node) {
                         }
                     }
                 } else {
-                    error("can't find variable: " + node->children[0].data_s);
+                    interpreter->error("can't find variable: " + node->children[0].data_s);
                 }
             } else if (lhs.type == AstType::IndexExp) {
                 auto array_reg = compile(&lhs.children[0]);
@@ -484,7 +480,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             if (node->children.size()) {
                 auto return_register = child(0);
                 if (return_register == 0xff) {
-                    error("return value incorrect register");
+                    interpreter->error("return value incorrect register");
                     // emit(RET, 0, 0, 0);
                 }
                 emit(RET, 1, return_register, 0);
@@ -506,7 +502,7 @@ uint8_t Compiler::compile(const AstNode* node) {
                     return v->reg;
                 }
             }
-            error("identifier: can't find variable: " + node->data_s);
+            interpreter->error("identifier: can't find variable: " + node->data_s);
             return 0xff;
         }
 
@@ -819,15 +815,13 @@ uint8_t Compiler::compile(const AstNode* node) {
             return out;
         }
 
-    default: { error("unknown ast: " + to_string(node->type)); } break;
+    default: { interpreter->error("unknown ast: " + to_string(node->type)); } break;
     }
 
-    error("forgot to return a register");
+    interpreter->error("forgot to return a register");
     return 0;
 }
 
-
-#undef error
 #undef handle
 #undef should_allocate
 #undef label

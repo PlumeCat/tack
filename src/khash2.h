@@ -5,7 +5,7 @@
 #include <utility>
 #include <assert.h>
 
-// Adapted from khash (commit: 5fc2090) to have a more C++-friendly 
+// Adapted from khash (commit: 5fc2090) to have a more C++-friendly interface
 // Uses std::vector instead of realloc
 
 /* The MIT License
@@ -73,7 +73,7 @@ private:
     std::vector<KeyType> keys;
     std::vector<ValType> vals;
     HashFunc hash_func;
-    #define cmp_func(a, b) ((a) == (b))
+    #define cmp_func(a, b) ((a) == (b)) // HACK:
 
 public:
     KHash(): n_buckets(0), size_(0), n_occupied(0), upper_bound(0) {}

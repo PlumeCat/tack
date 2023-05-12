@@ -1,15 +1,16 @@
 #include "parsing.h"
+#include "interpreter.h"
 
-#define JLIB_LOG_VISUALSTUDIO
-#include <jlib/log.h>
+#include <stdexcept>
 
 // parsing utils
 using namespace std::string_literals;
 
 struct ParseContext : private std::string_view {
     uint32_t line_number = 1;
+    Interpreter* vm;
     
-    ParseContext(const std::string& s) : std::string_view(s) {}
+    ParseContext(const std::string& s, Interpreter* vm) : std::string_view(s), vm(vm) {}
     void remove_prefix(std::string_view::size_type s) noexcept {
         for (auto i = 0u; i < s; i++) {
             if ((*this)[i] == '\n') {
@@ -30,7 +31,7 @@ struct ParseContext : private std::string_view {
 #ifdef ERROR
 #undef ERROR
 #endif
-#define ERROR(msg) throw std::runtime_error("parsing error "s + msg + " | line: " + std::to_string(code.line_number) + "\n'" + std::string(code.substr(0, 32))  + "... '");
+#define ERROR(msg) code.vm->error("parsing error: "s + msg + " | line: " + std::to_string(code.line_number) + "\n'" + std::string(code.substr(0, 32))  + "... '");
 #define EXPECT(s) if (!parse_raw_string(code, s)) { FAIL(); }
 #define EXPECT_WS(s) if (!(parse_raw_string(code, s) && (isspace(code[0]) || !code.size()))) { FAIL(); }
 
@@ -561,15 +562,15 @@ DEFPARSER(module, {
 });
 
 
-bool parse(const std::string& code, AstNode& out_ast) {
-    auto s_code = ParseContext(code);
+bool Interpreter::parse(const std::string& code, AstNode& out_ast) {
+    auto s_code = ParseContext(code, this);
     out_ast = AstNode { AstType::Unknown };
     auto res = parse_module(s_code, out_ast);
     if (!res) {
-        throw std::runtime_error("parser error: "s + std::string(s_code.substr(0, 100)));
+        error("parser error: "s + std::string(s_code.substr(0, 100)));
     }
     if (s_code.size()) {
-        throw std::runtime_error("expected end of file: "s + std::string(s_code.substr(0, 100)));
+        error("parser error: expected end of file: "s + std::string(s_code.substr(0, 100)));
     }
     return true;
 }

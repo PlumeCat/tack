@@ -80,8 +80,8 @@ enum class Opcode : uint8_t { opcodes() };
 #undef opcode
 #define opcode(x) { Opcode::x, #x },
 inline std::string to_string(Opcode opcode) {
-    static const std::unordered_map<Opcode, std::string> opcode_to_string = { opcodes() };
-    return opcode_to_string.at(opcode);
+    static const std::unordered_map<Opcode, std::string> opcodestring = { opcodes() };
+    return opcodestring.at(opcode);
 }
 #undef opcode
 

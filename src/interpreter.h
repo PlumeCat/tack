@@ -75,7 +75,7 @@ public:
     void* get_user_pointer() const override;
     void set_user_pointer(void* ptr) override;
 
-    CodeFragment* create_fragment();
+    void error(const std::string& msg) override;
 
     inline void set_global(const std::string& name, Value value, bool is_const) override {
         set_global_v(name, value, is_const);
@@ -87,11 +87,13 @@ public:
         load_module_s(module_name);
     }
 
+    CodeFragment* create_fragment();
     Compiler::VariableContext* set_global_v(const std::string& name, Value value, bool is_const);
     Compiler::VariableContext* set_global_v(const std::string& name, const std::string& module_name, Value value, bool is_const);
-    Value get_global(const std::string& name);
-    Value get_global(const std::string& name, const std::string& module_name);
+    Value get_global(const std::string& name) override;
+    Value get_global(const std::string& name, const std::string& module_name) override;
     uint16_t next_gid();
+    void add_libs() override;
     void add_module_dir_cwd();
     void add_module_dir(const std::string& dir);
     Compiler::ScopeContext* load_module_s(const std::string& filename);
@@ -104,4 +106,6 @@ public:
     BoxType* alloc_box(Value val);
     Value::StringType* alloc_string(const std::string& data);
     Value::StringType* intern_string(const std::string& data);
+
+    bool parse(const std::string& code, AstNode& out_ast);
 };

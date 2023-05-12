@@ -71,8 +71,8 @@ enum class AstType { ast_type() };
 #undef ast
 #define ast(x) { AstType::x, #x },
 inline std::string to_string(AstType type) {
-    static const std::unordered_map<AstType, std::string> type_to_string = { ast_type() };
-    return type_to_string.at(type);
+    static const std::unordered_map<AstType, std::string> typestring = { ast_type() };
+    return typestring.at(type);
 }
 #undef ast
 
@@ -106,5 +106,3 @@ struct AstNode {
         return s;
     }
 };
-
-bool parse(const std::string& code, AstNode& out_ast);

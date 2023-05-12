@@ -10,12 +10,11 @@
 #include <chrono>
 #include <filesystem>
 
-#define JLIB_IMPLEMENTATION
 #if (defined _MSC_VER && defined _DEBUG)
-#define JLIB_LOG_VISUALSTUDIO
+#define _CRTDBG_MAP_ALLOC
+#include <stdlib.h>
+#include <crtdbg.h>
 #endif
-#include <jlib/log.h>
-#include <jlib/text_file.h>
 
 int main(int argc, char* argv[]) {
     auto vm = TackVM::create();
@@ -24,19 +23,12 @@ int main(int argc, char* argv[]) {
 
     auto files = std::vector<std::string>{};
     for (auto i = 1; i < argc; i++) {
-        auto arg = std::string(argv[i]);
-        if (arg == "-A") {
-            // vm.log_ast = true;
-        } else if  (arg == "-D") {
-            // vm.log_bytecode = true;
-        } else {
-            files.emplace_back(std::move(arg));
-        }
+        files.emplace_back(argv[i]);
     }
 
     std::ios::sync_with_stdio(false);
     if (!files.size()) {
-        log("error: no source file provided (repl not supported yet)");
+        std::cout << "error: no source files provided (repl not supported yet)" << std::endl;
         return 1;
     }
 
@@ -45,7 +37,7 @@ int main(int argc, char* argv[]) {
             vm->load_module(f);
         }
     } catch (std::exception& e) {
-        log(e.what());
+        std::cout << e.what() << std::endl;
     }
 
     return 0;

@@ -1,9 +1,8 @@
 #include "interpreter.h"
 
 #include <sstream>
-#define JLIB_LOG_VISUALSTUDIO
-#include <jlib/log.h>
-#include <jlib/text_file.h>
+#include <fstream>
+#include <optional>
 
 using namespace std::string_literals;
 static const float pi = 3.1415926535f;
@@ -12,6 +11,26 @@ static const float pi = 3.1415926535f;
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
 // TODO: string routines not optimal
+std::optional<std::string> read_text_file(const std::string& fname) {
+    auto file = std::ifstream(fname);
+    if (!file.is_open()) {
+        return std::nullopt;
+    }
+    //auto start = file.tellg();
+    //file.seekg(0, std::ios::end);
+    //auto end = file.tellg();
+    //auto length = (size_t)(end - start);
+    //file.seekg(0, std::ios::beg);
+
+    file.ignore(std::numeric_limits<std::streamsize>::max());
+    std::streamsize length = file.gcount();
+    file.clear();   //  Since ignore will have set eof.
+    file.seekg(0, std::ios_base::beg);
+
+    auto data = std::string(length, 0);
+    file.read(data.data(), length);
+    return std::optional(data);
+}
 std::string replace_all(const std::string& data, const std::string& s1, const std::string& s2) {
     auto s = std::stringstream {};
     auto pos = 0;
@@ -79,22 +98,29 @@ std::vector<std::string> split(const std::string& data, const std::string& split
 }
 
 #define paste(a, b) a##b
-#define error(msg) throw std::runtime_error(msg);
-#define check_args(n) { if (nargs != n) { error("expected "s + std::to_string(n) + " arguments"); }}
+#define check_args(n) { if (nargs != n) { vm->error("expected "s + std::to_string(n) + " arguments"); }}
+#define check_arg(i, ty) if (!(args[i].is_##ty())) vm->error("type error: expected " #ty);
+#define check_val(v, ty) if (!((v).is_##ty())) vm->error("type error: expected " #ty);
 #define tack_func_name(name) paste(tack_, name)
 #define tack_func(name) Value tack_func_name(name)(TackVM* vm, int nargs, Value* args)
 #define tack_bind(name)  vm->set_global(#name, Value::cfunction(tack_func_name(name)), true);
 #define tack_math(func)  vm->set_global(#func, Value::cfunction([](TackVM* vm, int nargs, Value* args) { \
     check_args(1); \
-    return Value::number(func(args[0].number()));\
+    check_arg(0, number); \
+    return Value::number(func(args[0].__number()));\
 }), true);
 #define tack_math2(func) vm->set_global(#func, Value::cfunction([](TackVM* vm, int nargs, Value* args) { \
     check_args(2);\
-    return Value::number(func(args[0].number(), args[1].number()));\
+    check_arg(0, number);\
+    check_arg(1, number);\
+    return Value::number(func(args[0].__number(), args[1].__number()));\
 }), true);
 #define tack_math3(func) vm->set_global(#func, Value::cfunction([](TackVM* vm, int nargs, Value* args) { \
     check_args(3);\
-    return Value::number(func(args[0].number(), args[1].number(), args[2].number());\
+    check_arg(0, number);\
+    check_arg(1, number);\
+    check_arg(2, number);\
+    return Value::number(func(args[0].__number(), args[1].__number(), args[2].__number());\
 }), true);
 
 // standard library
@@ -130,7 +156,8 @@ tack_func(tostring) {
 // array funcs
 tack_func(any) {
     check_args(1);
-    auto* arr = args[0].array();
+    check_arg(0, array);
+    auto* arr = args[0].__array();
     if (arr->data.size()) {
         for (auto i = 0u; i < arr->data.size(); i++) {
             if (arr->data.at(i).get_truthy()) {
@@ -142,7 +169,8 @@ tack_func(any) {
 }
 tack_func(all) {
     check_args(1);
-    auto* arr = args[0].array();
+    check_arg(0, array);
+    auto* arr = args[0].__array();
     if (arr->data.size()) {
         for (auto i = 0u; i < arr->data.size(); i++) {
             if (!arr->data.at(i).get_truthy()) {
@@ -154,7 +182,8 @@ tack_func(all) {
 }
 tack_func(next) {
     check_args(2);
-    auto* arr = args[0].array();
+    check_arg(0, array);
+    auto* arr = args[0].__array();
     if (arr->data.size()) {
         if (args[1].is_function()) {
             auto func = args[1];
@@ -166,7 +195,7 @@ tack_func(next) {
                 }
             }
         } else if (args[1].is_cfunction()) {
-            auto func = args[1].cfunction();
+            auto func = args[1].__cfunction();
             for (auto i = 0u; i < arr->data.size(); i++) {
                 auto val = arr->data.at(i);
                 auto res = (*func)(vm, 1, &val);
@@ -180,7 +209,8 @@ tack_func(next) {
 }
 tack_func(foreach) {
     check_args(2);
-    auto* arr = args[0].array();
+    check_arg(0, array);
+    auto* arr = args[0].__array();
     if (arr->data.size()) {
         if (args[1].is_function()) {
             auto func = args[1];
@@ -188,7 +218,7 @@ tack_func(foreach) {
                 vm->call(func, 1, &arr->data.at(i));
             }
         } else if (args[1].is_cfunction()) {
-            auto func = args[1].cfunction();
+            auto func = args[1].__cfunction();
             for (auto i = 0u; i < arr->data.size(); i++) {
                 (*func)(vm, 1, &arr->data.at(i));
             }
@@ -198,7 +228,8 @@ tack_func(foreach) {
 }
 tack_func(map) {
     check_args(2);
-    auto* arr = args[0].array();
+    check_arg(0, array);
+    auto* arr = args[0].__array();
     auto retval = vm->alloc_array();
     retval->refcount = 1;
     if (arr->data.size()) {
@@ -209,7 +240,7 @@ tack_func(map) {
                 retval->data.at(i) = vm->call(func, 1, &arr->data.at(i));
             }
         } else if (args[1].is_cfunction()) {
-            auto func = args[1].cfunction();
+            auto func = args[1].__cfunction();
             for (auto i = 0u; i < arr->data.size(); i++) {
                 retval->data.at(i) = (*func)(vm, 1, &arr->data.at(i));
             }
@@ -220,7 +251,8 @@ tack_func(map) {
 }
 tack_func(filter) {
     check_args(2);
-    auto* arr = args[0].array();
+    check_arg(0, array);
+    auto* arr = args[0].__array();
     auto* retval = vm->alloc_array();
     retval->refcount = 1;
     auto func = args[1];
@@ -232,21 +264,22 @@ tack_func(filter) {
             }
         }
     } else if (func.is_cfunction()) {
-        auto* f = func.cfunction();
+        auto* f = func.__cfunction();
         for (auto val : arr->data) {
             if (f(vm, 1, &val).get_truthy()) {
                 retval->data.push_back(val);
             }
         }
     } else {
-        error("expected function or cfunction in filter()");
+        vm->error("expected function or cfunction in filter()");
     }
     retval->refcount = 0;
     return Value::array(retval);
 }
 tack_func(reduce) {
     check_args(3);
-    auto* arr = args[0].array();
+    check_arg(0, array);
+    auto* arr = args[0].__array();
     auto func = args[1];
     if (func.is_function()) {
         auto ra = std::array<Value, 2>{}; // arguments for reducer function
@@ -257,7 +290,7 @@ tack_func(reduce) {
         }
         return ra[1];
     } else if (func.is_cfunction()) {
-        auto* f = func.cfunction();
+        auto* f = func.__cfunction();
         auto ra = std::array<Value, 2>{}; // arguments for reducer function
         ra[1] = args[2];
         for (auto i = arr->data.begin(); i != arr->data.end(); i++) {
@@ -266,8 +299,9 @@ tack_func(reduce) {
         }
         return ra[1];
     } else {
-        error("expected function or cfunction in filter()");
+        vm->error("expected function or cfunction in reduce()");
     }
+    return Value::null();
 }
 tack_func(sort) {
     // TODO: currently assumes the type by looking at the first elemen { return Value::null(); }
@@ -275,50 +309,54 @@ tack_func(sort) {
     auto retval = vm->alloc_array();
     retval->refcount = 1;
     if (nargs == 1) {
-        auto* arr = args[0].array();
+        check_arg(0, array);
+        auto* arr = args[0].__array();
         if (arr->data.size()) {
             std::copy(arr->data.begin(), arr->data.end(), std::back_inserter(retval->data));
             auto type = arr->data.at(0).get_type();
             if (type == Type::Number) {
                 // default number sort
-                std::sort(retval->data.begin(), retval->data.end(), [](Value l, Value r) {
-                    return l.number() < r.number();
-                    });
+                std::sort(retval->data.begin(), retval->data.end(), [vm](Value l, Value r) {
+                    check_val(l, number);
+                    check_val(r, number);
+                    return l.__number() < r.__number();
+                });
             } else if (type == Type::String) {
                 // default string sort
-                std::sort(retval->data.begin(), retval->data.end(), [](Value l, Value r) {
-                    return l.string()->data < r.string()->data;
-                    });
+                std::sort(retval->data.begin(), retval->data.end(), [vm](Value l, Value r) {
+                    check_val(l, string);
+                    check_val(r, string);
+                    return l.__string()->data < r.__string()->data;
+                });
             } else {
-                error("sort: expects an array of number or an array of string");
+                vm->error("sort: expects an array of number or an array of string");
             }
         }
     } else if (nargs == 2) {
-        auto* arr = args[0].array();
+        check_arg(0, array);
+        auto* arr = args[0].__array();
         if (arr->data.size()) {
             std::copy(arr->data.begin(), arr->data.end(), std::back_inserter(retval->data));
             auto func = args[1];
             if (func.is_function()) {
                 // custom sort with tack function
                 std::sort(retval->data.begin(), retval->data.end(), [&](Value l, Value r) {
-                    // return true;
                     Value lr[2] = { l, r };
-                    return vm->call(func, 2, lr).boolean();
-                    });
+                    return vm->call(func, 2, lr).get_truthy();
+                });
             } else if (func.is_cfunction()) {
-                auto f = func.cfunction();
+                auto f = func.__cfunction();
                 // custom sort with c function
                 std::sort(retval->data.begin(), retval->data.end(), [&](Value l, Value r) {
-                    // return true;
                     Value lr[2] = { l, r };
-                    return f(vm, 2, lr).boolean();
-                    });
+                    return f(vm, 2, lr).get_truthy();
+                });
             } else {
-                error("sort: expected function or cfunction for optional second argument");
+                vm->error("sort: expected function or cfunction for optional second argument");
             }
         }
     } else {
-        error("sort expected 1 or 2 arguments");
+        vm->error("sort expected 1 or 2 arguments");
     }
 
     retval->refcount = 0;
@@ -326,24 +364,28 @@ tack_func(sort) {
 }
 tack_func(sum) {
     check_args(1);
-    auto* arr = args[0].array();
+    check_arg(0, array);
+    auto* arr = args[0].__array();
     auto sum = 0.f;
     for (auto i : arr->data) {
-        sum += (i).number();
+        check_val(i, number);
+        sum += (i).__number();
     }
     return Value::number(sum);
 }
 
 tack_func(push) {
     check_args(2);
-    auto* arr = args[0].array();
+    check_arg(0, array);
+    auto* arr = args[0].__array();
     auto val = args[1];
     arr->data.push_back(val);
     return Value::null();
 }
 tack_func(push_front) {
     check_args(2);
-    auto* arr = args[0].array();
+    check_arg(0, array);
+    auto* arr = args[0].__array();
     auto val = args[1];
     if (arr->data.size()) {
         arr->data.insert(arr->data.begin(), val);
@@ -354,7 +396,8 @@ tack_func(push_front) {
 }
 tack_func(pop) {
     check_args(1);
-    auto* arr = args[0].array();
+    check_arg(0, array);
+    auto* arr = args[0].__array();
     if (arr->data.size()) {
         auto val = arr->data.back();
         arr->data.pop_back();
@@ -364,7 +407,8 @@ tack_func(pop) {
 }
 tack_func(pop_front) {
     check_args(1);
-    auto* arr = args[0].array();
+    check_arg(0, array);
+    auto* arr = args[0].__array();
     if (arr->data.size()) {
         auto val = *arr->data.begin();
         arr->data.erase(arr->data.begin());
@@ -375,56 +419,65 @@ tack_func(pop_front) {
 
 tack_func(insert) {
     check_args(3);
-    auto* arr = args[0].array();
+    check_arg(0, array);
+    auto* arr = args[0].__array();
     auto val = args[1];
-    auto pos = (args[2]).number();
+    check_arg(2, number);
+    auto pos = (args[2]).__number();
     if (pos > arr->data.size()) {
-        error("Insert out of bounds");
+        vm->error("Insert out of bounds");
     }
     arr->data.insert(arr->data.begin() + pos, val);
     return Value::null();
 }
 tack_func(remove) {
     if (nargs == 2) {
-        auto* arr = args[0].array();
-        auto pos = (size_t)(args[1].number());
+        check_arg(0, array);
+        check_arg(1, number);
+        auto* arr = args[0].__array();
+        auto pos = (size_t)(args[1].__number());
         if (pos < arr->data.size()) {
             arr->data.erase(arr->data.begin() + pos);
         }
     } else if (nargs == 3) {
-        auto* arr = args[0].array();
+        check_arg(0, array);
+        check_arg(1, number);
+        check_arg(2, number);
+        auto* arr = args[0].__array();
         auto s = arr->data.size();
         if (s) {
-            auto i1 = arr->data.begin() + std::min((size_t)(args[1].number()), s);
-            auto i2 = arr->data.begin() + std::min((size_t)(args[2].number()), s);
+            auto i1 = arr->data.begin() + std::min((size_t)(args[1].__number()), s);
+            auto i2 = arr->data.begin() + std::min((size_t)(args[2].__number()), s);
             arr->data.erase(i1, i2);
         }
     } else {
-        error("expected "s + std::to_string(2) + " arguments");;
+        vm->error("expected "s + std::to_string(2) + " arguments");;
     }
     return Value::null();
 }
 tack_func(remove_value) {
     check_args(2);
-    auto* arr = args[0].array();
+    check_arg(0, array);
+    auto* arr = args[0].__array();
     std::erase(arr->data, args[1]);
     return Value::null();
 }
 tack_func(remove_if) {
     check_args(2);
-    auto* arr = args[0].array();
+    check_arg(0, array);
+    auto* arr = args[0].__array();
     auto func = args[1];
     if (func.is_function()) {
         std::erase_if(arr->data, [&](Value val) {
-            return vm->call(func, 1, &val).boolean();
-            });
+            return vm->call(func, 1, &val).get_truthy();
+        });
     } else if (func.is_cfunction()) {
-        auto* f = func.cfunction();
+        auto* f = func.__cfunction();
         std::erase_if(arr->data, [&](Value val) {
-            return f(vm, 1, &val).boolean();
-            });
+            return f(vm, 1, &val).get_truthy();
+        });
     } else {
-        error("expected function or cfunction in filter()");
+        vm->error("expected function or cfunction in remove_if()");
     }
     return Value::null();
 }
@@ -432,19 +485,26 @@ tack_func(min) {
     if (nargs == 0) {
         return Value::null();
     } else if (nargs == 1) {
-        auto arr = args[0].array();
+        check_arg(0, array);
+        auto arr = args[0].__array();
         if (!arr->data.size()) {
             return Value::null();
         }
-        auto m = arr->data.at(0).number();
+        auto _0 = arr->data.at(0);
+        check_val(_0, number);
+        auto m = _0.__number();
         for (auto i = 1u; i < arr->data.size(); i++) {
-            m = std::min(m, arr->data.at(i).number());
+            auto _i = arr->data.at(i);
+            check_val(_i, number);
+            m = std::min(m, _i.__number());
         }
         return Value::number(m);
     } else {
-        auto m = args[0].number();
+        check_arg(0, number);
+        auto m = args[0].__number();
         for (auto i = 1; i < nargs; i++) {
-            m = std::min(m, args[i].number());
+            check_arg(i, number);
+            m = std::min(m, args[i].__number());
         }
         return Value::number(m);
     }
@@ -453,19 +513,26 @@ tack_func(max) {
     if (nargs == 0) {
         return Value::null();
     } else if (nargs == 1) {
-        auto arr = args[0].array();
+        check_arg(0, array);
+        auto arr = args[0].__array();
         if (!arr->data.size()) {
             return Value::null();
         }
-        auto m = arr->data.at(0).number();
+        auto _0 = arr->data.at(0);
+        check_val(_0, number);
+        auto m = _0.__number();
         for (auto i = 1u; i < arr->data.size(); i++) {
-            m = std::max(m, arr->data.at(i).number());
+            auto _i = arr->data.at(i);
+            check_val(_i, number);
+            m = std::max(m, _i.__number());
         }
         return Value::number(m);
     } else {
-        auto m = args[0].number();
+        check_arg(0, number);
+        auto m = args[0].__number();
         for (auto i = 1; i < nargs; i++) {
-            m = std::max(m, args[i].number());
+            check_arg(i, number);
+            m = std::max(m, args[i].__number());
         }
         return Value::number(m);
     }
@@ -475,12 +542,15 @@ tack_func(join) {
 
     auto retval = std::stringstream {};
 
-    auto* arr = args[0].array();
-    auto* str = args[1].string();
+    check_arg(0, array);
+    check_arg(1, string);
+    auto* arr = args[0].__array();
+    auto* str = args[1].__string();
 
     if (arr->data.size()) {
         for (auto i = arr->data.begin() + 1; i != arr->data.end(); i++) {
-            retval << str->data << (*i).string();
+            check_val(*i, string);
+            retval << str->data << (*i).__string();
         }
     }
 
@@ -493,17 +563,19 @@ tack_func(join) {
 // array and string
 tack_func(slice) {
     check_args(3);
-    auto l = (int)args[1].number();
-    auto r = (int)args[2].number();
+    check_arg(1, number);
+    check_arg(2, number);
+    auto l = (int)args[1].__number();
+    auto r = (int)args[2].__number();
 
     if (args[0].is_array()) {
-        auto* arr = args[0].array();
+        auto* arr = args[0].__array();
         auto s = (int)arr->data.size();
         if (l < 0 || l > s) {
-            error("slice index out of range");
+            vm->error("slice index out of range");
         }
         if (r < 0 || r > s) {
-            error("slice index out of range");
+            vm->error("slice index out of range");
         }
         auto ret = vm->alloc_array();
         ret->data.reserve(r - l);
@@ -512,27 +584,34 @@ tack_func(slice) {
         }
         return Value::array(ret);
     } else if (args[0].is_string()) {
-        auto* str = args[0].string();
+        auto* str = args[0].__string();
         auto s = (int)str->data.size();
         if (l < 0 || l > s) {
-            error("slice index out of range");
+            vm->error("slice index out of range");
         }
         if (r < 0 || r > s) {
-            error("slice index out of range");
+            vm->error("slice index out of range");
         }
         auto ret = vm->alloc_string(str->data.substr(l, r - l));
         return Value::string(ret);
     } else {
-        error("slice expected array or string");
+        vm->error("slice expected array or string");
     }
+    return Value::null();
 }
 tack_func(find) {
     if (nargs < 2 || nargs > 3) {
-        error("find expected 2 or 3 arguments");
+        vm->error("find expected 2 or 3 arguments");
     }
-    auto offset = (nargs == 3) ? (int)args[2].number() : 0;
+    
+    auto offset = 0;
+    if (nargs == 3) {
+        check_arg(2, number);
+        offset = (int)args[2].__number();
+    }    
+    
     if (args[0].is_array()) {
-        auto* arr = args[0].array();
+        auto* arr = args[0].__array();
         auto val = args[1];
         for (auto i = 0u; i < arr->data.size(); i++) {
             if (arr->data.at(i) == val) {
@@ -541,28 +620,32 @@ tack_func(find) {
         }
         return Value::number(-1);
     } else if (args[0].is_string()) {
-        auto* str = args[0].string();
-        auto* sub = args[1].string();
+        auto* str = args[0].__string();
+        check_arg(1, string);
+        auto* sub = args[1].__string();
         auto f = str->data.find(sub->data, offset);
         if (f == std::string::npos) {
             return Value::number(-1);
         }
         return Value::number(f);
     } else {
-        error("find expected array or string");
+        vm->error("find expected array or string");
     }
+    return Value::null();
 }
 
 // string
 tack_func(chr) {
     // integer to character
     check_args(1);
-    return Value::string(vm->alloc_string(std::string(1, (char)args[0].number())));
+    check_arg(0, number);
+    return Value::string(vm->alloc_string(std::string(1, (char)args[0].__number())));
 }
 tack_func(ord) {
     // character to integer
     check_args(1);
-    auto str = args[0].string();
+    check_arg(0, string);
+    auto str = args[0].__string();
     auto ch = str->data.size() ? str->data[0] : 0.0;
     return Value::number((char)ch);
 }
@@ -571,7 +654,8 @@ tack_func(tonumber) {
     // eg "123.45foo" -> 123.45
     // is this desired behaviour
     check_args(1);
-    auto* str = args[0].string();
+    check_arg(0, string);
+    auto* str = args[0].__string();
     auto* data = str->data.data();
     auto* end = (char*)nullptr;
     auto retval = std::strtod(data, &end);
@@ -579,11 +663,13 @@ tack_func(tonumber) {
     if (dist != 0) {
         return Value::number(retval);
     }
-    error("could not convert to number");
+    vm->error("could not convert to number");
+    return Value::null();
 }
 tack_func(tolower) {
     check_args(1);
-    auto* str = vm->alloc_string(args[0].string()->data);
+    check_arg(0, string);
+    auto* str = vm->alloc_string(args[0].__string()->data);
     for (auto& c : str->data) {
         c = std::tolower(c);
     }
@@ -591,7 +677,8 @@ tack_func(tolower) {
 }
 tack_func(toupper) {
     check_args(1);
-    auto* str = vm->alloc_string(args[0].string()->data);
+    check_arg(0, string);
+    auto* str = vm->alloc_string(args[0].__string()->data);
     for (auto& c : str->data) {
         c = std::toupper(c);
     }
@@ -601,16 +688,19 @@ tack_func(split) {
     // TODO: inefficient
     auto retval = std::vector<std::string> {};
     if (nargs == 1) {
-        retval = split_ws(args[0].string()->data);
+        check_arg(0, string);
+        retval = split_ws(args[0].__string()->data);
     } else {
+        check_arg(0, string);
+        check_arg(1, string);
         if (nargs != 2) {
-            error("expected "s + std::to_string(2) + " arguments");;
+            vm->error("expected "s + std::to_string(2) + " arguments");;
         }
-        auto* sep = args[1].string();
+        auto* sep = args[1].__string();
         if (!sep->data.size()) {
-            error("empty split() separator");
+            vm->error("empty split() separator");
         }
-        retval = split(args[0].string()->data, sep->data);
+        retval = split(args[0].__string()->data, sep->data);
     }
     auto* arr = vm->alloc_array();
     for (auto& s : retval) {
@@ -622,14 +712,18 @@ tack_func(split) {
 // tack_func(format)
 tack_func(replace) {
     check_args(3);
-    auto* str = args[0].string();
-    auto* sub = args[1].string();
-    auto* rep = args[2].string();
+    check_arg(0, string);
+    check_arg(1, string);
+    check_arg(2, string);
+    auto* str = args[0].__string();
+    auto* sub = args[1].__string();
+    auto* rep = args[2].__string();
     return Value::string(vm->alloc_string(replace_all(str->data, sub->data, rep->data)));
 }
 tack_func(isupper) {
     check_args(1);
-    auto* str = args[0].string();
+    check_arg(0, string);
+    auto* str = args[0].__string();
     for (auto c : str->data) {
         if (!std::isupper(c)) {
             return Value::false_();
@@ -639,7 +733,8 @@ tack_func(isupper) {
 }
 tack_func(islower) {
     check_args(1);
-    auto* str = args[0].string();
+    check_arg(0, string);
+    auto* str = args[0].__string();
     for (auto c : str->data) {
         if (!std::islower(c)) {
             return Value::false_();
@@ -649,7 +744,8 @@ tack_func(islower) {
 }
 tack_func(isdigit) {
     check_args(1);
-    auto* str = args[0].string();
+    check_arg(0, string);
+    auto* str = args[0].__string();
     for (auto c : str->data) {
         if (!std::isdigit(c)) {
             return Value::false_();
@@ -659,7 +755,8 @@ tack_func(isdigit) {
 }
 tack_func(isalnum) {
     check_args(1);
-    auto* str = args[0].string();
+    check_arg(0, string);
+    auto* str = args[0].__string();
     for (auto c : str->data) {
         if (!std::isalnum(c)) {
             return Value::false_();
@@ -671,7 +768,8 @@ tack_func(isalnum) {
 // object
 tack_func(keys) {
     check_args(1);
-    auto* obj = args[0].object();
+    check_arg(0, object);
+    auto* obj = args[0].__object();
     auto* arr = vm->alloc_array();
     for (auto i = obj->data.begin(); i != obj->data.end(); i = obj->data.next(i)) {
         auto& key = obj->data.key_at(i);
@@ -682,7 +780,8 @@ tack_func(keys) {
 }
 tack_func(values) {
     check_args(1);
-    auto* obj = args[0].object();
+    check_arg(0, object);
+    auto* obj = args[0].__object();
     auto* arr = vm->alloc_array();
     for (auto i = obj->data.begin(); i != obj->data.end(); i = obj->data.next(i)) {
         arr->data.push_back(obj->data.value_at(i));
@@ -693,30 +792,39 @@ tack_func(values) {
 // math
 tack_func(radtodeg) {
     check_args(1);
-    return Value::number(args[0].number() * 180.f / pi);
+    check_arg(0, number);
+    return Value::number(args[0].__number() * 180.f / pi);
 }
 tack_func(degtorad) {
     check_args(1);
-    return Value::number(args[0].number() * pi / 180.f);
+    check_arg(0, number);
+    return Value::number(args[0].__number() * pi / 180.f);
 }
 tack_func(lerp) {
     check_args(3);
-    auto a = args[0].number();
-    auto b = args[1].number();
-    auto c = args[2].number();
+    check_arg(0, number);
+    check_arg(1, number);
+    check_arg(2, number);
+    auto a = args[0].__number();
+    auto b = args[1].__number();
+    auto c = args[2].__number();
     return Value::number(a + (b - a) * c);
 }
 tack_func(clamp) {
     check_args(3);
-    return Value::number(std::max(args[2].number(), std::min(args[1].number(), args[0].number())));
+    check_arg(0, number);
+    check_arg(1, number);
+    check_arg(2, number);
+    return Value::number(std::max(args[2].__number(), std::min(args[1].__number(), args[0].__number())));
 }
 tack_func(saturate) {
     check_args(1);
-    return Value::number(std::max(0.0, std::min(1.0, args[0].number())));
+    check_arg(0, number);
+    return Value::number(std::max(0.0, std::min(1.0, args[0].__number())));
 }
 // TODO: more interpolation: smoothstep/cubic, beziers, ...
 
-void TackVM::add_libs() {
+void Interpreter::add_libs() {
     auto vm = this;
     // generic
     vm->set_global("print", Value::cfunction(tack_print), true);
@@ -778,7 +886,7 @@ void TackVM::add_libs() {
     tack_bind(clamp);
     tack_bind(saturate);
 
-    vm->set_global("pi", Value::number(pi));
+    vm->set_global("pi", Value::number(pi), true);
     tack_math(sin);
     tack_math(cos);
     tack_math(tan);

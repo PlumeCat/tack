@@ -3,17 +3,13 @@
 #include "interpreter.h"
 #include "parsing.h"
 
-#define JLIB_LOG_VISUALSTUDIO
-#include <jlib/log.h>
-#include <jlib/text_file.h>
-
 #include <list>
 #include <vector>
 #include <array>
 #include <exception>
 #include <cstring>
 #include <filesystem>
-#include <signal.h>
+#include <optional>
 
 #include "khash2.h"
 
@@ -21,6 +17,7 @@ using namespace std::string_literals;
 
 static const std::string GLOBAL_NAMESPACE = "[global]";
 
+std::optional<std::string> read_text_file(const std::string& fname);
 
 TackVM* TackVM::create() {
     return new Interpreter();
@@ -50,7 +47,7 @@ void Interpreter::set_user_pointer(void* ptr) {
 
 uint16_t Interpreter::next_gid() {
     if (next_globalid == UINT16_MAX) {
-        throw std::runtime_error("too many globals");
+        error("too many globals");
     }
     return next_globalid++;
 }
@@ -112,7 +109,7 @@ Compiler::VariableContext* Interpreter::set_global_v(const std::string& name, Va
 Compiler::VariableContext* Interpreter::set_global_v(const std::string& name, const std::string& module_name, Value value, bool is_const) {
     auto iter = modules.find(module_name);
     if (iter == modules.end()) {
-        log("Error: module not found:", module_name);
+        error("Error: module not found:" + module_name);
         return nullptr;
     }
     auto scope = modules.value_at(iter);
@@ -166,7 +163,7 @@ Compiler::ScopeContext* Interpreter::load_module_s(const std::string& module_nam
             }
         }
         if (!file_data.has_value()) {
-            log("Unable to load module: ", module_name);
+            error("Unable to load module: " + module_name);
             return nullptr;
         }
     
@@ -204,13 +201,21 @@ Compiler::ScopeContext* Interpreter::load_module_s(const std::string& module_nam
     
 }
 
+
+void Interpreter::error(const std::string& msg) {
+    throw std::runtime_error(msg);
+}
+
 #define handle(opcode)  break; case Opcode::opcode:
-#define error(err)      throw std::runtime_error(err);
 #define REGISTER_RAW(n) stack[stackbase+n]
 #define REGISTER(n)     (*(value_is_boxed(REGISTER_RAW(n)) ? &value_to_boxed(REGISTER_RAW(n))->value : &REGISTER_RAW(n)))
+#define check(v, ty)    if (!(v).is_##ty()) error("type error: expected " #ty);
 
 Value Interpreter::call(Value fn, int nargs, Value* args) {
-    auto* func = fn.function();
+    if (!fn.is_function()) {
+        error("type error: call() expects function type");
+    }
+    auto* func = fn.__function();
 
     // program counter
     auto _pr = func; // current program
@@ -233,7 +238,7 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
 
     auto dumpstack = [&]() {
         auto ln = _pr->bytecode->line_numbers[_pc];
-        log("encountered at line:", ln, "in", _pr->bytecode->name);
+        std::cout << "encountered at line: " << ln << " in " << _pr->bytecode->name << std::endl;
         /*auto s = stackbase;
         while (stack[s - 1]._i != 0) {
             auto retpc = stack[s - 3]._i;
@@ -265,62 +270,86 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     REGISTER(i.r0) = _pr->bytecode->storage[i.u1];
                 }
                 handle(INCREMENT) {
-                    REGISTER(i.r0) = Value::number(REGISTER(i.r0).number() + 1);
+                    auto r0 = REGISTER(i.r0);
+                    check(r0, number);
+                    REGISTER(i.r0) = Value::number(REGISTER(i.r0).__number() + 1);
                 }
                 handle(ADD) {
                     auto lhs = REGISTER(i.u8.r1);
+                    auto rhs = REGISTER(i.u8.r2);
                     auto lt = lhs.get_type();
                     if (lt == Type::Number) {
                         // numeric add
-                        REGISTER(i.r0) = Value::number(lhs.number() + REGISTER(i.u8.r2).number());
+                        check(rhs, number);
+                        REGISTER(i.r0) = Value::number(lhs.__number() + rhs.__number());
                     } else if (lt == Type::String) {
                         // string add
-                        auto l = lhs.string();
-                        auto r = REGISTER(i.u8.r2).string();
+                        check(rhs, string);
+                        auto l = lhs.__string();
+                        auto r = rhs.__string();
                         auto new_str = std::string(l->data) + std::string(r->data);
                         REGISTER(i.r0) = Value::string(alloc_string(new_str));
                     } else if (lt == Type::Array) {
                         // array add
-                        auto l = lhs.array();
-                        auto r = REGISTER(i.u8.r2).array();
+                        check(rhs, array);
+                        auto l = lhs.__array();
+                        auto r = rhs.__array();
                         auto n = alloc_array();
                         std::copy(l->data.begin(), l->data.end(), std::back_inserter(n->data));
                         std::copy(r->data.begin(), r->data.end(), std::back_inserter(n->data));
                     } else {
-                        error("operator '+' exected number / array / string");
+                        error("operator '+' expected number / array / string");
                     }
                 }
                 handle(SUB) {
-                    REGISTER(i.r0) = Value::number(REGISTER(i.u8.r1).number() - REGISTER(i.u8.r2).number());
+                    auto lhs = REGISTER(i.u8.r1);
+                    auto rhs = REGISTER(i.u8.r2);
+                    check(lhs, number);
+                    check(rhs, number);
+                    REGISTER(i.r0) = Value::number(lhs.__number() - rhs.__number());
                 }
                 handle(MUL) {
-                    REGISTER(i.r0) = Value::number(REGISTER(i.u8.r1).number() * REGISTER(i.u8.r2).number());
+                    auto lhs = REGISTER(i.u8.r1);
+                    auto rhs = REGISTER(i.u8.r2);
+                    check(lhs, number);
+                    check(rhs, number);
+                    REGISTER(i.r0) = Value::number(lhs.__number() * rhs.__number());
                 }
                 handle(DIV) {
-                    REGISTER(i.r0) = Value::number(REGISTER(i.u8.r1).number() / REGISTER(i.u8.r2).number());
+                    auto lhs = REGISTER(i.u8.r1);
+                    auto rhs = REGISTER(i.u8.r2);
+                    check(lhs, number);
+                    check(rhs, number);
+                    REGISTER(i.r0) = Value::number(lhs.__number() / rhs.__number());
                 }
                 handle(MOD) {
-                    auto x = REGISTER(i.u8.r1).number();
-                    auto y = REGISTER(i.u8.r2).number();
-                    REGISTER(i.r0) = Value::number(fmod(x, y));
+                    auto lhs = REGISTER(i.u8.r1);
+                    auto rhs = REGISTER(i.u8.r2);
+                    check(lhs, number);
+                    check(rhs, number);
+                    REGISTER(i.r0) = Value::number(fmod(lhs.__number(), rhs.__number()));
                 }
                 handle(POW) {
-                    auto x = REGISTER(i.u8.r1).number();
-                    auto y = REGISTER(i.u8.r2).number();
-                    REGISTER(i.r0) = Value::number(pow(x, y));
+                    auto lhs = REGISTER(i.u8.r1);
+                    auto rhs = REGISTER(i.u8.r2);
+                    check(lhs, number);
+                    check(rhs, number);
+                    REGISTER(i.r0) = Value::number(pow(lhs.__number(), rhs.__number()));
                 }
+                
                 handle(SHL) {
                     auto lhs = REGISTER(i.u8.r1);
                     auto rhs = REGISTER(i.u8.r2);
                     if (lhs.is_array()) {
-                        auto* arr = lhs.array();
+                        auto* arr = lhs.__array();
                         arr->data.emplace_back(rhs);
                         // put the appended value into r0
                         REGISTER(i.r0) = rhs;
                     } else if (lhs.is_number()) {
+                        check(rhs, number);
                         REGISTER(i.r0) = Value::number(
-                            (uint32_t)lhs.number() << 
-                            (uint32_t)rhs.number()
+                            (uint32_t)lhs.__number() << 
+                            (uint32_t)rhs.__number()
                         );
                     } else {
                         error("expected number or array");
@@ -330,14 +359,15 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     auto lhs = REGISTER(i.u8.r1);
                     auto rhs = REGISTER(i.u8.r2);
                     if (lhs.is_array()) {
-                        auto* arr = lhs.array();
+                        auto* arr = lhs.__array();
                         // put the popped value into r0
                         REGISTER(i.r0) = arr->data.back();
                         arr->data.pop_back();
                     } else if (lhs.is_number()) {
+                        check(rhs, number);
                         REGISTER(i.r0) = Value::number(
-                            (uint32_t)lhs.number() >>
-                            (uint32_t)rhs.number()
+                            (uint32_t)lhs.__number() >>
+                            (uint32_t)rhs.__number()
                         );
                     } else {
                         error("expected number or array");
@@ -345,14 +375,10 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                 }
                 
                 handle(AND) {
-                    REGISTER(i.r0) = Value::boolean(
-                        REGISTER(i.u8.r1).get_truthy() && REGISTER(i.u8.r2).get_truthy()
-                    );
+                    REGISTER(i.r0) = Value::boolean(REGISTER(i.u8.r1).get_truthy() && REGISTER(i.u8.r2).get_truthy());
                 }
                 handle(OR) {
-                    REGISTER(i.r0) = Value::boolean(
-                        REGISTER(i.u8.r1).get_truthy() || REGISTER(i.u8.r2).get_truthy()
-                    );
+                    REGISTER(i.r0) = Value::boolean(REGISTER(i.u8.r1).get_truthy() || REGISTER(i.u8.r2).get_truthy());
                 }
                 
                 handle(EQUAL) {
@@ -362,28 +388,32 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     REGISTER(i.r0) = Value::boolean(!(REGISTER(i.u8.r1) == REGISTER(i.u8.r2)));
                 }
                 handle(LESS) {
-                    REGISTER(i.r0) = Value::boolean(
-                        REGISTER(i.u8.r1).number() <
-                        REGISTER(i.u8.r2).number()
-                    );
+                    auto lhs = REGISTER(i.u8.r1);
+                    auto rhs = REGISTER(i.u8.r2);
+                    check(lhs, number);
+                    check(rhs, number);
+                    REGISTER(i.r0) = Value::boolean(lhs.__number() < rhs.__number());
                 }
                 handle(LESSEQ) {
-                    REGISTER(i.r0) = Value::boolean(
-                        REGISTER(i.u8.r1).number() <=
-                        REGISTER(i.u8.r2).number()
-                    );
+                    auto lhs = REGISTER(i.u8.r1);
+                    auto rhs = REGISTER(i.u8.r2);
+                    check(lhs, number);
+                    check(rhs, number);
+                    REGISTER(i.r0) = Value::boolean(lhs.__number() <= rhs.__number());
                 }
                 handle(GREATER) {
-                    REGISTER(i.r0) = Value::boolean(
-                        REGISTER(i.u8.r1).number() >
-                        REGISTER(i.u8.r2).number()
-                    );
+                    auto lhs = REGISTER(i.u8.r1);
+                    auto rhs = REGISTER(i.u8.r2);
+                    check(lhs, number);
+                    check(rhs, number);
+                    REGISTER(i.r0) = Value::boolean(lhs.__number() > rhs.__number());
                 }
                 handle(GREATEREQ) {
-                    REGISTER(i.r0) = Value::boolean(
-                        REGISTER(i.u8.r1).number() >=
-                        REGISTER(i.u8.r2).number()
-                    );
+                    auto lhs = REGISTER(i.u8.r1);
+                    auto rhs = REGISTER(i.u8.r2);
+                    check(lhs, number);
+                    check(rhs, number);
+                    REGISTER(i.r0) = Value::boolean(lhs.__number() >= rhs.__number());
                 }
                 handle(MOVE) {
                     REGISTER(i.r0) = REGISTER(i.u8.r1);
@@ -395,9 +425,11 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     globals[i.u1] = REGISTER(i.r0); // i.u1 will never be out of range
                 }
                 handle(FOR_INT) {
-                    auto var = REGISTER(i.r0).number();
-                    auto end = REGISTER(i.u8.r1).number();
-                    if (var < end) {
+                    auto var = REGISTER(i.r0);
+                    auto end = REGISTER(i.u8.r1);
+                    check(var, number);
+                    check(end, number);
+                    if (var.__number() < end.__number()) {
                         _pc++;
                     }
                 }
@@ -407,7 +439,7 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     if (iter_type == Type::Array) {
                         REGISTER_RAW(i.r0)._i = 0;
                     } else if (iter_type == Type::Object) {
-                        REGISTER_RAW(i.r0)._i = iter_val.object()->data.begin();
+                        REGISTER_RAW(i.r0)._i = iter_val.__object()->data.begin();
                     // } else if (iter_type == Type::Function) {
                     } else {
                         error("for loop expected array or object");
@@ -418,14 +450,14 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     auto iter_type = iter_val.get_type();
                     if (iter_type == Type::Array) {
                         auto ind = REGISTER_RAW(i.r0)._i;
-                        auto arr = iter_val.array();
+                        auto arr = iter_val.__array();
                         if (ind < arr->data.size()) {
                             REGISTER(i.u8.r2) = arr->data.at(ind);
                             _pc++;
                         }
                     } else if (iter_type == Type::Object) {
                         auto it = REGISTER_RAW(i.r0)._i;
-                        auto obj = iter_val.object();
+                        auto obj = iter_val.__object();
                         if (it != obj->data.end()) {
                             auto& key = obj->data.key_at(it);
                             auto cached = intern_string(key);
@@ -437,7 +469,8 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                 }
                 handle(FOR_ITER2) {
                     auto iter_val = REGISTER(i.u8.r1);
-                    auto obj = iter_val.object();
+                    check(iter_val, object);
+                    auto obj = iter_val.__object();
                     auto it = REGISTER_RAW(i.r0)._i;
                     if (it != obj->data.end()) {
                         auto& key = obj->data.key_at(it);
@@ -455,7 +488,7 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                         REGISTER_RAW(i.r0)._i += 1;
                     } else if (iter_type == Type::Object) {
                         // next key
-                        auto obj = iter_val.object();
+                        auto obj = iter_val.__object();
                         REGISTER_RAW(i.r0)._i = obj->data.next(REGISTER_RAW(i.r0)._i);
                     }
                 }
@@ -470,24 +503,26 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     auto val = REGISTER(i.u8.r1);
                     auto type = val.get_type();
                     if (type == Type::Array) {
-                        REGISTER(i.r0) = Value::number(val.array()->data.size());
+                        REGISTER(i.r0) = Value::number(val.__array()->data.size());
                     } else if (type == Type::String) {
-                        REGISTER(i.r0) = Value::number(val.string()->data.size());
+                        REGISTER(i.r0) = Value::number(val.__string()->data.size());
                     } else if (type == Type::Object) {
-                        REGISTER(i.r0) = Value::number(val.object()->data.size());
+                        REGISTER(i.r0) = Value::number(val.__object()->data.size());
                     } else {
                         error("operator '#' expected string / array / object");
                     }
                 }
                 handle(NEGATE) {
-                    REGISTER(i.r0) = Value::number(-REGISTER(i.u8.r1).number());
+                    auto val = REGISTER(i.u8.r1);
+                    check(val, number);
+                    REGISTER(i.r0) = Value::number(-(val.__number()));
                 }
                 handle(READ_CAPTURE) {
                     REGISTER_RAW(i.r0) = _pr->captures[i.u8.r1];
                 }
                 handle(ALLOC_FUNC) {
                     // create closure
-                    auto code = (CodeFragment*)_pr->bytecode->storage[i.u1].pointer();
+                    auto code = (CodeFragment*)_pr->bytecode->storage[i.u1].__pointer(); // assumed correct type due to compiler
                     auto* func = heap.alloc_function(code);
                     // capture captures; box inplace if necessary
                     for (const auto& c : code->capture_info) {
@@ -515,7 +550,7 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                     auto* obj = heap.alloc_object();
                     // emplace child elements
                     for (auto e = 0; e < i.u8.r1; e++) {
-                        auto key = REGISTER(i.u8.r2 + e * 2).string();
+                        auto key = REGISTER(i.u8.r2 + e * 2).__string(); // assumed correct type due to compiler
                         auto val = REGISTER(i.u8.r2 + e * 2 + 1);
                         obj->data.set(key->data, val);
                     }
@@ -524,8 +559,10 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                 handle(LOAD_ARRAY) {
                     auto arr_val = REGISTER(i.u8.r1);
                     auto ind_val = REGISTER(i.u8.r2);
-                    auto* arr = arr_val.array();
-                    auto ind = ind_val.number();
+                    check(arr_val, array);
+                    check(ind_val, number);
+                    auto* arr = arr_val.__array();
+                    auto ind = ind_val.__number();
                     if (ind >= arr->data.size() || ind < 0) {
                         error("index out of range");
                     }
@@ -534,8 +571,10 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                 handle(STORE_ARRAY) {
                     auto arr_val = REGISTER(i.u8.r1);
                     auto ind_val = REGISTER(i.u8.r2);
-                    auto* arr = arr_val.array();
-                    auto ind = ind_val.number();
+                    check(arr_val, array);
+                    check(ind_val, number);
+                    auto* arr = arr_val.__array();
+                    auto ind = ind_val.__number();
                     if (ind > arr->data.size()) {
                         error("index out of range");
                     }
@@ -543,8 +582,11 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                 }
                 handle(LOAD_OBJECT) {
                     auto lhs = REGISTER(i.u8.r1);
-                    auto key = REGISTER(i.u8.r2).string();
-                    auto* obj = (lhs).object();
+                    auto rhs = REGISTER(i.u8.r2);
+                    check(lhs, object);
+                    check(rhs, string);
+                    auto key = rhs.__string();
+                    auto* obj = lhs.__object();
                     auto found = false;
                     auto val = obj->data.get(key->data, found);
                     if (!found) {
@@ -556,14 +598,16 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                 handle(STORE_OBJECT) {
                     auto lhs = REGISTER(i.u8.r1);
                     auto key_val = REGISTER(i.u8.r2);
-                    auto* obj = lhs.object();
-                    auto key = key_val.string();
+                    check(lhs, object);
+                    check(key_val, string);
+                    auto* obj = lhs.__object();
+                    auto key = key_val.__string();
                     obj->data.set(key->data, REGISTER(i.r0));
                 }
                 handle(CALL) {
                     auto r0 = REGISTER(i.r0);
                     if (r0.is_function()) {
-                        auto func = r0.function();
+                        auto func = r0.__function();
                         auto nargs = i.u8.r1;
                         auto correct_nargs = 0; // func->bytecode->nargs;
                         // TODO: arity checking
@@ -586,7 +630,7 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
                         _pc = -1;
                         stackbase = stackbase + new_base; // new stack frame
                     } else if (r0.is_cfunction()) {
-                        auto cfunc = r0.cfunction();
+                        auto cfunc = r0.__cfunction();
                         auto nargs = i.u8.r1;
                         
                         auto old_base = stackbase;
@@ -626,7 +670,7 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
             _pc++;
         }
     } catch (std::exception& e) {
-        log("runtime error: ", e.what());
+        std::cerr << "runtime error: " << e.what() << std::endl;
         dumpstack();
         return Value::null();
     }
@@ -634,8 +678,6 @@ Value Interpreter::call(Value fn, int nargs, Value* args) {
     error("Reached end of interpreter loop - should be impossible");
     return Value::null(); // should be unreachable
 }
-
-#undef error
 #undef handle
 #undef REGISTER
 #undef REGISTER_RAW
