@@ -38,17 +38,17 @@ bool is_small_integer(double d, int16_t& out_si) {
 }
 
 uint16_t CodeFragment::store_number(double d) {
-    storage.emplace_back(Value::number(d));
+    storage.emplace_back(TackValue::number(d));
     return (uint16_t)(storage.size() - 1);
 }
 
-uint16_t CodeFragment::store_string(Value::StringType* str) {
+uint16_t CodeFragment::store_string(TackValue::StringType* str) {
     //strings.emplace_back(data);
-    storage.emplace_back(Value::string(str));
+    storage.emplace_back(TackValue::string(str));
     return (uint16_t)(storage.size() - 1);
 }
 uint16_t CodeFragment::store_fragment(CodeFragment* fragment) {
-    storage.emplace_back(Value::pointer(fragment));
+    storage.emplace_back(TackValue::pointer(fragment));
     return (uint16_t)(storage.size() - 1);
 }
 std::string CodeFragment::str() {
@@ -149,7 +149,7 @@ Compiler::VariableContext* Compiler::bind_name(const std::string& binding, uint8
     return &scopes.back().bindings.try_emplace(binding, VariableContext { reg, is_const }).first->second;
 }
 Compiler::VariableContext* Compiler::bind_export(const std::string& binding, const std::string& module_name, bool is_const) {
-    return interpreter->set_global_v(binding, module_name, Value::null(), is_const);
+    return interpreter->set_global_v(binding, module_name, TackValue::null(), is_const);
 }
 
 // free a register if it's not bound

@@ -5,14 +5,14 @@
 #include <sstream>
 #include <iomanip>
 
-bool Value::get_truthy() {
+bool TackValue::get_truthy() {
     return
         (!std::isnan(_d))                             ? (_d != 0.0) : // number -> compare to 0
         (_i == UINT64_MAX)                            ? false :
-        ((_i & type_bits) == (uint64_t)Type::Boolean) ? (_i & boolean_bits) :
+        ((_i & type_bits) == (uint64_t)TackType::Boolean) ? (_i & 1u) :
         true;
 }
-std::string Value::get_string() {
+std::string TackValue::get_string() {
     auto s = std::stringstream {};
     if (!std::isnan(_d)) {
         if (_d == trunc(_d)) {
@@ -23,14 +23,14 @@ std::string Value::get_string() {
         return s.str();
     }
     switch (_i & type_bits) {
-        case (uint64_t)Type::Null:      { s << "null"; break; }
-        case (uint64_t)Type::Boolean:   { s << (boolean() ? "true" : "false"); break; }
-        case (uint64_t)Type::String:    { s << string()->data; break; }
-        case (uint64_t)Type::Pointer:   { s << pointer(); break; }
-        case (uint64_t)Type::Function:  { s << "function: " << function()->bytecode->name; break; }
-        case (uint64_t)Type::CFunction: { s << "c-func:   " << std::hex << _p; break; }
+        case (uint64_t)TackType::Null:      { s << "null"; break; }
+        case (uint64_t)TackType::Boolean:   { s << (boolean() ? "true" : "false"); break; }
+        case (uint64_t)TackType::String:    { s << string()->data; break; }
+        case (uint64_t)TackType::Pointer:   { s << pointer(); break; }
+        case (uint64_t)TackType::Function:  { s << "function: " << function()->bytecode->name; break; }
+        case (uint64_t)TackType::CFunction: { s << "c-func:   " << std::hex << _p; break; }
         case type_bits_boxed:           { s << "box:      " << std::hex << _p << "(" << std::hex << value_to_boxed(*this)->value._p << ")"; break; }
-        case (uint64_t)Type::Object: { 
+        case (uint64_t)TackType::Object: { 
             auto* obj = object();
             s << "object {";
             if (obj->data.size()) {
@@ -47,7 +47,7 @@ std::string Value::get_string() {
             s << '}';
             break;
         }
-        case (uint64_t)Type::Array: {
+        case (uint64_t)TackType::Array: {
             auto* arr = array();
             s << "array [";
             if (arr->data.size()) {

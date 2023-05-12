@@ -20,7 +20,7 @@ enum class RegisterState {
 };
 
 struct AstNode;
-struct Interpreter;
+class Interpreter;
 
 struct CaptureInfo {
     std::string name; // for debug
@@ -31,12 +31,12 @@ struct CodeFragment {
     std::string name;
     std::vector<Instruction> instructions;
     std::vector<uint32_t> line_numbers;
-    std::vector<Value> storage; // program constant storage goes at the bottom of the stack for now
+    std::vector<TackValue> storage; // program constant storage goes at the bottom of the stack for now
     std::vector<CaptureInfo> capture_info;
     uint32_t max_register = 0;
 
     uint16_t store_number(double d);
-    uint16_t store_string(Value::StringType* str);
+    uint16_t store_string(TackValue::StringType* str);
     uint16_t store_fragment(CodeFragment* ptr);
     std::string str();
 };
