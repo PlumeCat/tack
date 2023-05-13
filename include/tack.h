@@ -101,7 +101,7 @@ struct TackValue {
     static inline TackValue array(ArrayType* arr)       { return { nan_bits | (uint64_t)TackType::Array | uint64_t(arr) }; }
     static inline TackValue cfunction(CFunctionType cf) { return { nan_bits | (uint64_t)TackType::CFunction | uint64_t(cf) }; }
 
-    inline bool operator == (const TackValue& r) {
+    inline bool operator == (const TackValue& r) const {
         if (std::isnan(_d) && std::isnan(r._d)) {
             return _i == r._i;
         }

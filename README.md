@@ -59,10 +59,12 @@ To run a script:
 ## Building
 
 ```bash
+# After cloning the repo into 'tack/'
+cd tack
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make
+cmake ..
+make # Generates the `tack` executable in the `build/` folder
 ```
 To force CMake to generate a Makefile: `cmake .. -G 'Unix Makefiles` . However, the provided CMakeLists should also be usable in Visual Studio via the "Open Folder" option
 

@@ -42,11 +42,12 @@ std::string replace_all(const std::string& data, const std::string& s1, const st
         auto f = data.find(s1, pos);
         if (f == std::string::npos) {
             // no more matches, append the rest of s
-            s << std::string_view(data.begin() + pos, data.end());
+            s << std::string_view(data.data() + pos, data.size() - pos);
             break;
         } else {
             // found match, append data[pos:f] and s2
-            s << std::string_view(data.begin() + pos, data.begin() + f);
+            // s << std::string_view(data.begin() + pos, data.begin() + f);
+            s << std::string_view(data.data() + pos, f - pos);
             s << std::string_view(s2);
             pos = f + n;
         }
@@ -56,19 +57,23 @@ std::string replace_all(const std::string& data, const std::string& s1, const st
 std::vector<std::string> split_ws(const std::string& data) {
     auto retval = std::vector<std::string> {};
 
-    auto pos = 0;
+    auto pos = 0u;
     auto ws = false;
     for (auto c = 0u; c < data.size(); c++) {
         if (!ws && std::isspace(data[c])) {
             // found space
             ws = true;
-            if (c - pos) retval.emplace_back(data.begin() + pos, data.begin() + c);
+            if (c - pos) {
+                retval.emplace_back(data.data() + pos, c - pos);
+            }
         } else if (ws && !std::isspace(data[c])) {
             ws = false;
             pos = c;
         }
     }
-    if (!ws) retval.emplace_back(data.begin() + pos, data.end());
+    if (!ws) {//retval.emplace_back(data.begin() + pos, data.end());
+        retval.emplace_back(data.data() + pos, data.size() - pos);
+    }
     return retval;
 }
 std::vector<std::string> split(const std::string& data, const std::string& split) {
