@@ -1,420 +1,110 @@
 #pragma once
 
-#include <list>
 #include <string>
+#include <list>
+#include <array>
 #include <vector>
 
-#include <jlib/hash_map.h>
-
 #include "instructions.h"
+#include "../include/tack.h"
 
-using namespace std;
+static const uint32_t MAX_REGISTERS = 256;
+static const uint32_t STACK_FRAME_OVERHEAD = 3;
+static const uint32_t MAX_STACK = 4096;
+static const uint32_t MIN_GC_ALLOCATIONS = 1024; // min allocations before GC will run; don't make it too small
 
-struct Program {
-    vector<Instruction> instructions;
-    vector<Value> storage; // program constant storage goes at the bottom of the stack for now
-    vector<string> strings; // string constants and literals storage - includes identifiers for objects
-
-    string to_string() {
-        auto s = stringstream {};
-
-        s << "Program:\n";
-        s << "   Bytecode:\n";
-        auto i = 0;
-        for (auto bc : instructions) {
-            auto op = (Opcode)uint16_t(bc >> 16);
-            auto r1 = uint16_t(bc & 0xffff);
-            s << "        " << i << ": " << ::to_string(op) << ", " << r1 << '\n'; //", " << r2 << ", " << r3 << '\n';
-            i++;
-        }
-
-        s << "    Storage:\n";
-        i = 0;
-        for (auto& x : storage) {
-            s << "        " << i << ": " << x << '\n';
-            i++;
-        }
-
-        s << "    Strings:\n";
-        i = 0;
-        for (auto& _s: strings) {
-            s << "        " << i << ": " << _s << '\n';
-            i++;
-        }
-
-        return s.str();
-    }
+enum class RegisterState {
+    FREE = 0,
+    BUSY = 1,
+    BOUND = 2
 };
 
-struct VariableContext {
-    string name;
-    uint32_t stackpos;
-    bool is_const = false; // if marked const, don't allow reassignment
-    bool is_reassigned = false; // if never reassigned, can be auto-consted
-    bool is_captured = false; // if captured by a lower scope, allocate on heap
+struct AstNode;
+class Interpreter;
+
+struct CaptureInfo {
+    std::string name; // for debug
+    uint8_t source_register;
+    uint8_t dest_register;
 };
-struct ScopeContext {
-    hash_map<string, VariableContext> variables;
+struct CodeFragment {
+    std::string name;
+    std::vector<Instruction> instructions;
+    std::vector<uint32_t> line_numbers;
+    std::vector<TackValue> storage; // program constant storage goes at the bottom of the stack for now
+    std::vector<CaptureInfo> capture_info;
+    uint32_t max_register = 0;
+
+    uint16_t store_number(double d);
+    uint16_t store_string(TackValue::StringType* str);
+    uint16_t store_fragment(CodeFragment* ptr);
+    std::string str();
 };
-struct FunctionContext {
-    const AstNode* func_node; // before compilation
-    vector<ScopeContext> scopes;
-    FunctionContext* parent_context; // so we can capture variables from lexical parent scopes
-    uint32_t storage_location;
-    uint32_t variable_count = 0;
-    
-    // variable -> stack index relative to current stack frame
-    VariableContext& lookup_variable(const string& identifier) {
-        // TODO: search in higher scopes starting from parent scope
-        // if the variable is found in a parent scope, mark as is_captured
-        // captured variables must be auto boxed and garbage collected/reference counted
-        // (we can also do escape analysis, eg if a reference to child function does not escape a parent function,
-        // then it can refer to captured variables via the stack)
-        for (auto s = scopes.rbegin(); s != scopes.rend(); s++) {
-            if (auto iter = (*s).variables.find(identifier); iter != (*s).variables.end()) {
-                return iter->second;
-            }
-        }
-        throw runtime_error("Variable not found");
-    }
-    
-    // set stack position for new variable
-    // don't bind if already exists in current scope
-    VariableContext& bind_variable(const string& identifier, bool is_const) {
-        if (scopes.back().variables.find(identifier) != scopes.back().variables.end()) {
-            throw runtime_error("Already exists in current scope");
-        }
-        auto stackpos = variable_count++;
-        auto iter = scopes.back().variables.insert(identifier, { identifier, stackpos, is_const });
-        return iter->second;
-    }
+struct Compiler {
+    struct VariableContext {
+        uint8_t reg = 0;
+        bool is_const = false;
+        bool is_global = false;
+        bool is_capture = false;
+        bool is_mirror = false;
+        uint16_t g_id = 0;
+    };
+    struct ScopeContext {
+        Compiler* compiler;
+        ScopeContext* parent_scope = nullptr;
+        bool is_function_scope = false;
+        std::unordered_map<std::string, VariableContext> bindings = {}; // variables
+        std::list<ScopeContext*> imports = {}; // imported modules
 
-    void push_scope() {
-        scopes.push_back({});
-    }
-    void pop_scope() {
-        scopes.pop_back();
-    }
+        // lookup a variable
+        // if it lives in a parent function, code will be emitted to capture it
+        VariableContext* lookup(const std::string& name);
+    };
+    Interpreter* interpreter = nullptr;
+    // root AST node from last compile_func() call
+    const AstNode* node = nullptr;
+    // current output as of last compile_func() call, included here for convenience
+    CodeFragment* output = nullptr;
+
+    // compiler state
+    std::array<RegisterState, MAX_REGISTERS> registers = {};
+    std::list<ScopeContext> scopes = {};
+    std::vector<CaptureInfo> captures = {};
+
+    // lookup a variable in the current scope stack
+    VariableContext* lookup(const std::string& name);
+
+    // get a free register and mark as busy
+    uint8_t allocate_register();
+    // get 2 free registers; returns the first one; mark both as busy
+    uint8_t allocate_register2();
+
+    // get the register immediately after the highest non-free register
+    uint8_t get_end_register();
+
+    // set a register or global as bound by a variable with given name
+    // NOTE: if it's global, make sure to emit WRITE_GLOBAL when relevant
+    // this method can't currently do it automatically - see FuncLiteral compiler
+    VariableContext* bind_name(const std::string& binding, uint8_t reg, bool is_const = false);
+    VariableContext* bind_export(const std::string& binding, const std::string& module_name, bool is_const = false);
+    
+    // free a register if it's not bound
+    void free_register(uint8_t reg);
+
+    // free all unbound registers
+    void free_all_registers();
+
+    void push_scope(ScopeContext* parent_scope, bool is_top_level = false);
+    void pop_scope();
+
+    void compile_func(const AstNode* node, CodeFragment* output, ScopeContext* parent_scope = nullptr);
+    uint8_t compile(const AstNode* node);
+
+    void emit_ins(Opcode op, uint8_t r0, uint8_t r1, uint8_t r2, uint32_t ln = 0);
+    void emit_u_ins(Opcode op, uint8_t r0, uint16_t u, uint32_t ln = 0);
+    void emit_s_ins(Opcode op, uint8_t r0, int16_t s, uint32_t ln = 0);
+    void rewrite_ins(uint32_t pos, Opcode op, uint8_t r0, uint8_t r1, uint8_t r2);
+    void rewrite_u_ins(uint32_t pos, Opcode op, uint8_t r0, uint16_t u);
 };
-struct Compiler {    
-    list<FunctionContext> funcs; // list not vector - need to push while iterating and not invalidate reference. queue would be even better
 
-    void add_function(const AstNode* node, uint32_t storage_location = UINT32_MAX, FunctionContext* parent_context = nullptr) {
-        funcs.emplace_back(FunctionContext { node, {}, parent_context, storage_location });
-    }
-    
-    void compile(const AstNode& module, Program& program) {
-        // treat the top level of the program as a function body
-        // RET will be emitted for it - don't need a special EXIT instruction
-        // when the program is entered, the 0th stack frame has the last instruction+1
-        // as the return address, so the interpreter loop can terminate
-        // (see 'execute')
-        auto node = AstNode(
-            AstType::FuncLiteral,
-            AstNode(AstType::ParamDef, {}),
-            module // parsing ensures that module is always a stat-list
-        );
 
-        add_function(&node);
-
-        // compile all function literals and append to main bytecode
-        // TODO: interesting, can this be parallelized?
-        for (auto f = funcs.begin(); f != funcs.end(); f++) { // can't use range-based for because compiler.functions size changes
-            auto& func = *f;
-            if (func.storage_location != UINT32_MAX) {
-                auto start_address = program.instructions.size();
-                program.storage[func.storage_location] = value_from_function(start_address);
-                // program.addr_to_function[start_address] = program.strings[program.storage[func.storage_location +1].d];
-            }
-            compile_function(func, program);
-        }
-    }
-
-    #define encode(op, ...) encode_instruction(Opcode::op, __VA_ARGS__)
-    #define emit(op, ...) program.instructions.push_back(encode(op, __VA_ARGS__));
-    #define rewrite(instr, op, ...) program.instructions[instr] = encode(op, __VA_ARGS__);
-    #define handle(type)                break; case AstType::type:
-    #define handle_binexp(type, opcode) handle(type) { child(0); child(1); emit(opcode, 0); }
-    #define child(n) compile_node(context, node.children[n], program);
-    #define label(name) auto name = program.instructions.size();
-    
-    void compile_function(FunctionContext& context, Program& program) {
-        auto num_args = (int)context.func_node->children[0].children.size();
-        
-        // grow stack to make space for variables (space required will be known later)
-        label(grow); emit(GROW, 0);
-        
-        // handle arguments; bind as variables
-        context.push_scope();
-        for(const auto& arg: context.func_node->children[0].children) {
-            // bind arg as variable
-            // it's at the top of the stack so it's mutable
-            context.bind_variable(arg.data_s, false);
-        }
-        // compile body
-        compile_node(context, context.func_node->children[1], program);
-        context.pop_scope();
-        
-        // return
-        emit(RET, 0);
-        
-        // space for variables
-        auto num_variables = (int)context.variable_count;
-        auto extra_stack = max(0, num_variables - num_args); // extra space for arguments not needed, CALL will handle, we just need to allow space for variable bindings
-        rewrite(grow, GROW, extra_stack);
-    }
-
-    void compile_node(FunctionContext& context, const AstNode& node, Program& program) {
-        switch (node.type) {
-            case AstType::Unknown: return;
-            
-            handle(StatList) {
-                context.push_scope();
-                for (auto i = 0; i < node.children.size(); i++) {
-                    child(i); // TODO: discard expression statements from stack (ideally they aren't permitted)
-                }
-                context.pop_scope();
-            }
-            handle(ConstDeclStat) {
-                auto variable = context.bind_variable(node.children[0].data_s, true);
-                child(1);
-                emit(WRITE_VAR, variable.stackpos);
-            }
-            handle(VarDeclStat) {
-                // make sure not already declared
-                // TODO: allow shadowing in lower scopes?
-                auto variable = context.bind_variable(node.children[0].data_s, false);
-                child(1); // push result of expression
-                emit(WRITE_VAR, variable.stackpos); // put the value at the top of the stack into the variable at stackpos
-            }
-            handle(AssignStat) {
-                auto& lhs = node.children[0];
-                auto& rhs = node.children[1];
-
-                if (lhs.type == AstType::AccessExp) {
-                    // put array, value on stack
-                    // the identifier to use is in program strings, index is encoded in instruction
-                    compile_node(context, lhs.children[0], program); // object
-                    child(1); // value
-                    program.strings.emplace_back(lhs.children[1].data_s);
-                    emit(STORE_OBJECT, program.strings.size() - 1);
-                } else if (lhs.type == AstType::IndexExp) {
-                    // put array, index, value on the stack
-                    compile_node(context, lhs.children[0], program); // array
-                    compile_node(context, lhs.children[1], program); // index
-                    child(1); // value
-                    emit(STORE_ARRAY, 0);
-                } else if (lhs.type == AstType::Identifier) {
-                    // make sure variable exists
-                    auto& var = context.lookup_variable(node.children[0].data_s);
-                    if (var.is_const) {
-                        throw runtime_error("Compile error: Can't reassign to const");
-                    }
-                    var.is_reassigned = true;
-                    child(1);
-                    emit(WRITE_VAR, var.stackpos); // value at top of stack into variable at stackpos
-                } else {
-                    throw runtime_error("Compile error: invalid LHS for assignment statement");
-                }
-                
-            }
-            handle(PrintStat) {
-                child(0);
-                emit(PRINT, 0);
-            }
-            handle(IfStat) {
-                child(0); // evaluate the expression
-                
-                label(condjump);emit(CONDJUMP, 0); // PLACEHOLDER
-                                child(1); // compile the if body
-                label(endif);   emit(JUMPF, 0); // PLACEHODLER TODO: not needed if there's no else-block
-
-                label(startelse);if (node.children.size() == 3)
-                                child(2); // compile the else body
-                label(endelse);
-                
-                // TODO: make more efficient
-                // can be more efficient for the case when there's no else (probably)
-                rewrite(condjump, CONDJUMP, startelse - condjump);
-                rewrite(endif, JUMPF, endelse - endif);
-            }
-            handle(WhileStat) {
-                label(cond);    child(0); // evaluate expression
-                
-                label(condjump);emit(CONDJUMP, 0); // placeholder
-                                child(1); // compile the body
-                label(jumpback);emit(JUMPB, jumpback - cond); // jump to top of loop
-                label(ewhile);
-
-                rewrite(condjump, CONDJUMP, ewhile - condjump);
-            }
-            
-            handle(TernaryExp) {}
-            handle(OrExp) {}
-            handle(AndExp) {}
-            handle(BitOrExp) {}
-            handle(BitAndExp) {}
-            handle(BitXorExp) {}
-            
-            handle_binexp(ShiftLeftExp, SHL)
-            handle(ShiftRightExp) {}
-            
-            handle_binexp(EqExp, EQUAL)
-            handle_binexp(NotEqExp, NEQUAL)
-            handle_binexp(LessExp, LESS)
-            handle_binexp(GreaterExp, GREATER)
-            handle_binexp(LessEqExp, LESSEQ)
-            handle_binexp(GreaterEqExp, GREATEREQ)
-            
-            // handle_binexp(AddExp, ADD)
-            handle(AddExp) {
-                auto& c0 = node.children[0];
-                auto& c1 = node.children[1];
-                if (c1.type == AstType::NumLiteral && trunc(c1.data_d) == c1.data_d && abs(c0.data_d) <= INT16_MAX) {
-                    child(0);
-                    // ADDI right (commutative)
-                    int16_t _i[2] = { int16_t(c1.data_d), 0 };
-                    auto i = uint32_t(Opcode::ADDI) << 16 | *reinterpret_cast<uint32_t*>(_i);
-                    program.instructions.emplace_back(i);
-
-                } else {
-                    // generic add
-                    child(0);
-                    child(1);
-                    emit(ADD, 0);
-                }
-            }
-            
-            handle_binexp(SubExp, SUB)
-            handle_binexp(MulExp, MUL)
-            handle_binexp(DivExp, DIV)
-            handle_binexp(ModExp, MOD)
-            handle_binexp(PowExp, POW)
-
-            handle(NegateExp) { child(0); emit(NEGATE, 0); }
-            handle(NotExp)    { child(0); emit(NOT, 0); }
-            handle(BitNotExp) { child(0); emit(BITNOT, 0); }
-            handle(LenExp)    { child(0); emit(LEN, 0); }
-
-            handle(IndexExp) {
-                child(0); // push the array
-                child(1); // push the index
-                emit(LOAD_ARRAY, 0);
-            }
-            handle(AccessExp) {
-                child(0); // push the object
-                program.strings.emplace_back(node.children[1].data_s);
-                emit(LOAD_OBJECT, program.strings.size() - 1);
-            }
-
-            // TODO: for loops
-            // TODO: break and continue in loops (?)
-            handle(ReturnStat) {
-                // TODO: handle return value
-                auto nret = node.children.size(); // should be 0 or 1
-                if (nret) {
-                    child(0); // push return value. will never need to be boxed
-                }
-                emit(RET, nret);
-            }
-            handle(CallExp) {
-                // TODO: optimize direct calls vs indirect calls with some kind of symbol table?
-                // RHS of call expression is an ArgList; evaluate all arguments
-                auto nargs = node.children[1].children.size();
-                // emit(DUMP, 0);
-                emit(PRECALL, 0);
-                emit(GROW, nargs); // allocate space for arguments
-                child(1);          // push all arguments
-                child(0);          // LHS of the call exp evaluates to a function address
-                emit(CALL, nargs); // call function at top of stack
-            }
-            handle(ArgList) {
-                // top of stack contains args. 
-                for (auto i = 0; i < node.children.size(); i++) {
-                    child(i); // push child value to stack
-                }
-            }
-            handle(FuncLiteral) {
-                // put a placeholder value in storage at first. when the program is linked, the placeholder is
-                // overwritten with the real start address
-                auto storage_index = program.storage.size();
-                program.storage.emplace_back(value_from_function(0)); // insptr (placeholder value)
-                program.storage.emplace_back(value_from_integer(program.strings.size())); // index of string name
-                auto& name = (context.func_node->children.size() == 3) ? context.func_node->children[2].data_s : "(anonymous)";
-                program.strings.emplace_back(name); // string name if there is one
-                // funcs.emplace_back(pair { &node, func_storage }); // compile function
-                add_function(&node, storage_index, &context);
-                // load the function start address
-                emit(LOAD_CONST, storage_index);
-
-                /*
-                TODO: closure capture
-                need to emit code to grab all the captured variables when the function literal is created
-                these go in a separate allocation something like an invisible array, which is used
-                as a sort of secondary stack when the function is reading/writing variables
-
-                eg 
-                 storage_index
-                */
-
-            }
-            handle(ParamDef) {}
-            handle(NumLiteral) {
-                // TODO: don't store the same constant more than once
-                auto val = value_null();
-                if (trunc(node.data_d) == node.data_d) {
-                    val = value_from_integer((int32_t)node.data_d);
-                } else {
-                    val = value_from_number(node.data_d);
-                }
-                program.storage.emplace_back(val);
-                emit(LOAD_CONST, program.storage.size() - 1);
-            }
-            handle(StringLiteral) {
-                // TODO: don't store the same string more than once
-                // especially important for frequently-used object fields
-                program.strings.emplace_back(node.data_s);
-                emit(LOAD_STRING, program.strings.size() - 1);
-            }
-            handle(ArrayLiteral) {
-                // push the contents of the array to stack
-                // ALLOC_ARRAY will copy them
-                for (auto i = 0; i < node.children.size(); i++) {
-                    child(i);
-                }
-                emit(ALLOC_ARRAY, node.children.size());
-            }
-            handle(ObjectLiteral) {
-                // TODO: push any key-values
-                for (auto i = 0; i < node.children.size(); i++) {
-                    auto& ident = node.children[i].children[0].data_s;
-                    auto& exp = node.children[i].children[1];
-                    // push key
-                    program.strings.emplace_back(ident);
-                    emit(LOAD_STRING, program.strings.size() - 1);
-                    // push value
-                    compile_node(context, exp, program);
-                }
-                emit(ALLOC_OBJECT, node.children.size());
-            }
-            handle(ClockExp) { emit(CLOCK, 0); } // TODO: remove
-            handle(RandomExp) { emit(RANDOM, 0); } // TODO: remove
-            handle(Identifier) {
-                // reading a variable (writing is not encountered by recursive compile)
-                // so the variable exists and points to a stackpos
-                auto stackpos = context.lookup_variable(node.data_s).stackpos;
-                emit(READ_VAR, stackpos);
-            }
-        }
-
-        // TODO: constant folding
-        // TODO: jump folding
-        // TODO: mov folding
-    }
-    
-    #undef encode
-    #undef emit
-    #undef handle
-    #undef child
-    #undef label
-};

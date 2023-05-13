@@ -1,0 +1,43 @@
+fn bottom_up(depth) {
+    if depth > 0 {
+        depth = depth - 1
+        let left = bottom_up(depth)
+        let right = bottom_up(depth)
+        return [ left, right ]
+    } else {
+        return []
+    }
+}
+
+fn item_check(tree) {
+    if #tree {
+        return 1 + item_check(tree[0]) + item_check(tree[1])
+    } else {
+        return 1
+    }
+}
+
+const N = 16
+let mindepth = 4
+let maxdepth = mindepth + 2
+if maxdepth < N {
+    maxdepth = N
+}
+
+let stretchdepth = maxdepth + 1
+let stretchtree = bottom_up(stretchdepth)
+print("stretch tree of depth " + tostring(stretchdepth) + "    check: " + tostring(item_check(stretchtree)))
+
+let longtree = bottom_up(maxdepth)
+
+for d in mindepth/2 + 1, maxdepth/2 +1 {
+    let depth = d * 2
+    let iterations = 2 ** (maxdepth - depth + mindepth)
+    let check = 0
+    for i in 0, iterations {
+        check = check + item_check(bottom_up(depth))
+    }
+    print(tostring(iterations) + " trees of depth " + tostring(depth) + "    check: " + tostring(check))
+}
+
+print("long lived tree of depth: " + tostring(maxdepth) + " check: " + tostring(item_check(longtree)))

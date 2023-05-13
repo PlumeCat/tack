@@ -1,0 +1,38 @@
+fn quicksort(arr) {
+    const n = #arr
+    if n <= 1 {
+        return arr
+    }
+
+    " find the midpoint "
+    let l = min(arr)
+    let r = max(arr)
+    if r == l {
+        return arr
+    }
+    const mid = (l + r) / 2
+    
+    " split array into upper and lower "
+    const upper = []
+    const lower = []
+    for i in 0, n {
+        const e = arr[i]
+        if e < mid {
+            lower << e
+        } else {
+            upper << e
+        }
+    }
+
+    " recursively sort the upper and lower sub-arrays and join the result"
+    return quicksort(lower) + quicksort(upper)
+}
+
+" test "
+let A = []
+for i in 1, 1000 {
+    A << random()
+}
+let B = quicksort(A)
+print(A)
+print(B)

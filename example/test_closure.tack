@@ -1,0 +1,56 @@
+fn test_closure() {
+    let i = 100
+    if true {
+        let i = 200
+        if false {
+            let i = 300
+        } else {
+            i = i + 1
+            fn write() {
+                i = i + 1
+            }
+            write()
+            fn read() {
+                return fn() {
+                    return i
+                }
+            }
+            write()
+            return read
+        }
+    }
+}
+
+let a = test_closure()()()
+print("Expect 203: ", a)
+
+
+fn Rectangle(w, h) {
+    let self = {
+        width = w,
+        height = h
+    }
+
+    self.area = fn() {
+        return self.width * self.height
+    }
+    self.is_square = fn() {
+        return self.width == self.height
+    }
+    
+    return self
+}
+
+let r1 = Rectangle(4, 5)
+let r2 = Rectangle(6, 6)
+print(r1.area(), r2.area())
+print(r1.is_square(), r2.is_square())
+
+
+let arr = [ 1, 2, 3 ]
+arr << 4
+arr >> true
+
+let x = 1
+
+print(arr, x)

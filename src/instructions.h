@@ -1,55 +1,97 @@
 #pragma once
 
+#include <unordered_map>
+#include <string>
+
 #define opcodes() \
     opcode(UNKNOWN)\
+    /* unary operations */\
+    \
+    opcode(INCREMENT)\
+    opcode(DECREMENT) \
+    opcode(NEGATE)\
+    opcode(NOT)\
+    opcode(BITNOT)\
+    opcode(LEN) \
+    \
     /* binary operations:*/\
-    opcode(EQUAL) opcode(NEQUAL) opcode(GREATER) opcode(LESS) opcode(GREATEREQ) opcode(LESSEQ)\
-    opcode(ADD) opcode(SUB) opcode(DIV) opcode(MUL) opcode(MOD) opcode(POW)\
-    opcode(ADDI) \
-    opcode(SHL) opcode(SHR) opcode(BITAND) opcode(BITOR) opcode(BITXOR) opcode(AND) opcode(OR)\
-    /* unary operation: apply inplace for value at top of stack*/\
-    opcode(NEGATE) opcode(NOT) opcode(BITNOT) opcode(LEN) \
+    opcode(EQUAL)\
+    opcode(NEQUAL)\
+    opcode(GREATER)\
+    opcode(LESS)\
+    opcode(GREATEREQ)\
+    opcode(LESSEQ)\
+    opcode(ADD)\
+    opcode(SUB)\
+    opcode(DIV)\
+    opcode(MUL)\
+    opcode(MOD)\
+    opcode(POW)\
+    opcode(SHL)\
+    opcode(SHR)\
+    opcode(BITAND)\
+    opcode(BITOR)\
+    opcode(BITXOR)\
+    opcode(AND)\
+    opcode(OR)\
     \
-    /* stack and variable operations */\
-    opcode(READ_VAR) \
-    opcode(WRITE_VAR) \
+    opcode(LOAD_CONST) \
+    opcode(LOAD_I_SN)\
+    opcode(LOAD_I_BOOL)\
+    opcode(LOAD_I_NULL) \
+    opcode(MOVE) \
+    opcode(READ_CAPTURE)\
+    opcode(ZERO_CAPTURE)\
+    opcode(READ_GLOBAL)\
+    opcode(WRITE_GLOBAL)\
     \
-    opcode(LOAD_CONST) opcode(LOAD_STRING) \
-    opcode(LOAD_ARRAY) opcode(LOAD_OBJECT) opcode(STORE_ARRAY) opcode(STORE_OBJECT) \
-    opcode(GROW) \
+    /* lua allows 200 local variables */\
+    /* lua can jump 1<<24 instructions */\
+    opcode(FOR_INT)\
+    opcode(FOR_ITER)\
+    opcode(FOR_ITER2)\
+    opcode(FOR_ITER_INIT)\
+    opcode(FOR_ITER_NEXT) \
+    opcode(JUMPF)\
+    opcode(JUMPB)\
+    opcode(CONDSKIP)\
+    opcode(ALLOC_FUNC)\
+    opcode(ALLOC_BOX)\
+    opcode(READ_BOX)\
+    opcode(WRITE_BOX)\
+    opcode(ALLOC_ARRAY)\
+    opcode(LOAD_ARRAY)\
+    opcode(STORE_ARRAY) \
+    opcode(ALLOC_OBJECT)\
+    opcode(LOAD_OBJECT)\
+    opcode(STORE_OBJECT) \
+    opcode(PRECALL)\
+    opcode(CALL)\
+    opcode(RET)\
+    opcode(PRINT)\
+    opcode(CLOCK)\
+    opcode(RANDOM) \
     \
-    opcode(JUMPF) opcode(JUMPB) opcode(CONDJUMP)\
-    opcode(ALLOC_OBJECT) opcode(ALLOC_ARRAY)\
-    opcode(PRECALL) opcode(CALL) opcode(RET)/**/\
-    opcode(PRINT) opcode(CLOCK) opcode(RANDOM) \
-    opcode(DUMP) /* dump stack */\
     opcode(OPCODE_MAX)
     
 
-#include <unordered_map>
 #define opcode(x) x,
 enum class Opcode : uint8_t { opcodes() };
 #undef opcode
 #define opcode(x) { Opcode::x, #x },
-string to_string(Opcode opcode) {
-    static const hash_map<Opcode, string> opcode_to_string = { opcodes() };
-    return opcode_to_string[opcode];
+inline std::string to_string(Opcode opcode) {
+    static const std::unordered_map<Opcode, std::string> opcodestring = { opcodes() };
+    return opcodestring.at(opcode);
 }
 #undef opcode
 
-using Instruction = uint32_t;
-
-Instruction encode_instruction(Opcode opcode, uint32_t operand = 0) {
-    if (operand > UINT16_MAX) {
-        throw runtime_error("Out of range operand");
-    }
-    return Instruction(
-        uint32_t(opcode) << 16 |
-        uint32_t(operand)
-    );
+struct InputRegister { uint8_t r1, r2; };
+struct Instruction {
+    Opcode opcode;
+    uint8_t r0;
+    union {
+        InputRegister u8;
+        int16_t s1;
+        uint16_t u1;
+    };
 };
-void decode_instruction(Instruction instruction, Opcode& out_opcode, uint16_t& out_operand) {
-    out_opcode = (Opcode)(uint16_t)(instruction >> 16);
-    out_operand = (uint16_t)(instruction & 0xffff);
-}
-

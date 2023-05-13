@@ -1,0 +1,45 @@
+"TODO: Test the whole standard library"
+
+let a = [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]
+
+print(filter(a, fn(x) { return x % 2 - 1 }))
+print(reduce(a, fn(x, v) { return x + v }, 0))
+print(sum(a))
+
+let s = [ 1, 3, 2, 4, 3, 56, 3 ]
+print(sort(s))
+print(sort(s, fn(x, y) { return x > y }))
+print(sort(split("hello world this  is a   tack program")))
+
+print(map([ 1, 2, 3 ], fn(x) { return x * 2 }))
+foreach([ 1, 2, 3, 4, 5 ], print)
+print(slice("hello world", 1, 5))
+print(replace("hello world", "o", "a"))
+
+print(tonumber("123"))
+print(tonumber("123.45"))
+print(tonumber("123.f"))
+print(tonumber("123e3"))
+print(tonumber("0.00123E3"))
+print(tonumber("0x234.234"))
+print(tonumber("  123"))
+    
+print(ord("a"), ord("A"), ord("c"), ord("C"), ord("hello"))
+print(chr(64), chr(65), chr(65 + 32), chr(65 + 25), chr(65 + 25 + 32))
+
+let foo = {
+    x = 1,
+    y = 2,
+    z = 3
+}
+for k, v in foo {
+    print(k, v)
+}
+print(keys(foo))
+print(values(foo))
+
+
+fn named() {
+    foo.y = 5
+}
+print(null, true, false, 1.23, 5, "hello", print, named, fn(){}, {}, foo, [], s)

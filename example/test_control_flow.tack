@@ -1,0 +1,55 @@
+fn fizzbuzz() {
+    print("fizzbuzz test")
+    for i in 1, 31 {
+        if i % 3 == 0 {
+            if i % 5 == 0 {
+                print("fizzbuzz")
+            } else {
+                print("fizz")
+            }
+        } else if i % 5 == 0 {
+            print("buzz")
+        } else {
+            print(i)
+        }
+    }
+}
+fizzbuzz()
+
+fn foo() {
+    "testing capture of the iterable"
+    let arr = [ 1, 2, 3, 4, 5 ]
+    for i in arr {
+        print(i)
+        fn bar() {
+            arr[4]
+        }
+        bar()
+    }
+}
+foo()
+
+fn() {
+    "testing capture of the loop variable"
+    for x in [ "hello", "world", "this", "is", "a", "tack", "program" ] {
+        fn() {
+            print(x)
+        }()
+    }
+}()
+
+fn() {
+    let obj = { x = 1, y = 2, z = 3, w = 4 }
+    print(obj)
+    "print(obj.x, obj[""w""])"
+    "TODO: object access with square brackets is temp disabled"
+    "for k in obj {
+        print(k, obj[k])
+    }"
+
+    print("object 2 iter")
+
+    for k, v in obj {
+        print(k, v)
+    }
+}()
