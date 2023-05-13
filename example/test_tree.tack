@@ -30,4 +30,9 @@ export fn print_tree(t) {
 }
 
 let tree = make_tree(8)
+
+fn longest_path() {
+
+}
+
 print_tree(tree)

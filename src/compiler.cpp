@@ -278,7 +278,13 @@ uint8_t Compiler::compile(const AstNode* node) {
                 auto var = bind_export(node->children[0].data_s, output->name, true);
                 emit_u(WRITE_GLOBAL, reg, var->g_id);
             } else {
-                bind_name(node->children[0].data_s, reg, true);
+                if (registers[reg] == RegisterState::BOUND) {
+                    auto new_reg = allocate_register();
+                    emit(MOVE, new_reg, reg, 0);
+                    bind_name(node->children[0].data_s, new_reg, true);
+                } else {
+                    bind_name(node->children[0].data_s, reg, true);
+                }
             }
             return 0xff;
         }
@@ -290,7 +296,14 @@ uint8_t Compiler::compile(const AstNode* node) {
                 auto var = bind_export(node->children[0].data_s, output->name, false);
                 emit_u(WRITE_GLOBAL, reg, var->g_id);
             } else {
-                bind_name(node->children[0].data_s, reg, false);
+                if (registers[reg] == RegisterState::BOUND) {
+                    // if reg was already bound, bind to a new register and MOVE to it
+                    auto new_reg = allocate_register();
+                    emit(MOVE, new_reg, reg, 0);
+                    bind_name(node->children[0].data_s, new_reg, false);
+                } else {
+                    bind_name(node->children[0].data_s, reg, false);
+                }
             }
             return 0xff;
         }
