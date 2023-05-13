@@ -41,9 +41,7 @@ uint16_t CodeFragment::store_number(double d) {
     storage.emplace_back(TackValue::number(d));
     return (uint16_t)(storage.size() - 1);
 }
-
 uint16_t CodeFragment::store_string(TackValue::StringType* str) {
-    //strings.emplace_back(data);
     storage.emplace_back(TackValue::string(str));
     return (uint16_t)(storage.size() - 1);
 }
@@ -173,8 +171,8 @@ void Compiler::pop_scope() {
     // unbind all bound registers
     for (auto& b : scopes.back().bindings) {
         // TODO: disabled currently because boxes must remain bound forever without nulling the regsiter
-        // and there's no way to know at scope pop time whether a variable is boxed or not-boxed
-        // registers[b.second.reg] = RegisterState::FREE;            
+        // and there's currently no way to know at compile time whether a variable is boxed or not-boxed
+        // registers[b.second.reg] = RegisterState::FREE;
         if (b.second.is_capture || b.second.is_mirror) {
             // HACK: zero out all mirror variables and variables that were captured in this scope
             // if there;s a loop then READ_CAPTURE will be run again which is a bit inefficient

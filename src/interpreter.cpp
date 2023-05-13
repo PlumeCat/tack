@@ -24,6 +24,7 @@ TackVM* TackVM::create() {
 }
 
 Interpreter::Interpreter() {
+    srand(time(nullptr)); // TODO: remove
     next_globalid = 0;
     stackbase = 0;
 
@@ -222,6 +223,7 @@ void Interpreter::error(const std::string& msg) {
 #define REGISTER_RAW(n) stack[stackbase+n]
 #define REGISTER(n)     (*(value_is_boxed(REGISTER_RAW(n)) ? &value_to_boxed(REGISTER_RAW(n))->value : &REGISTER_RAW(n)))
 #define check(v, ty)    if (!(v).is_##ty()) error("type error: expected " #ty);
+#define in_error(msg)   error(msg + func->bytecode->name + std::to_string(func->bytecode->line_numbers[_pc]))
 
 TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
     if (!fn.is_function()) {
@@ -295,8 +297,9 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                     auto n = alloc_array();
                     std::copy(l->data.begin(), l->data.end(), std::back_inserter(n->data));
                     std::copy(r->data.begin(), r->data.end(), std::back_inserter(n->data));
+                    REGISTER(i.r0) = TackValue::array(n);
                 } else {
-                    error("operator '+' expected number / array / string");
+                    in_error("operator '+' expected number / array / string");
                 }
             }
             handle(SUB) {
@@ -350,7 +353,7 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                         (uint32_t)rhs.number()
                     );
                 } else {
-                    error("expected number or array");
+                    in_error("expected number or array");
                 }
             }
             handle(SHR) {
@@ -368,7 +371,7 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                         (uint32_t)rhs.number()
                     );
                 } else {
-                    error("expected number or array");
+                    in_error("expected number or array");
                 }
             }
                 
@@ -440,7 +443,7 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                     REGISTER_RAW(i.r0)._i = iter_val.object()->data.begin();
                 // } else if (iter_type == Type::Function) {
                 } else {
-                    error("for loop expected array or object");
+                    in_error("for loop expected array or object");
                 }
             }
             handle(FOR_ITER) {
@@ -507,7 +510,7 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 } else if (type == TackType::Object) {
                     REGISTER(i.r0) = TackValue::number(val.object()->data.size());
                 } else {
-                    error("operator '#' expected string / array / object");
+                    in_error("operator '#' expected string / array / object");
                 }
             }
             handle(NEGATE) {
@@ -562,7 +565,7 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 auto* arr = arr_val.array();
                 auto ind = ind_val.number();
                 if (ind >= arr->data.size() || ind < 0) {
-                    error("index out of range");
+                    in_error("index out of range");
                 }
                 REGISTER(i.r0) = arr->data.at(ind);
             }
@@ -574,7 +577,7 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 auto* arr = arr_val.array();
                 auto ind = ind_val.number();
                 if (ind > arr->data.size()) {
-                    error("index out of range");
+                    in_error("index out of range");
                 }
                 arr->data.at(ind) = REGISTER(i.r0);
             }
@@ -588,7 +591,7 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 auto found = false;
                 auto val = obj->data.get(key->data, found);
                 if (!found) {
-                    error("key not found"s + key->data);
+                    in_error("key not found"s + key->data);
                 } else {
                     REGISTER(i.r0) = val;
                 }
@@ -610,12 +613,12 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                     auto correct_nargs = 0; // func->bytecode->nargs;
                     // TODO: arity checking
                     if (false && nargs != correct_nargs) {
-                        error("wrong nargs");
+                        in_error("wrong nargs");
                     }
                     auto new_base = i.u8.r2 + STACK_FRAME_OVERHEAD;
 
                     if (new_base + func->bytecode->max_register > MAX_STACK) {
-                        error("would exceed stack");
+                        in_error("would exceed stack");
                     }
 
                     // set up call frame
@@ -637,7 +640,7 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                     stackbase = old_base;
                     REGISTER_RAW(i.u8.r2) = retval;
                 } else {
-                    error("tried to call non-function");
+                    in_error("tried to call non-function");
                 }
             }
             handle(RET) {
@@ -663,7 +666,7 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                     return return_val;
                 }
             }
-        break; default: error("unknown instruction: " + to_string(i.opcode));
+        break; default: in_error("unknown instruction: " + to_string(i.opcode));
         }
         _pc++;
     }

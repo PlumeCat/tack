@@ -132,7 +132,8 @@ tack_func(print) {
     return TackValue::null();
 }
 tack_func(random) {
-    return TackValue::number(rand());
+    // TODO: improve this
+    return TackValue::number(rand() % 0xffffu);
 }
 tack_func(clock) {
     return TackValue::number(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 1e6);

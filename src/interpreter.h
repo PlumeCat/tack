@@ -74,38 +74,34 @@ public:
 
     void* get_user_pointer() const override;
     void set_user_pointer(void* ptr) override;
+    TackGCState get_gc_state() const override;
+    void set_gc_state(TackGCState state) override;
 
-    void error(const std::string& msg) override;
-
-    inline void set_global(const std::string& name, TackValue value, bool is_const) override {
-        set_global_v(name, value, is_const);
-    }
-    inline void set_global(const std::string& name, const std::string& module_name, TackValue value, bool is_const) override {
-        set_global_v(name, module_name, value, is_const);
-    }
-    inline void load_module(const std::string& module_name) override {
-        load_module_s(module_name);
-    }
-
-    CodeFragment* create_fragment();
-    Compiler::VariableContext* set_global_v(const std::string& name, TackValue value, bool is_const);
-    Compiler::VariableContext* set_global_v(const std::string& name, const std::string& module_name, TackValue value, bool is_const);
+    inline void set_global(const std::string& name, TackValue value, bool is_const) override { set_global_v(name, value, is_const); }
+    inline void set_global(const std::string& name, const std::string& module_name, TackValue value, bool is_const) override { set_global_v(name, module_name, value, is_const); }
     TackValue get_global(const std::string& name) override;
     TackValue get_global(const std::string& name, const std::string& module_name) override;
-    uint16_t next_gid();
-    void add_libs() override;
-    void add_module_dir_cwd();
-    void add_module_dir(const std::string& dir);
-    Compiler::ScopeContext* load_module_s(const std::string& filename);
-    TackValue call(TackValue fn, int nargs, TackValue* args);
-    TackGCState get_gc_state() const;
-    void set_gc_state(TackGCState state);
-    TackValue::ArrayType* alloc_array();
-    TackValue::ObjectType* alloc_object();
-    TackValue::FunctionType* alloc_function(CodeFragment* code);
-    BoxType* alloc_box(TackValue val);
-    TackValue::StringType* alloc_string(const std::string& data);
-    TackValue::StringType* intern_string(const std::string& data);
 
+    void add_libs() override;
+    void add_module_dir(const std::string& dir) override;
+    inline void load_module(const std::string& module_name) override { load_module_s(module_name); }
+    TackValue call(TackValue fn, int nargs, TackValue* args) override;
+    void error(const std::string& msg) override;
+    
+    TackValue::ArrayType* alloc_array() override;
+    TackValue::ObjectType* alloc_object() override;
+    TackValue::StringType* alloc_string(const std::string& data) override;
+    TackValue::StringType* intern_string(const std::string& data) override;
+    
+    TackValue::FunctionType* alloc_function(CodeFragment* code);
+    CodeFragment* create_fragment();
+    BoxType* alloc_box(TackValue val);
+    void add_module_dir_cwd();
+    Compiler::VariableContext* set_global_v(const std::string& name, TackValue value, bool is_const);
+    Compiler::VariableContext* set_global_v(const std::string& name, const std::string& module_name, TackValue value, bool is_const);
+    Compiler::ScopeContext* load_module_s(const std::string& filename);
+
+private:
     bool parse(const std::string& code, AstNode& out_ast);
+    uint16_t next_gid();    
 };

@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 #include <cmath>
-#include <exception>
 
 #include "../src/khash2.h"
 
@@ -68,26 +67,26 @@ struct TackValue {
     std::string get_string();
     
     // check type
-    inline TackType get_type()                      { return std::isnan(_d) ? (TackType)(_i & type_bits) : TackType::Number; }
-    inline bool is_null()                           { return _i == UINT64_MAX; }
-    inline bool is_boolean()                        { return (_i & type_bits) == (uint64_t)TackType::Boolean; }
-    inline bool is_number()                         { return !std::isnan(_d); }
-    inline bool is_pointer()                        { return (_i & type_bits) == (uint64_t)TackType::Pointer; }
-    inline bool is_function()                       { return (_i & type_bits) == (uint64_t)TackType::Function; }
-    inline bool is_cfunction()                      { return (_i & type_bits) == (uint64_t)TackType::CFunction; }
-    inline bool is_string()                         { return (_i & type_bits) == (uint64_t)TackType::String; }
-    inline bool is_object()                         { return (_i & type_bits) == (uint64_t)TackType::Object; }
-    inline bool is_array()                          { return (_i & type_bits) == (uint64_t)TackType::Array; }
+    inline TackType get_type()                          { return std::isnan(_d) ? (TackType)(_i & type_bits) : TackType::Number; }
+    inline bool is_null()                               { return _i == UINT64_MAX; }
+    inline bool is_boolean()                            { return (_i & type_bits) == (uint64_t)TackType::Boolean; }
+    inline bool is_number()                             { return !std::isnan(_d); }
+    inline bool is_pointer()                            { return (_i & type_bits) == (uint64_t)TackType::Pointer; }
+    inline bool is_function()                           { return (_i & type_bits) == (uint64_t)TackType::Function; }
+    inline bool is_cfunction()                          { return (_i & type_bits) == (uint64_t)TackType::CFunction; }
+    inline bool is_string()                             { return (_i & type_bits) == (uint64_t)TackType::String; }
+    inline bool is_object()                             { return (_i & type_bits) == (uint64_t)TackType::Object; }
+    inline bool is_array()                              { return (_i & type_bits) == (uint64_t)TackType::Array; }
 
     // convert to actual type. result will be undefined (most likely crash) if the value's type does not match, so check first
-    inline StringType*      string()                { return (StringType*)(_i & pointer_bits); }
-    inline ArrayType*       array()                 { return (ArrayType*)(_i & pointer_bits); }
-    inline ObjectType*      object()                { return (ObjectType*)(_i & pointer_bits); }
-    inline FunctionType*    function()              { return (FunctionType*)(_i & pointer_bits); }
-    inline CFunctionType    cfunction()             { return (CFunctionType)(_i & pointer_bits); }
-    inline bool             boolean()               { return (bool)(_i & 1u); }
-    inline double           number()                { return _d; }
-    inline void*            pointer()               { return (void*)(_i & pointer_bits); }
+    inline StringType*      string()                    { return (StringType*)(_i & pointer_bits); }
+    inline ArrayType*       array()                     { return (ArrayType*)(_i & pointer_bits); }
+    inline ObjectType*      object()                    { return (ObjectType*)(_i & pointer_bits); }
+    inline FunctionType*    function()                  { return (FunctionType*)(_i & pointer_bits); }
+    inline CFunctionType    cfunction()                 { return (CFunctionType)(_i & pointer_bits); }
+    inline bool             boolean()                   { return (bool)(_i & 1u); }
+    inline double           number()                    { return _d; }
+    inline void*            pointer()                   { return (void*)(_i & pointer_bits); }
     
     // create value
     static inline constexpr TackValue null()            { return { UINT64_MAX }; }
@@ -110,7 +109,6 @@ struct TackValue {
     }
 };
 
-
 class TackVM {
 public:
     static TackVM* create();
@@ -120,8 +118,12 @@ public:
     virtual void set_user_pointer(void* ptr) = 0;
     virtual TackGCState get_gc_state() const = 0;
     virtual void set_gc_state(TackGCState state) = 0;
+    
+    // set global variables
     virtual void set_global(const std::string& name, TackValue value, bool is_const = true) = 0;
     virtual void set_global(const std::string& name, const std::string& module_name, TackValue value, bool is_const = true) = 0;
+    
+    // get global variables
     virtual TackValue get_global(const std::string& name) = 0;
     virtual TackValue get_global(const std::string& name, const std::string& module_name) = 0;
 

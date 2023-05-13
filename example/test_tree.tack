@@ -1,0 +1,33 @@
+export fn make_tree(maxdepth) {
+    if maxdepth > 0 {
+        let l = null
+        let r = null
+        if random() < 0xcfff {
+            l = make_tree(maxdepth - 1)
+        }
+        if random() < 0xcfff {
+            r = make_tree(maxdepth - 1)
+        }
+
+        return {
+            left = l,
+            right = r,
+            data = random() % (maxdepth * 2)
+        }
+    }
+    return null
+}
+
+export fn print_tree(t) {
+    fn f(t, prefix) {
+        if t {
+            print(prefix, "data=" + tostring(t.data))
+            f(t.left, prefix +  "    ")
+            f(t.right, prefix + "    ")
+        }
+    }
+    f(t, "")
+}
+
+let tree = make_tree(8)
+print_tree(tree)

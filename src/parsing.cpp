@@ -55,9 +55,6 @@ struct ParseContext : private std::string_view {
 #define TRYs(s)\
     if (parse_raw_string(code, s))
 
-
-
-
 bool is_identifier_char(char c) {
     return isalnum(c) || c == '_';
 }
