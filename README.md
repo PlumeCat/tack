@@ -51,11 +51,34 @@ Key features:
 - "Register"-based bytecode
 - Hybrid stackless interpreter
 
-To run a script:
+To run a script, build the `tack` executable, then:
 
 ```bash
 tack my-script.tack
 ```
+
+## Requirements
+
+- cmake
+- doxygen (optional)
+
+## Building
+
+```bash
+# After cloning the repo into 'tack/'
+cd tack
+mkdir build
+cd build
+cmake ..
+make # Generates the `tack` executable in the `build/` folder
+```
+To force CMake to generate a Makefile: `cmake .. -G 'Unix Makefiles` . However, the provided CMakeLists should also be usable in Visual Studio via the "Open Folder" option
+
+For detailed language documentation see the `doc/` folder
+
+Generate documentation (recommended) for the public C++ interface by running `doxygen` in the root. Documentation is then found in `doc/html/index.html`
+
+
 
 ---
 ### Motivations
