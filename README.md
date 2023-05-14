@@ -42,6 +42,8 @@ let B = quicksort(A)
 
 For a detailed look at the language itself, see [Introduction to Tack](doc/INTRODUCTION.md)
 
+For a guide to embedding into a C++ program, see [Embedding](doc/EMBEDDING.md)
+
 Tack is semantically a mixture of Lua, Javascript and Python, with some Rust influence on the syntax. It aims for performance equal to or better than the stock Lua interpreter, while offering alternative syntax, adjusted semantics, and much more flexibility for integrating into host C++ programs.
 
 Key features:
