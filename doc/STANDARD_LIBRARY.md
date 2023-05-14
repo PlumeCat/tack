@@ -7,7 +7,7 @@
 - `print(x...)`
     - x: any, variadic
     - returns: null
-    Prints a string representation of each arguments to stdout
+    Prints the string representation of each argument, space separated, to stdout
 - `random()`
     - returns: number
     returns a "random" integer between 0 and 65535 inclusive

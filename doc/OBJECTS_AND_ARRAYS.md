@@ -1,5 +1,61 @@
 # Arrays
-Arrays resemble Javascript arrays and behave in the manner e
+
+Arrays resemble Javascript arrays and behave in the same manner
+Indexing starts at 0 and ends at N-1 where N is the length of the array
+
+Arrays are created with the syntax
+
+```rust
+[ element1, element2, element3, ... ]
+```
+
+where an element can be the result of any arbitrary expression.
+
+Once an array is created, elements can be pushed/popped to the end with << and >> operators.
+
+```rust
+
+let a = []
+a << 1
+a << 2
+a << 3
+
+let c = a >> 1
+print(c)      " 3 "
+```
+
+In addition there are several standard library functions for manipulating the contents of an array, or for computing new ones from existing values: [Standard library ](doc/STANDARD_LIBRARY.md)
+
+##### To iterate over an array:
+
+```rust
+array = [ 1, 2, 3, 4, 5 ]
+" per-element iteration "
+for x in array {
+    print(x)
+}
+" numerical iteration "
+for i in 0, #array {
+    print(i, "=", array[i])
+}
+```
+will output
+```
+1
+2
+3
+4
+5
+0 = 1
+1 = 2
+2 = 3
+3 = 4
+4 = 5
+```
+
+Use the `#` operator to find the length of the array. This is O(1)
+
+Use the `in` operator to check whether an element is present in the array. This is O(N)
 
 # Objects
 
@@ -16,8 +72,6 @@ Objects are created with the syntax
 ```
 Presently, keys must be valid identifiers. Values can be anything.
 
-Object 
-
 Once an object is created, new keys can be added with assignment syntax, but keys cannot be removed, and attempting to read from a key that is not present will result in an error
 
 ```rust
@@ -27,23 +81,25 @@ x.b = 2
 print(x.c) " error! "
 ```
 
+Use the `#` operator to check the number of keys in the object. This is O(1)
 
-## Iteration
-To iterate over an object:
+Use the `in` operator to check whether a certain key can be found in the object. This is O(1), more or less
+
+##### To iterate over an object:
 
 ```rust
 let obj = { x = 1, y = 2 }
 for k, v in obj {
-    print(x, y)
+    print(x, "=", y)
 }
 ```
-prints:
+will output
 ```
 x = 1
 y = 2
 ```
 
-The single-variable form of `for in` also works, but as objects can't currently be dynamically indexed, this is of limited use
+The single-variable form of `for in` also works.
 
 
 ## Object-oriented programming

@@ -29,10 +29,28 @@ fn quicksort(arr) {
 }
 
 " test "
+let N = 1e6
 let A = []
-for i in 1, 1000 {
-    A << random() % 1000
+for i in 0, N {
+    A << random()
 }
+
+print("Quicksort: ", #A, "elements")
+
+gc_disable()
+let before = clock()
 let B = quicksort(A)
-print(A)
-print(B)
+let after = clock()
+gc_enable()
+print("Time taken: ", after - before)
+
+for i in 0, #B-1 {
+    if B[i] > B[i+1] {
+        print("Incorrect result")
+    }
+}
+
+if N < 1001 {
+    print(A)
+    print(B)
+}

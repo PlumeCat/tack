@@ -109,7 +109,7 @@ my_func(1, 2, "hello")
 
 ## Retaining Tack data in C++ code
 
-A key difference between Tack and  Lua is the ability to "retain" direct pointers to Tack values' data in the host program. The idea behind this is to avoid the bottleneck caused Lua-style stack based interop.
+A key difference between Tack and  Lua is the ability to "retain" direct pointers to Tack data in the host program. The idea behind this is to avoid the bottleneck caused Lua-style stack based interop.
 
 Usually if a function, object or other has gone out of scope in the Tack code and is no longer reachable through any live objects, it would be expected that the garbage collector (GC) will deallocate it at some point. However, a reference counting mechanism is provided _in addition to_ the usual mark-and-sweep GC; the host can increment a value's refcount to indicate that an object is not to be deallocated by the Tack GC. In addition, values reachable through the refcounted object will be kept alive as well, even if they are not refcounted themselves.
 
@@ -183,6 +183,45 @@ callback 3, and callback 3 is kept alive by the host program, `temp_obj` will on
 
 ---
 
+## Iterating objects and arrays from C++
+
+```C++
+// "value" is a TackValue
+
+// Iterating an array
+if (value.is_array()) {
+    auto* arr = value.array();
+
+    // with index
+    for (auto i = 0u; i < arr->data.size(); i++) {
+        auto val = arr->data[i];
+        std::cout << "Array element: " << i << " - " << val.get_string() << std::endl;
+    }
+    
+    // without index
+    for (auto val: arr->data) {
+        std::cout << "Array element: " << val.get_string() << std::endl;
+    }
+}
+
+// Iterating an object
+if (value.is_object()) {
+    auto* obj = value.object();
+
+    // Iterate over the underlying KHash
+    for (auto i = obj->data.begin(); i != obj->data.end(); i = obj->data.next(i)) {
+        auto& key = obj->key_at(i); // key is std::string&
+        auto val = obj->value_at(i);// val is another TackValue
+
+        std::cout << "Object: key: " << key << " - value: " << val.get_string() << std::endl;
+    }
+}
+```
+
+Be careful when recursively iterating objects/arrays as there could be cycles. An object value/array element may even reference the object or array itself.
+
+---
+
 ## Notes
 
 - Non-capturing C++ lambdas can be passed into Tack if they have the right signature: this can make binding a little less arduous
@@ -215,4 +254,4 @@ callback 3, and callback 3 is kept alive by the host program, `temp_obj` will on
     The host program could modify this value*, but it is not immediately apparent why this would be desirable. 
 
 
-\* Modifying this data is not recommended, but if it must, it should be done in mutual exclusion from the owning TackVM, ie don't do it on another thread while the TackVM is running.
+\* Modifying this data is not recommended, but if needs must, it should be done in mutual exclusion from the owning TackVM, ie don't do it on another thread while the TackVM is running.

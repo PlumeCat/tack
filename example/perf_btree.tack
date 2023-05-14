@@ -1,3 +1,5 @@
+"copied from the lua btree benchmark"
+
 fn bottom_up(depth) {
     if depth > 0 {
         depth = depth - 1

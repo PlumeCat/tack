@@ -1,6 +1,6 @@
-# TACK
+# Tack
 
-A small scripting language for games and lightweight embedding
+A fast lightweight scripting language for games and embedding
 
 ```rust
 fn quicksort(arr) {
@@ -33,7 +33,6 @@ fn quicksort(arr) {
     return quicksort(lower) + quicksort(upper)
 }
 
-" test "
 let A = []
 for i in 1, 1000000 {
     A << random()
@@ -41,9 +40,16 @@ for i in 1, 1000000 {
 let B = quicksort(A)
 ```
 
-Tack is semantically a mixture of Javascript, Lua and Python, with some Rust influence on the syntax. It aims to perform similarly to Lua without
+For a detailed look at the language itself, see [Introduction to Tack](doc/INTRODUCTION.md)
 
-Features: dynamic typing, closures, fast interpreter, efficient binding
+Tack is semantically a mixture of Lua, Javascript and Python, with some Rust influence on the syntax. It aims for performance equal to or better than the stock Lua interpreter, while offering alternative syntax, adjusted semantics, and much more flexibility for integrating into host C++ programs.
+
+Key features:
+- Dynamic typing
+- Garbage collection
+- Lexically scoped closures
+- "Register"-based bytecode
+- Hybrid stackless interpreter
 
 To run a script:
 
@@ -51,43 +57,48 @@ To run a script:
 tack my-script.tack
 ```
 
-Why tack and not python
+---
+### Motivations
 
-- faster than python, probably
-- let keyword for variables, and better scopes
-- lightweight
+A sole developer's learning project! With the ambition to improve and be more widely used.
+This project is relatively young, and should be considered "v0.1" alpha-level/early beta-level software.
+The compiler and parser in particular may have bugs or subtly incorrect behaviour, and are in need of more battle-testing before this can be recommended for use in serious production contexts.
 
-Why tack and not lua
-- binding pain with the stack; keep a pointer to arguments, keep a pointer to values/data
-- 1-based indexing
-- inconsistency with metatable** method invocation: `foo:bar()` vs `foo.bar()`
-- pascal syntax
-- node wins for performance
+Why not use Python?
+- performance
+- better variable scoping; `let` keyword required for new variables.
 
-Why tack and not node
+Why not use Lua?
+- inefficiency due to stack based binding
+- some operations such as array length are unexpectedly O(N)
+- some operations like array length are unintuitively defined
+- inconsistency of invoking a "method" from a metatable**: `foo:bar()` vs `foo.bar()`
+    - tack does not have a metatable/prototype equivalent yet. Basic objects can be implemented via closures, the upcoming "vtables" feature will canonicalize this and be more efficient.
+- syntax, although this is personal preference more than anything.
+
+Why not use LuaJIT?
+- ...You probably should use LuaJIT.
+
+Why not use NodeJS?
 - https://www.destroyallsoftware.com/talks/wat
 
+**Why not use Tack?**
 
-## Building
+- Immature
+- No proper comments - loose string literals are a surprisingly adequate substitute though
+- Very limited error handling
+- Limited support, no literature
+- No unicode yet
+- No coroutines/parallelism
+- Limited ergonomicity of the standard library, and some batteries not included. (No file/socket IO yet)
+- Syntax and standard library are unfixed, possibly self-inconsistent or ill-defined, and likely to change. See [Syntax](doc/SYNTAX.md)
+    
+_Despite this, it is already possible to build small games and useful scripts with tack in its current state!_
 
-Tested with: MSVC 2022, clang 14, g++ 11
+---
 
-```bash
-# After cloning the repo into 'tack/'
-cd tack
-mkdir build
-cd build
-cmake ..
-make # Generates the `tack` executable in the `build/` folder
-```
-To force CMake to generate a Makefile: `cmake .. -G 'Unix Makefiles` . However, the provided CMakeLists should also be usable in Visual Studio via the "Open Folder" feature
+### Upcoming features
 
-For more detailed language documentation see [Introduction](doc/INTRODUCTION.md)
-
-Generate documentation (recommended) for the public C++ interface by running `doxygen` in the root. Documentation is then found in `doc/html/index.html`
-
-
-## Todo List
 - [x] variadic print
 - [x] a more usable looping construct
 - [ ] break and continue? labelled break?
@@ -123,4 +134,4 @@ Generate documentation (recommended) for the public C++ interface by running `do
 - [ ] type deduction in AST for optimizations
 - [ ] lifetime/escape analysis
 - [ ] improve GC
-- [ ] templating JIT
+- [ ] JIT
