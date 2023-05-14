@@ -1,5 +1,7 @@
 ## Embedding
 
+##### You must use C++20 (or greater)
+
 Tack can easily be embedded into an existing C++ program, either by linking the static library, or by adding the `src/` and `include/` folders to the project.
 
 In either case, the steps involved are:
