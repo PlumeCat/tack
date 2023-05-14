@@ -2,7 +2,6 @@
 
 A small scripting language for games and lightweight embedding
 
-
 ```rust
 fn quicksort(arr) {
     const n = #arr
@@ -36,27 +35,42 @@ fn quicksort(arr) {
 
 " test "
 let A = []
-for i in 1, 1000 {
+for i in 1, 1000000 {
     A << random()
 }
 let B = quicksort(A)
-print(A)
-print(B)
-
 ```
+
+Tack is semantically a mixture of Javascript, Lua and Python, with some Rust influence on the syntax. It aims to perform similarly to Lua without
 
 Features: dynamic typing, closures, fast interpreter, efficient binding
 
 To run a script:
 
-    ./tack my-script.tack
+```bash
+tack my-script.tack
+```
 
-## Requirements
+Why tack and not python
 
-- cmake
-- doxygen (optional)
+- faster than python, probably
+- let keyword for variables, and better scopes
+- lightweight
+
+Why tack and not lua
+- binding pain with the stack; keep a pointer to arguments, keep a pointer to values/data
+- 1-based indexing
+- inconsistency with metatable** method invocation: `foo:bar()` vs `foo.bar()`
+- pascal syntax
+- node wins for performance
+
+Why tack and not node
+- https://www.destroyallsoftware.com/talks/wat
+
 
 ## Building
+
+Tested with: MSVC 2022, clang 14, g++ 11
 
 ```bash
 # After cloning the repo into 'tack/'
@@ -66,9 +80,9 @@ cd build
 cmake ..
 make # Generates the `tack` executable in the `build/` folder
 ```
-To force CMake to generate a Makefile: `cmake .. -G 'Unix Makefiles` . However, the provided CMakeLists should also be usable in Visual Studio via the "Open Folder" option
+To force CMake to generate a Makefile: `cmake .. -G 'Unix Makefiles` . However, the provided CMakeLists should also be usable in Visual Studio via the "Open Folder" feature
 
-For detailed language documentation see the `doc/` folder
+For more detailed language documentation see the `doc/` folder
 
 Generate documentation (recommended) for the public C++ interface by running `doxygen` in the root. Documentation is then found in `doc/html/index.html`
 

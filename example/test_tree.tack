@@ -21,18 +21,63 @@ export fn make_tree(maxdepth) {
 export fn print_tree(t) {
     fn f(t, prefix) {
         if t {
-            print(prefix, "data=" + tostring(t.data))
-            f(t.left, prefix +  "    ")
+            print(     prefix + "data=" + tostring(t.data))
+            f(t.left,  prefix + "    ")
             f(t.right, prefix + "    ")
         }
     }
     f(t, "")
 }
 
-let tree = make_tree(8)
+fn visit(tree, distinct, path_length, dir) {
+    if tree.data in distinct {
+        return path_length
+    }
+    path_length = path_length + 1
+    
+    distinct << tree.data
+    print(distinct)
 
-fn longest_path() {
+    let path_length_r = 0
+    let path_length_l = 0
 
+    if tree.left != null {
+        path_length_l = visit(tree.left, distinct, path_length, "left")
+    }
+    if tree.right != null {
+        path_length_r = visit(tree.right, distinct, path_length, "right")
+    }
+
+    distinct >> 1
+
+    return max(path_length_l, path_length_r)
 }
 
+
+fn longest_distinct_path(tree) {
+    const distinct = []
+    return visit(tree, distinct, 0, "root")
+}
+
+
+const tree = make_tree(8)
+print("-------------------------------------------")
+
 print_tree(tree)
+
+const res = longest_distinct_path(tree)
+print("-------------------------------------------")
+print("RESULT:")
+print(res)
+print("-------------------------------------------")
+
+
+import test
+
+test(1, 2)
+
+test(1, 1)
+
+test("hello", "wrodl")
+
+test("hello", 3)

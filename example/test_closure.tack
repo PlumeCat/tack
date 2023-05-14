@@ -20,37 +20,4 @@ fn test_closure() {
         }
     }
 }
-
-let a = test_closure()()()
-print("Expect 203: ", a)
-
-
-fn Rectangle(w, h) {
-    let self = {
-        width = w,
-        height = h
-    }
-
-    self.area = fn() {
-        return self.width * self.height
-    }
-    self.is_square = fn() {
-        return self.width == self.height
-    }
-    
-    return self
-}
-
-let r1 = Rectangle(4, 5)
-let r2 = Rectangle(6, 6)
-print(r1.area(), r2.area())
-print(r1.is_square(), r2.is_square())
-
-
-let arr = [ 1, 2, 3 ]
-arr << 4
-arr >> true
-
-let x = 1
-
-print(arr, x)
+print("203 ==", test_closure()()())

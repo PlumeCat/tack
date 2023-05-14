@@ -32,6 +32,7 @@
     opcode(BITAND)\
     opcode(BITOR)\
     opcode(BITXOR)\
+    opcode(IN)\
     opcode(AND)\
     opcode(OR)\
     \

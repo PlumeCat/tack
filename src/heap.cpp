@@ -187,7 +187,7 @@ void Heap::gc(std::vector<TackValue>& globals, const Stack &stack, uint32_t stac
     {
         auto i = boxes.begin();
         while (i != boxes.end()) {
-            if (!i->marker && i->refcount == 0) {
+            if (!i->marker) {
                 dump("collected box", i->value);
                 num_collections += 1;
                 i = boxes.erase(i);

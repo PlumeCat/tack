@@ -1,3 +1,6 @@
+# Arrays
+Arrays resemble Javascript arrays and behave in the manner e
+
 # Objects
 
 Objects resemble Javascript objects or Lua tables (the hash part), however not all the same features are yet present (and not all are planned).

@@ -102,6 +102,31 @@ TackValue Interpreter::get_global(const std::string& name, const std::string& mo
 
     return globals[var->g_id];
 }
+TackValue Interpreter::get_type_name(TackType type) {
+    static auto nulltype    = TackValue::string(intern_string("null"));
+    static auto booltype    = TackValue::string(intern_string("boolean"));
+    static auto numtype     = TackValue::string(intern_string("number"));
+    static auto stringtype  = TackValue::string(intern_string("string"));
+    static auto ptrtype     = TackValue::string(intern_string("pointer"));
+    static auto objecttype  = TackValue::string(intern_string("object"));
+    static auto arraytype   = TackValue::string(intern_string("array"));
+    static auto cftype      = TackValue::string(intern_string("cfunction"));
+    static auto ftype       = TackValue::string(intern_string("function"));
+    static auto unknown     = TackValue::string(intern_string("unknown"));
+
+    switch (type) {
+        case TackType::Boolean: return booltype;
+        case TackType::Number:  return numtype;
+        case TackType::Null:    return nulltype;
+        case TackType::String:  return stringtype;
+        case TackType::Pointer: return ptrtype;
+        case TackType::Object:  return objecttype;
+        case TackType::Array:   return arraytype;
+        case TackType::CFunction:return cftype;
+        case TackType::Function:return ftype;
+        default: return unknown;
+    }
+}
 
 Compiler::VariableContext* Interpreter::set_global_v(const std::string& name, TackValue value, bool is_const) {
     return set_global_v(name, GLOBAL_NAMESPACE, value, is_const);
@@ -156,16 +181,18 @@ Compiler::ScopeContext* Interpreter::load_module_s(const std::string& module_nam
     if (iter == modules.end()) {
         auto filename = module_name;
         auto file_data = read_text_file(filename);
-        for (auto& d : module_dirs) {
-            auto path = std::filesystem::path(d).append(filename).string();
-            file_data = read_text_file(std::filesystem::path(d).append(filename).string());
-            if (file_data.has_value()) {
-                break;
-            }
-        }
         if (!file_data.has_value()) {
-            error("Unable to load module: " + module_name);
-            return nullptr;
+            for (auto& d : module_dirs) {
+                auto path = std::filesystem::path(d).append(filename).string();
+                file_data = read_text_file(path);
+                if (file_data.has_value()) {
+                    break;
+                }
+            }
+            if (!file_data.has_value()) {
+                error("Unable to load module: " + module_name);
+                return nullptr;
+            }
         }
     
         // parse
@@ -381,6 +408,29 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
             handle(OR) {
                 REGISTER(i.r0) = TackValue::boolean(REGISTER(i.u8.r1).get_truthy() || REGISTER(i.u8.r2).get_truthy());
             }
+            handle(IN) {
+                auto test_val = REGISTER(i.u8.r1);
+                auto arr_val = REGISTER(i.u8.r2);
+                if (arr_val.is_array()) {
+                    auto* arr = arr_val.array();
+                    auto found = TackValue::false_();
+                    for (auto i : arr->data) {
+                        if (i == test_val) {
+                            found = TackValue::true_();
+                            break;
+                        }
+                    }
+                    REGISTER(i.r0) = found;
+                } else if (arr_val.is_object()) {
+                    check(test_val, string);
+                    auto* obj = arr_val.object();
+                    auto* str = test_val.string();
+                    auto f = obj->data.find(str->data);
+                    REGISTER(i.r0) = (f == obj->data.end()) ? TackValue::false_() : TackValue::true_();
+                } else {
+                    in_error("in: expected array or object");
+                }
+            }
                 
             handle(EQUAL) {
                 REGISTER(i.r0) = TackValue::boolean(REGISTER(i.u8.r1) == REGISTER(i.u8.r2));
@@ -518,6 +568,10 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 check(val, number);
                 REGISTER(i.r0) = TackValue::number(-(val.number()));
             }
+            handle(NOT) {
+                auto val = REGISTER(i.u8.r1);
+                REGISTER(i.r0) = TackValue::boolean(!val.get_truthy());
+            }
             handle(READ_CAPTURE) {
                 REGISTER_RAW(i.r0) = _pr->captures[i.u8.r1];
             }
@@ -560,26 +614,48 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
             handle(LOAD_ARRAY) {
                 auto arr_val = REGISTER(i.u8.r1);
                 auto ind_val = REGISTER(i.u8.r2);
-                check(arr_val, array);
-                check(ind_val, number);
-                auto* arr = arr_val.array();
-                auto ind = ind_val.number();
-                if (ind >= arr->data.size() || ind < 0) {
-                    in_error("index out of range");
+
+                if (arr_val.is_array()) {
+                    check(ind_val, number);
+                    auto* arr = arr_val.array();
+                    auto ind = ind_val.number();
+                    if (ind >= arr->data.size() || ind < 0) {
+                        in_error("index out of range");
+                    }
+                    REGISTER(i.r0) = arr->data.at(ind);
+                } else if (arr_val.is_object()) {
+                    check(ind_val, string);
+                    auto* obj = arr_val.object();
+                    auto* str = ind_val.string();
+                    auto f = obj->data.find(str->data);
+                    if (f == obj->data.end()) {
+                        in_error("key not found: " + ind_val.get_string());
+                    }
+                    REGISTER(i.r0) = obj->data.value_at(f);
+                } else {
+                    in_error("[]: expected array or object");
                 }
-                REGISTER(i.r0) = arr->data.at(ind);
             }
             handle(STORE_ARRAY) {
                 auto arr_val = REGISTER(i.u8.r1);
                 auto ind_val = REGISTER(i.u8.r2);
-                check(arr_val, array);
-                check(ind_val, number);
-                auto* arr = arr_val.array();
-                auto ind = ind_val.number();
-                if (ind > arr->data.size()) {
-                    in_error("index out of range");
+
+                if (arr_val.is_array()) {
+                    check(ind_val, number);
+                    auto* arr = arr_val.array();
+                    auto ind = ind_val.number();
+                    if (ind > arr->data.size()) {
+                        in_error("index out of range");
+                    }
+                    arr->data.at(ind) = REGISTER(i.r0);
+                } else if (arr_val.is_object()) {
+                    check(ind_val, string);
+                    auto* obj = arr_val.object();
+                    auto* str = ind_val.string();
+                    obj->data.value_at(obj->data.put(str->data)) = REGISTER(i.r0);
+                } else {
+                    in_error("[]: expected array or object");
                 }
-                arr->data.at(ind) = REGISTER(i.r0);
             }
             handle(LOAD_OBJECT) {
                 auto lhs = REGISTER(i.u8.r1);
@@ -591,7 +667,7 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 auto found = false;
                 auto val = obj->data.get(key->data, found);
                 if (!found) {
-                    in_error("key not found"s + key->data);
+                    in_error("key not found: "s + key->data);
                 } else {
                     REGISTER(i.r0) = val;
                 }

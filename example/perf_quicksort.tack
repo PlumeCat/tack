@@ -31,7 +31,7 @@ fn quicksort(arr) {
 " test "
 let A = []
 for i in 1, 1000 {
-    A << random()
+    A << random() % 1000
 }
 let B = quicksort(A)
 print(A)

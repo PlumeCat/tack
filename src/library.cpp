@@ -5,7 +5,7 @@
 #include <optional>
 
 using namespace std::string_literals;
-static const float pi = 3.1415926535f;
+static const double pi = 3.141592653589793;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -104,23 +104,23 @@ std::vector<std::string> split(const std::string& data, const std::string& split
 
 #define paste(a, b) a##b
 #define check_args(n) { if (nargs != n) { vm->error("expected "s + std::to_string(n) + " arguments"); }}
-#define check_arg(i, ty) if (!(args[i].is_##ty())) vm->error("type error: expected " #ty);
+#define check_arg(i, ty) if (!(args[i].is_##ty())) vm->error("type error: expected " #ty " in argument " #ty);
 #define check_val(v, ty) if (!((v).is_##ty())) vm->error("type error: expected " #ty);
 #define tack_func_name(name) paste(tack_, name)
 #define tack_func(name) TackValue tack_func_name(name)(TackVM* vm, int nargs, TackValue* args)
-#define tack_bind(name)  vm->set_global(#name, TackValue::cfunction(tack_func_name(name)), true);
-#define tack_math(func)  vm->set_global(#func, TackValue::cfunction([](TackVM* vm, int nargs, TackValue* args) { \
+#define tack_bind(name)  set_global(#name, TackValue::cfunction(tack_func_name(name)), true);
+#define tack_math(func)  set_global(#func, TackValue::cfunction([](TackVM* vm, int nargs, TackValue* args) { \
     check_args(1); \
     check_arg(0, number); \
     return TackValue::number(func(args[0].number()));\
 }), true);
-#define tack_math2(func) vm->set_global(#func, TackValue::cfunction([](TackVM* vm, int nargs, TackValue* args) { \
+#define tack_math2(func) set_global(#func, TackValue::cfunction([](TackVM* vm, int nargs, TackValue* args) { \
     check_args(2);\
     check_arg(0, number);\
     check_arg(1, number);\
     return TackValue::number(func(args[0].number(), args[1].number()));\
 }), true);
-#define tack_math3(func) vm->set_global(#func, TackValue::cfunction([](TackVM* vm, int nargs, TackValue* args) { \
+#define tack_math3(func) set_global(#func, TackValue::cfunction([](TackVM* vm, int nargs, TackValue* args) { \
     check_args(3);\
     check_arg(0, number);\
     check_arg(1, number);\
@@ -157,6 +157,10 @@ tack_func(gc_enable) {
 tack_func(tostring) {
     check_args(1);
     return TackValue::string(vm->alloc_string(args[0].get_string()));
+}
+tack_func(type) {
+    check_args(1);
+    return vm->get_type_name(args[0].get_type());
 }
 
 // array funcs
@@ -554,9 +558,9 @@ tack_func(join) {
     auto* str = args[1].string();
 
     if (arr->data.size()) {
+        retval << arr->data.at(0).get_string();
         for (auto i = arr->data.begin() + 1; i != arr->data.end(); i++) {
-            check_val(*i, string);
-            retval << str->data << (*i).string();
+            retval << str->data << (*i).get_string();
         }
     }
 
@@ -609,13 +613,11 @@ tack_func(find) {
     if (nargs < 2 || nargs > 3) {
         vm->error("find expected 2 or 3 arguments");
     }
-    
     auto offset = 0;
     if (nargs == 3) {
         check_arg(2, number);
         offset = (int)args[2].number();
-    }    
-    
+    }
     if (args[0].is_array()) {
         auto* arr = args[0].array();
         auto val = args[1];
@@ -634,6 +636,15 @@ tack_func(find) {
             return TackValue::number(-1);
         }
         return TackValue::number(f);
+    } else if (args[0].is_object()) {
+        auto* obj = args[0].object();
+        check_arg(1, string);
+        auto* key = args[1].string();
+        auto f = obj->data.find(key->data);
+        if (f == obj->data.end()) {
+            return TackValue::null();
+        }
+        return obj->data.value_at(f);
     } else {
         vm->error("find expected array or string");
     }
@@ -821,7 +832,15 @@ tack_func(clamp) {
     check_arg(0, number);
     check_arg(1, number);
     check_arg(2, number);
-    return TackValue::number(std::max(args[2].number(), std::min(args[1].number(), args[0].number())));
+    return TackValue::number(
+        std::max(
+            args[1].number(),
+            std::min(
+                args[2].number(),
+                args[0].number()
+            )
+        )
+    );
 }
 tack_func(saturate) {
     check_args(1);
@@ -831,16 +850,18 @@ tack_func(saturate) {
 // TODO: more interpolation: smoothstep/cubic, beziers, ...
 
 void Interpreter::add_libs() {
-    auto vm = this;
     // generic
-    vm->set_global("print", TackValue::cfunction(tack_print), true);
+    tack_bind(print);
     tack_bind(random);
     tack_bind(clock);
     tack_bind(gc_disable);
     tack_bind(gc_enable);
     // tack_bind(read_file);
     // tack_bind(write_file);
+    // tack_bind(getline);
+    // tack_bind(getarg);
     tack_bind(tostring);
+    tack_bind(type);
 
     // array
     tack_bind(any);
@@ -892,7 +913,8 @@ void Interpreter::add_libs() {
     tack_bind(clamp);
     tack_bind(saturate);
 
-    vm->set_global("pi", TackValue::number(pi), true);
+    set_global("pi", TackValue::number(pi), true);
+    
     tack_math(sin);
     tack_math(cos);
     tack_math(tan);

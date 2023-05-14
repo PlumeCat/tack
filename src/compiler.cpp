@@ -4,6 +4,8 @@
 
 #include <sstream>
 
+using namespace std::string_literals;
+
 // emit an instruction with 3 8 bit operands
 #define emit(op, _0, _1, _2)            emit_ins(Opcode::op, _0, _1, _2, node->line_number);
 
@@ -26,6 +28,7 @@
 #define should_allocate(n)
 #define handle(x)                       break; case AstType::x:
 #define child(n)                        compile(&node->children[n]);
+#define compile_error(err)              interpreter->error("compile error: "s + err + "; line: "s + std::to_string(node->line_number) + "in "s)
 
 
 bool is_small_integer(double d, int16_t& out_si) {
@@ -113,7 +116,7 @@ uint8_t Compiler::allocate_register() {
             return (uint8_t)i;
         }
     }
-    interpreter->error("Ran out of registers!");
+    compile_error("Ran out of registers!");
     return 0xff;
 }
 
@@ -127,7 +130,7 @@ uint8_t Compiler::allocate_register2() {
             return (uint8_t)i;
         }
     }
-    interpreter->error("Ran out of registers!");
+    compile_error("Ran out of registers!");
     return 0xff;
 }
 
@@ -339,7 +342,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             if (lhs.type == AstType::Identifier) {
                 if (auto var = lookup(node->children[0].data_s)) {
                     if (var->is_const) {
-                        interpreter->error("can't reassign const variable");
+                        compile_error("can't reassign const variable");
                     } else {
                         if (var->is_global) {
                             emit_u(WRITE_GLOBAL, source_reg, var->g_id);
@@ -348,7 +351,7 @@ uint8_t Compiler::compile(const AstNode* node) {
                         }
                     }
                 } else {
-                    interpreter->error("can't find variable: " + node->children[0].data_s);
+                    compile_error("can't find variable: " + node->children[0].data_s);
                 }
             } else if (lhs.type == AstType::IndexExp) {
                 auto array_reg = compile(&lhs.children[0]);
@@ -493,7 +496,7 @@ uint8_t Compiler::compile(const AstNode* node) {
             if (node->children.size()) {
                 auto return_register = child(0);
                 if (return_register == 0xff) {
-                    interpreter->error("return value incorrect register");
+                    compile_error("return value incorrect register");
                     // emit(RET, 0, 0, 0);
                 }
                 emit(RET, 1, return_register, 0);
@@ -515,7 +518,7 @@ uint8_t Compiler::compile(const AstNode* node) {
                     return v->reg;
                 }
             }
-            interpreter->error("identifier: can't find variable: " + node->data_s);
+            compile_error("identifier: can't find variable: " + node->data_s);
             return 0xff;
         }
 
@@ -533,6 +536,15 @@ uint8_t Compiler::compile(const AstNode* node) {
             auto in2 = child(1);
             auto out = allocate_register();
             emit(AND, out, in1, in2);
+            free_register(in1);
+            free_register(in2);
+            return out;
+        }
+        handle(InExp) {
+            auto in1 = child(0);
+            auto in2 = child(1);
+            auto out = allocate_register();
+            emit(IN, out, in1, in2);
             free_register(in1);
             free_register(in2);
             return out;
@@ -674,6 +686,20 @@ uint8_t Compiler::compile(const AstNode* node) {
             auto in = child(0);
             auto out = allocate_register();
             emit(NEGATE, out, in, 0);
+            free_register(in);
+            return out;
+        }
+        handle(NotExp) {
+            auto in = child(0);
+            auto out = allocate_register();
+            emit(NOT, out, in, 0);
+            free_register(in);
+            return out;
+        }
+        handle(BitNotExp) {
+            auto in = child(0);
+            auto out = allocate_register();
+            emit(BITNOT, out, in, 0);
             free_register(in);
             return out;
         }
@@ -828,10 +854,10 @@ uint8_t Compiler::compile(const AstNode* node) {
             return out;
         }
 
-    default: { interpreter->error("unknown ast: " + to_string(node->type)); } break;
+    default: { compile_error("unknown ast: " + to_string(node->type)); } break;
     }
 
-    interpreter->error("forgot to return a register");
+    compile_error("forgot to return a register");
     return 0;
 }
 

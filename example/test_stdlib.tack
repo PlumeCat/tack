@@ -1,45 +1,204 @@
-"TODO: Test the whole standard library"
+import test
 
-let a = [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]
+fn test_operators() {
+    print("test operators and basics")
+    TEST(1, 1)
+    TEST("hello", "hello")
+    TEST([], [])
+    TEST([ 1, 2, 3 ], [ 1, 2, 3 ])
+    TEST({}, {})
+    TEST({ x = 1, y = 1, z = 1 }, { y = 1, x = 1, z = 1 })
+    let x = { foo = 1, bar = 2 }
+    TEST("foo" in x, true)
+    TEST("bar" in x, true)
+    TEST("baz" in x, false)
+    TEST(keys(x), [ "foo", "bar" ])
 
-print(filter(a, fn(x) { return x % 2 - 1 }))
-print(reduce(a, fn(x, v) { return x + v }, 0))
-print(sum(a))
+    TEST(tonumber("123"), 123)
+    TEST(tonumber("123"), 123)
+    TEST(tonumber("123.45"), 123.45)
+    TEST(tonumber("123.f"), 123)
+    TEST(tonumber("123e3"), 123000)
+    TEST(tonumber("0.00123E3"), 1.23)
+    TEST(tonumber("0x234.234"), 0x234.234)
+    TEST(tonumber("  123"), 123)
 
-let s = [ 1, 3, 2, 4, 3, 56, 3 ]
-print(sort(s))
-print(sort(s, fn(x, y) { return x > y }))
-print(sort(split("hello world this  is a   tack program")))
-
-print(map([ 1, 2, 3 ], fn(x) { return x * 2 }))
-foreach([ 1, 2, 3, 4, 5 ], print)
-print(slice("hello world", 1, 5))
-print(replace("hello world", "o", "a"))
-
-print(tonumber("123"))
-print(tonumber("123.45"))
-print(tonumber("123.f"))
-print(tonumber("123e3"))
-print(tonumber("0.00123E3"))
-print(tonumber("0x234.234"))
-print(tonumber("  123"))
+    TEST(tostring("hello"), "hello")
+    TEST(tostring(null), "null")
+    TEST(tostring(true), "true")
+    TEST(tostring(false), "false")
+    TEST(tostring(1.23), "1.23")
+    TEST(tostring(0xff), "255")
+    TEST(tostring([ 1, 2, 3 ]), "array [ 1, 2, 3 ]")
+    TEST(tostring({ x = 1, y = 2 }), "object { y = 2, x = 1 }")
+    TEST(tostring( [ [ [ ] ] ]), "array [ array [ array [] ] ]")
+    TEST(tostring(test_operators), "function: test_stdlib.tack::test_operators")
     
-print(ord("a"), ord("A"), ord("c"), ord("C"), ord("hello"))
-print(chr(64), chr(65), chr(65 + 32), chr(65 + 25), chr(65 + 25 + 32))
-
-let foo = {
-    x = 1,
-    y = 2,
-    z = 3
+    TEST(type(null), "null")
+    TEST(type(true), "boolean")
+    TEST(type(false), "boolean")
+    TEST(type(1.23), "number")
+    TEST(type(0xff), "number")
+    TEST(type({}), "object")
+    TEST(type([[[]]]), "array")
+    TEST(type(print), "cfunction")
+    TEST(type(type), "cfunction")
+    TEST(type(test_operators), "function")
+    TEST(type(fn(){}), "function")
 }
-for k, v in foo {
-    print(k, v)
-}
-print(keys(foo))
-print(values(foo))
 
+fn test_array_calc() {
+    print("test array calcs")
+    let a = [ 1, 2, 3, 4, 5 ]
+    
+    TEST(map([ 1, 2, 3 ], fn(x) { return x * 2 }), [ 2, 4, 6 ])
+    
+    TEST(any([ 0, false, null, 3 ]), true)
+    TEST(any([ 0, false, false, null, 0, -1 ]), true)
+    TEST(any([ false, null, false]), false)
 
-fn named() {
-    foo.y = 5
+    TEST(all([ 1, 2, 3, 4, 5, -1, {}, [] ]), true)
+    TEST(all([ 1, 2, 3, 4, false, -1, {}, [] ]), false)
+    TEST(next([ 0, false, null, 32, false], fn(x) { return x }), 32)
+    TEST(next([ 0, false, null, false], fn(x) { return x }), null)
+    TEST(next([], fn(x) { return x }), null)
+
+    let foreach_test = ""
+    TEST(foreach([ 1, 2, 3, 4, 5 ], fn(x) { foreach_test = foreach_test + tostring(x) }), null)
+    TEST(foreach_test, "12345")
+
+    TEST(map(a, fn(x) { return x * 2 }), [ 2, 4, 6, 8, 10 ])
+    TEST(filter(a, fn(x) { return x % 2 - 1 }), [ 2, 4 ])
+    TEST(reduce(a, fn(x, v) { return x + v }, 0), 15)
+    TEST(sum(a), 15)
+    let s = [ 1, 3, 2, 4, 3, 56, 3 ]
+    TEST(sort(s), [ 1, 2, 3, 3, 3, 4, 56 ])
+    TEST(sort(s, fn(x, y) { return x > y }), [ 56, 4, 3, 3, 3, 2, 1 ])
+    TEST(sort(split("hello world this  is a   tack program")), [
+        "a", "hello", "is", "program", "tack", "this", "world"
+    ])
+
+    TEST(slice(s, 2, 6), [ 2, 4, 3, 56 ])
+    TEST(slice(s, 0, 5), [ 1, 3, 2, 4, 3 ])
+    TEST(slice(s, 0, 0), [])
+    TEST(slice(s, 0, #s), s)
+    TEST(find(s, 56), 5)
+    TEST(find(s, 235), -1)
 }
-print(null, true, false, 1.23, 5, "hello", print, named, fn(){}, {}, foo, [], s)
+
+fn test_array_inplace() {
+    print("test array inplace")
+    let a = [ 1, 2, 3, 4, 5 ]
+    push(a, 1) TEST(a, [ 1, 2, 3, 4, 5, 1 ])
+    push_front(a, "x") TEST(a, [ "x", 1, 2, 3, 4, 5, 1 ])
+    pop(a) TEST(a, [ "x", 1, 2, 3, 4, 5 ])
+    pop_front(a) TEST(a, [ 1, 2, 3, 4, 5 ])
+    
+    insert(a, "x", 3) TEST(a, [ 1, 2, 3, "x", 4, 5 ])
+    insert(a, "x", 0) TEST(a, [ "x", 1, 2, 3, "x", 4, 5 ])
+    remove_value(a, "x") TEST(a, [ 1, 2, 3, 4, 5 ])
+    remove(a, 1, 4) TEST(a, [ 1, 5 ])
+    a = [ 1, 2, 3, 4, 5, 6 ]
+    remove_if(a, fn(x) { return x % 2 }) TEST(a, [ 2, 4, 6 ])
+    TEST(min(a), 2)
+    TEST(max(a), 6)
+    TEST(min(1, 2, 5, 2, 3), 1)
+    TEST(min(), null)
+    TEST(max(1, 2, 5, 3, 4), 5)
+    TEST(max(), null)
+    TEST(join(a, "--"), "2--4--6")
+}
+
+fn test_string_stdlib() {
+    print("test string funcs")
+    TEST(ord("a"), 97)
+    TEST(ord("A"), 65)
+    TEST(ord("c"), 99)
+    TEST(ord("C"), 67)
+
+    TEST("a", chr(97))
+    TEST("A", chr(65))
+    TEST("c", chr(99))
+    TEST("C", chr(67))
+
+    TEST(slice("hello world", 1, 5), "ello")
+    TEST(replace("hello world", "o", "a"), "hella warld")
+    TEST(find("hello world", "hello"), 0)
+    TEST(find("", ""), 0)
+    TEST(find("world", "hello"), -1)
+
+    TEST(tolower("a"), "a")
+    TEST(tolower("~"), "~")
+    TEST(tolower("ABC"), "abc")
+    TEST(toupper("abc"), "ABC")
+    TEST(toupper("X"), "X")
+    TEST(toupper(" 123 "), " 123 ")
+
+    TEST(isupper("HELLo"), false)
+    TEST(isupper("HELLO"), true)
+    TEST(isupper("HELLO1"), false)
+    TEST(islower("Hello"), false)
+    TEST(islower("hello"), true)
+    TEST(islower("hello1"), false)
+    
+    TEST(isdigit("  123 "), false)
+    TEST(isdigit("123"), true)
+    TEST(isdigit("0x123"), false)
+
+    TEST(isalnum("0x123"), true)
+    TEST(isalnum("hello1"), true)
+    TEST(isalnum("1hello"), true)
+
+}
+fn test_object() {
+    TEST(sort(keys({ x = 1, y = 2, z = 3 })), [ "x", "y", "z" ])
+    TEST(sort(values({ x = 1, y = 2, z = 3 })), [ 1, 2, 3 ])
+}
+
+fn test_math() {
+    TEST(pi, 3.141592653589793)
+
+    TEST(radtodeg(pi), 180)
+    TEST(degtorad(180), pi)
+    TEST(degtorad(radtodeg(0)), 0)
+
+    TEST(lerp(0.1, 0.5, 0.25), 0.2)
+    TEST(lerp(0, 1, 0.6), 0.6)
+    TEST(lerp(0, 1, 1), 1)
+    
+    TEST(clamp(100, 0, 10), 10)
+    TEST(clamp(-100, 0, 10), 0)
+    TEST(clamp(5, 0, 10), 5)
+
+    TEST(saturate(0.5), 0.5)
+    TEST(saturate(-0.1), 0)
+    TEST(saturate(-100), 0)
+    TEST(saturate(100), 1)
+
+    TEST(sin(pi) < 0.0000001, true)
+    TEST(cos(pi) < -0.999999, true)
+    TEST(tan(pi) < 0.0000001, true) 
+    
+    TEST(asin(1), pi/2)
+    TEST(acos(1), 0)
+    TEST(atan(1), pi/4)
+    TEST(atan2(1, 1), pi / 4)
+    TEST(atan2(1, 0), pi / 2)
+
+    print("TODO: more math funcs from cmath not tested")
+}
+
+fn test_print() {
+    print("test print for built in types:")
+    for x in [ null, true, false, 1.23, 5, "hello", print, fn(){}, { x = 1, y = 2 }, [ 5, 6, 7, [ 8 ], { z = 3 } ] ] {
+        print(" ", x)
+    }
+}
+
+test_operators()
+test_array_calc()
+test_array_inplace()
+test_string_stdlib()
+test_print()
+test_object()
+test_math()

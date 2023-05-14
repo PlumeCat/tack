@@ -270,8 +270,8 @@ public:
     }
 
     Iterator begin() const {
-        auto i = 0;
-        if (!exist(i)) {
+        auto i = Iterator(0);
+        if (i != end() && !exist(i)) {
             i = next(i);
         }
         return i;

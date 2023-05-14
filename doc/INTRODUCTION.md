@@ -32,5 +32,5 @@ Objects
 
 Standard library
 
-Embedding to/from C
+EMBEDDING
 

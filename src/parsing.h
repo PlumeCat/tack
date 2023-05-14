@@ -33,6 +33,8 @@
     ast(LessEqExp)\
     ast(GreaterEqExp)\
     \
+    ast(InExp)\
+    \
     ast(BitOrExp)\
     ast(BitAndExp)\
     ast(BitXorExp)\

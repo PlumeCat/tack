@@ -8,8 +8,7 @@
 // Hidden box type
 struct BoxType {
     TackValue value;
-    uint32_t refcount = 0;
-    bool marker = false;
+    bool marker = false; // boxes don't need refcount
 };
 #define type_bits_boxed (0x00'0b'00'00'00'00'00'00)
 static inline TackValue value_from_boxed(BoxType* box)             { return { nan_bits | type_bits_boxed | uint64_t(box) }; }
@@ -55,7 +54,7 @@ class Interpreter: public TackVM {
     uint32_t stackbase;
     std::vector<TackValue> globals;
     uint16_t next_globalid;
-    KHash<std::string, TackValue::StringType*> key_cache; // TODO: move this into heap and use the refcount mechanism
+    KHash<std::string, TackValue::StringType*> key_cache; // TODO: move this into heap and use the refcount mechanism (and rename it!)
 
     Compiler::ScopeContext global_scope; // c-provided globals go here
     KHash<std::string, Compiler::ScopeContext*> modules; // all loaded modules; "" is global module and is always implicitly imported
@@ -87,6 +86,8 @@ public:
     inline void load_module(const std::string& module_name) override { load_module_s(module_name); }
     TackValue call(TackValue fn, int nargs, TackValue* args) override;
     void error(const std::string& msg) override;
+
+    TackValue get_type_name(TackType type) override;
     
     TackValue::ArrayType* alloc_array() override;
     TackValue::ObjectType* alloc_object() override;

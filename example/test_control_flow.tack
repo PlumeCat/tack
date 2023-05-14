@@ -16,7 +16,7 @@ fn fizzbuzz() {
 }
 fizzbuzz()
 
-fn foo() {
+fn () {
     "testing capture of the iterable"
     let arr = [ 1, 2, 3, 4, 5 ]
     for i in arr {
@@ -26,8 +26,7 @@ fn foo() {
         }
         bar()
     }
-}
-foo()
+}()
 
 fn() {
     "testing capture of the loop variable"
@@ -53,3 +52,10 @@ fn() {
         print(k, v)
     }
 }()
+
+let foo = {
+    x = 1,
+    y = 2,
+    z = 3
+}
+print("x" in foo, "y" in foo, "w" in foo)

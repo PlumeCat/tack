@@ -144,6 +144,22 @@ bool parse_raw_string(ParseContext& code, const std::string& c) {
             SUCCESS(res);\
         }\
    });
+#define BINOP_S(name, ty, precedent, op)\
+    DEFPARSER(name, {\
+        TRY(precedent) {\
+            auto res = precedent;\
+            while (true) {\
+                TRYs(op) {\
+                    if (skip_whitespace(code)) {\
+                        TRY(precedent) {\
+                            res = AstNode(AstType::ty, res, precedent);\
+                        } else ERROR("expected RHS for binary op '" op "'");\
+                    } else FAIL() /*ERROR("expected space after '" op "' operator")*/\
+                } else break;\
+            }\
+            SUCCESS(res);\
+        }\
+   });
 
 // binary operation non recursive in the grammar sense
 #define BINOP2(name, ty, precedent, op)\
@@ -364,8 +380,9 @@ DEFPARSER(cmp_exp, {
 BINOP(bit_and_exp, BitAndExp, cmp_exp, "&");
 BINOP(bit_xor_exp, BitXorExp, bit_and_exp, "^");
 BINOP(bit_or_exp, BitOrExp, bit_xor_exp, "|");
-BINOP(and_exp, AndExp, bit_or_exp, "and");
-BINOP(or_exp, OrExp, and_exp, "or");
+BINOP(in_exp, InExp, bit_or_exp, "in ");
+BINOP(and_exp, AndExp, in_exp, "and ");
+BINOP(or_exp, OrExp, and_exp, "or ");
 
 DEFPARSER(ternary_exp, {
     TRY(or_exp) {
@@ -381,7 +398,10 @@ DEFPARSER(ternary_exp, {
     }
 });
 
-DEFPARSER(exp, { TRY(ternary_exp) SUCCESS(ternary_exp); });
+DEFPARSER(exp, { TRY(or_exp) SUCCESS(or_exp); });
+
+// or, and, in, |, ^, &, cmp, <<, >>, +, -, *, /, %, **
+
 
 DEFPARSER(const_decl_stat, {
     auto is_export = parse_raw_string(code, "export") && skip_whitespace(code);

@@ -1,0 +1,59 @@
+" World's worst test framework "
+
+let testnum = 0
+
+fn test_error(msg, a, b) {
+    print("test", testnum, "error: ", msg, a, b)
+    return false
+}
+
+export fn TEST(a, b) {
+    testnum = testnum + 1
+    let ta = type(a)
+    let tb = type(b)
+    if ta != tb {
+        return test_error("mismatched types: ", a, b)
+    }
+
+    if ta == "number" or ta == "string" or ta == "boolean" or ta == "pointer" or ta == "null" or ta == "cfunction" or ta == "function" {
+        if a != b {
+            return test_error("not equal: ", a, b)
+        }
+    }
+
+    else if ta == "array" {
+        if #a != #b {
+            return test_error("different lengths", #a, #b)
+        }
+        
+        for i in 0, #a {
+            if a[i] != b[i] {
+                return test_error("array values differ at index " + tostring(i), a[i], b[i])
+            }
+        }
+    }
+
+    else if ta == "object" {
+        if #a != #b {
+            return test_error("different lengths", #a, #b)
+        }
+        
+        for k in a {
+            if !(k in b) {
+                return test_error("key from a not found in b: " + k, "", "")
+            }
+            if a[k] != b[k] {
+                return test_error("object values differ at key: " + k, a[k], b[k])
+            }
+        }
+
+        for k in b {
+            if !(k in a) {
+                return test_error("key from b not found in a: " + k, "", "")
+            }
+        }
+    }
+    
+    print("test ok: ", testnum, a, b)
+    return true
+}
