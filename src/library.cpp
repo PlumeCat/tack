@@ -680,7 +680,6 @@ tack_func(tonumber) {
     if (dist != 0) {
         return TackValue::number(retval);
     }
-    vm->error("could not convert to number");
     return TackValue::null();
 }
 tack_func(tolower) {
@@ -842,6 +841,16 @@ tack_func(clamp) {
         )
     );
 }
+
+tack_func(atan2) {
+    check_args(2);
+    check_arg(0, number);
+    check_arg(1, number);
+    return TackValue::number(
+        atan2(args[1].number(), args[0].number())
+    );
+}
+
 tack_func(saturate) {
     check_args(1);
     check_arg(0, number);

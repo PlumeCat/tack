@@ -1,3 +1,5 @@
+" Testing ifs and fors "
+
 fn fizzbuzz() {
     print("fizzbuzz test")
     for i in 1, 31 {
@@ -52,10 +54,3 @@ fn() {
         print(k, v)
     }
 }()
-
-let foo = {
-    x = 1,
-    y = 2,
-    z = 3
-}
-print("x" in foo, "y" in foo, "w" in foo)

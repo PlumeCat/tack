@@ -82,7 +82,7 @@ make # Generates the `tack` executable in the `build/` folder
 ```
 To force CMake to generate a Makefile: `cmake .. -G 'Unix Makefiles` . However, the provided CMakeLists should also be usable in Visual Studio via the "Open Folder" feature
 
-For more detailed language documentation see the `doc/` folder
+For more detailed language documentation see [Introduction](doc/INTRODUCTION.md)
 
 Generate documentation (recommended) for the public C++ interface by running `doxygen` in the root. Documentation is then found in `doc/html/index.html`
 

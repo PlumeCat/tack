@@ -91,8 +91,8 @@ fn test_array_inplace() {
     let a = [ 1, 2, 3, 4, 5 ]
     push(a, 1) TEST(a, [ 1, 2, 3, 4, 5, 1 ])
     push_front(a, "x") TEST(a, [ "x", 1, 2, 3, 4, 5, 1 ])
-    pop(a) TEST(a, [ "x", 1, 2, 3, 4, 5 ])
-    pop_front(a) TEST(a, [ 1, 2, 3, 4, 5 ])
+    TEST(pop(a), 1) TEST(a, [ "x", 1, 2, 3, 4, 5 ])
+    TEST(pop_front(a), "x") TEST(a, [ 1, 2, 3, 4, 5 ])
     
     insert(a, "x", 3) TEST(a, [ 1, 2, 3, "x", 4, 5 ])
     insert(a, "x", 0) TEST(a, [ "x", 1, 2, 3, "x", 4, 5 ])
@@ -111,6 +111,7 @@ fn test_array_inplace() {
 
 fn test_string_stdlib() {
     print("test string funcs")
+    TEST(ord("*"), 42)
     TEST(ord("a"), 97)
     TEST(ord("A"), 65)
     TEST(ord("c"), 99)
@@ -195,6 +196,8 @@ fn test_print() {
     }
 }
 
+TEST_START()
+
 test_operators()
 test_array_calc()
 test_array_inplace()
@@ -202,3 +205,6 @@ test_string_stdlib()
 test_print()
 test_object()
 test_math()
+
+
+TEST_END()

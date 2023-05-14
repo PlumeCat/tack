@@ -1,4 +1,4 @@
-# Tack
+# Introduction to Tack
 
 Values and types
 
