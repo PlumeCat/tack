@@ -39,8 +39,7 @@ Whilst the ability to execute single files is not without its uses, they pale in
 There are several ways the host program can pass values into tack code, or read values back:
 
 - global variables: see `TackVM::get_global()`
-- object values: see `Iterating Objects from C++`
-- array values: see `Iterating Arrays from C++`
+- object and array values: see `Iterating objects and arrays from C++`
 - cfunction arguments and return values: see `Calling Tack functions from C++ code`
 - tack function arguments and return values: see `Calling C++ functions from Tack code`
 - allocating new values from the host: this applies to strings, arrays, and objects.
@@ -82,8 +81,6 @@ Tack can call C++ functions with the `TackValue::CFunctionType` signature:
  - `vm`: The TackVM that initiated the call
  - `nargs`: The number of arguments passed into the function
  - `args`: The arguments.
-
- This kind of function
 
  Note that the `args` parameter may be pointing directly into the Tack stack; it is the host program's responsibility not to write past the end of `args[nargs-1]`, doing so can be considered undefined behaviour (but will most likely cause an error and/or crash in the Tack program).
 

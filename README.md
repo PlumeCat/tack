@@ -74,8 +74,6 @@ make # Generates the `tack` executable in the `build/` folder
 ```
 To force CMake to generate a Makefile: `cmake .. -G 'Unix Makefiles` . However, the provided CMakeLists should also be usable in Visual Studio via the "Open Folder" option
 
-For detailed language documentation see the `doc/` folder
-
 Generate documentation (recommended) for the public C++ interface by running `doxygen` in the root. Documentation is then found in `doc/html/index.html`
 
 
@@ -120,7 +118,7 @@ _Despite this, it is already possible to build small games and useful scripts wi
 
 ---
 
-### Upcoming features
+### TODO list
 
 - [x] variadic print
 - [x] a more usable looping construct
@@ -132,7 +130,7 @@ _Despite this, it is already possible to build small games and useful scripts wi
 - [x] calling tack functions from C/C++
 - [x] boolean literals and operations
 - [x] string operations (+, #, ...)
-- [ ] documentation for embedding
+- [x] documentation for embedding
 - [x] garbage collector
 - [ ] improve error handling and stack traces
 - [x] initialization for array and object literals

@@ -1,6 +1,6 @@
 # Arrays
 
-Arrays resemble Javascript arrays and behave in the same manner
+Arrays resemble Javascript arrays or Python lists, and behave in the same manner
 Indexing starts at 0 and ends at N-1 where N is the length of the array
 
 Arrays are created with the syntax
@@ -9,7 +9,7 @@ Arrays are created with the syntax
 [ element1, element2, element3, ... ]
 ```
 
-where an element can be the result of any arbitrary expression.
+where an element can be any arbitrary expression.
 
 Once an array is created, elements can be pushed/popped to the end with << and >> operators.
 
@@ -24,7 +24,7 @@ let c = a >> 1
 print(c)      " 3 "
 ```
 
-In addition there are several standard library functions for manipulating the contents of an array, or for computing new ones from existing values: [Standard library ](doc/STANDARD_LIBRARY.md)
+In addition there are several standard library functions for manipulating the contents of an array, or for computing new ones from existing values: [Standard library ](STANDARD_LIBRARY.md)
 
 ##### To iterate over an array:
 
