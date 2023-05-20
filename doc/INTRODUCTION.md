@@ -21,7 +21,7 @@ Values must be one of the following types:
     - array
         - A 0-indexed growable list
     - object
-        - Javascript-style object. Keys must be strings. Values can be anything
+        - Lua table-style associative array. Keys must be strings (for now), values can be anything
         ```rust
         let x = []
         let y = [ 1, 2, "hello", {} ]
@@ -32,12 +32,12 @@ Values must be one of the following types:
         }
         ```
 
-    For more details, see [Objects and arrays](doc/OBJECTS_AND_ARRAYS.md)
+    For more details, see [Objects and arrays](OBJECTS_AND_ARRAYS.md)
 
 - Function types
     - Function
         - A tack function
-        - Can accept any number of arguments (up to the available number of registers, which should be 200+), can return one value. If nothing is returned, ie an empty `return` statement or no return statement at all at all, the caller receives `null`
+        - Can accept any number of arguments (up to the available number of registers, which should be 200+), can return one value. If nothing is returned, ie an empty `return` statement or no return statement at all, the caller receives `null`
         ```rust
 
         " named functions "
@@ -65,7 +65,7 @@ Values must be one of the following types:
         }([ f, g ])
         ```
     - C++ function
-        - See [Embedding](doc/Embedding.md)
+        - See [Embedding](EMBEDDING.md)
 
 ##### "Truthiness"
 
@@ -132,9 +132,10 @@ where `name` is a valid C-style identifier, and `exp` is any expression
 
 The third form is equivalent to `const name = fn() {}`, but allows the function to refer to itself recursively by name.
 
-The optional export keyword makes it possible to use the variable in other files, if the current file is imported - see `import` below
+The optional export keyword makes it possible to use the variable in other files, if the current file is imported - see `import` statement
 
 ##### Reserved keywords
+
 These keywords may not be used as variable names:
 
     true false null import export let const fn if else while for return or and in
@@ -142,7 +143,7 @@ These keywords may not be used as variable names:
 
 ##### Reassignment
 
-Reassignment can be done non-const variables, or elements of compound values. The new type need not be the same as the old.
+Reassignment can be done to non-const variables, or elements of compound values. The new type need not be the same as the old.
 
 The LHS of the assignment must be an `identifier`, an indexing expression `<exp>[<exp>]` or an accessing expression `<exp>.ident`.
 
@@ -207,7 +208,7 @@ There are several forms of for loop:
 
 for i in <exp1>, <exp2> {
     " exp1 and exp2 must evaluate to number "
-    " i is initially equal to exp1 and loops over the range [exp1, exp2) incrementing by 1 each time"
+    " i loops through integers in the range exp1 <= i < exp2, incrementing by 1 each time"
 }
 
 for e in <exp> {
@@ -219,6 +220,7 @@ for e in <exp> {
 for k, v in <exp> {
     " exp must evaluate to object "
     " loop over key-value pairs of the object "
+    " k and v take on the key and value in each iteration respectively "
 }
 
 ```
@@ -242,4 +244,4 @@ An expression can be one of
 - Primary expression: `( <exp> )` where exp is any expression
 - Literal values: null, boolean, number, string, object, array, function all have literal syntax.
 
-For a list of operators see [Operators](doc/Operators.md)
+For a list of operators see [Operators](OPERATORS.md)

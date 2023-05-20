@@ -42,6 +42,8 @@ let B = quicksort(A)
 
 For a detailed look at the language itself, see [Introduction to Tack](doc/INTRODUCTION.md)
 
+For a guide to embedding into a C++ program, see [Embedding](doc/EMBEDDING.md)
+
 Tack is semantically a mixture of Lua, Javascript and Python, with some Rust influence on the syntax. It aims for performance equal to or better than the stock Lua interpreter, while offering alternative syntax, adjusted semantics, and much more flexibility for integrating into host C++ programs.
 
 Key features:
@@ -51,11 +53,32 @@ Key features:
 - "Register"-based bytecode
 - Hybrid stackless interpreter
 
-To run a script:
+To run a script, build the `tack` executable, then:
 
 ```bash
 tack my-script.tack
 ```
+
+## Requirements
+
+- cmake
+- doxygen (optional)
+
+## Building
+
+```bash
+# After cloning the repo into 'tack/'
+cd tack
+mkdir build
+cd build
+cmake ..
+make # Generates the `tack` executable in the `build/` folder
+```
+To force CMake to generate a Makefile: `cmake .. -G 'Unix Makefiles` . However, the provided CMakeLists should also be usable in Visual Studio via the "Open Folder" option
+
+Generate documentation (recommended) for the public C++ interface by running `doxygen` in the root. Documentation is then found in `doc/html/index.html`
+
+
 
 ---
 ### Motivations
@@ -97,7 +120,7 @@ _Despite this, it is already possible to build small games and useful scripts wi
 
 ---
 
-### Upcoming features
+### TODO list
 
 - [x] variadic print
 - [x] a more usable looping construct
@@ -109,7 +132,7 @@ _Despite this, it is already possible to build small games and useful scripts wi
 - [x] calling tack functions from C/C++
 - [x] boolean literals and operations
 - [x] string operations (+, #, ...)
-- [ ] documentation for embedding
+- [x] documentation for embedding
 - [x] garbage collector
 - [ ] improve error handling and stack traces
 - [x] initialization for array and object literals

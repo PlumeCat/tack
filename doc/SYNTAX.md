@@ -104,7 +104,7 @@ unary-operator:     // see Operators
 
 ## Notes
 
-- For a list of binary and unary prefix/postfix operators, see the "Operators" documentation
+- For a list of binary and unary prefix/postfix operators, see [Operators](OPERATORS.md) documentation
 
 - In general, the RHS of a var-decl cannot refer to the variable name.
     The "fn" form of var-decl makes the following code snippet:
