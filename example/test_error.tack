@@ -1,0 +1,17 @@
+
+fn baz(x, y, a) {
+    return x == sort([ x, y ], fn(a,b) { return a > b })[0]
+}
+
+fn bar(x, y) {
+    "return x > y"
+    return baz(x, y, 0)
+}
+
+fn foo() {
+    let a = [ 23, 5, 7, 23, 63, 47, 235, 3246, 34 ]
+
+    print(sort(a, fn(x, y) { return bar(x, y) }))
+}
+
+foo()

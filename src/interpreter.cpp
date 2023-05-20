@@ -34,7 +34,9 @@ Interpreter::Interpreter() {
     global_scope.is_function_scope = false;
     modules.value_at(modules.put(GLOBAL_NAMESPACE)) = &global_scope;
 
-    stack.fill(TackValue::null());
+    if constexpr(std::is_base_of<std::array<TackValue, MAX_STACK>, Stack>::value) {
+        stack.fill(TackValue::null());
+    }
 }
 Interpreter::~Interpreter() {}
 
@@ -243,39 +245,44 @@ void Interpreter::error(const std::string& msg) {
         log(" - called from line:", retln, "in", func->name);
         s = stack[s - 1]._i;
     }*/
+
+    for (auto s = stack.base; s --> 0; ) {
+        std::cout << "STACK: " << s << ", " << stack[s].get_string() << std::endl;
+    }
+
+    auto s = stack.base-2;
+    while (s > 0) {
+        auto func = ((TackValue::FunctionType*)stack[s]._p)->bytecode;
+        std::cout << func->name << std::endl;
+        s = stack[s-1]._i;
+    }
+
     throw std::runtime_error(msg);
 }
 
 #define handle(opcode)  break; case Opcode::opcode:
-#define REGISTER_RAW(n) stack[stackbase+n]
+#define REGISTER_RAW(n) stack[stack.base+n]
 #define REGISTER(n)     (*(value_is_boxed(REGISTER_RAW(n)) ? &value_to_boxed(REGISTER_RAW(n))->value : &REGISTER_RAW(n)))
 #define check(v, ty)    if (!(v).is_##ty()) error("type error: expected " #ty);
-#define in_error(msg)   error(msg + func->bytecode->name + std::to_string(func->bytecode->line_numbers[_pc]))
+#define in_error(msg)   error(msg + _pr->bytecode->name + std::to_string(_pr->bytecode->line_numbers[_pc]))
 
 TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
     if (!fn.is_function()) {
         error("type error: call() expects function type");
     }
-    auto* func = fn.function();
-
-    // program counter
-    auto _pr = func; // current program
-    auto _pc = 0u;
-    auto _pe = func->bytecode->instructions.size();
 
     // stack/registers
-    auto initial_stackbase = stackbase;
-    stackbase += STACK_FRAME_OVERHEAD;
+    stack.push_frame(nullptr, 0, 0);
 
+    // program counter
+    auto _pr = fn.function();
+    auto _pc = 0u;
+    auto _pe = _pr->bytecode->instructions.size();
+    
     // copy arguments to stack
-    if (nargs && args != &stack[stackbase]) {
-        std::memcpy(&stack[stackbase], args, sizeof(TackValue) * nargs);
+    if (nargs && args != &stack[stack.base]) {
+        std::memcpy(&stack[stack.base], args, sizeof(TackValue) * nargs);
     }
-
-    // set up initial call frame
-    REGISTER_RAW(-3)._i = _pr->bytecode->instructions.size();
-    REGISTER_RAW(-2)._p = (void*)func;
-    REGISTER_RAW(-1)._i = initial_stackbase; // special case
 
     while (_pc < _pe) {
         auto i = _pr->bytecode->instructions[_pc];
@@ -683,64 +690,38 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
             }
             handle(CALL) {
                 auto r0 = REGISTER(i.r0);
+                auto return_reg = i.u8.r2;
                 if (r0.is_function()) {
-                    auto func = r0.function();
-                    auto nargs = i.u8.r1;
-                    auto correct_nargs = 0; // func->bytecode->nargs;
+                    // TODO: stack overflow checking
                     // TODO: arity checking
-                    if (false && nargs != correct_nargs) {
-                        in_error("wrong nargs");
-                    }
-                    auto new_base = i.u8.r2 + STACK_FRAME_OVERHEAD;
-
-                    if (new_base + func->bytecode->max_register > MAX_STACK) {
-                        in_error("would exceed stack");
-                    }
-
-                    // set up call frame
-                    REGISTER_RAW(new_base - 3)._i = _pc; // push return addr
-                    REGISTER_RAW(new_base - 2)._p = (void*)_pr; // return program
-                    REGISTER_RAW(new_base - 1)._i = stackbase; // push return frameptr
-
+                    stack.push_frame(_pr, _pc, return_reg);
+                    auto func = r0.function();
                     _pr = func;
                     _pe = func->bytecode->instructions.size();
                     _pc = -1;
-                    stackbase = stackbase + new_base; // new stack frame
                 } else if (r0.is_cfunction()) {
                     auto cfunc = r0.cfunction();
                     auto nargs = i.u8.r1;
                         
-                    auto old_base = stackbase;
-                    stackbase = stackbase + i.u8.r2 + STACK_FRAME_OVERHEAD;                        
-                    auto retval = (*cfunc)(this, nargs, &stack[stackbase]);
-                    stackbase = old_base;
+                    auto old_base = stack.base;
+                    stack.base = stack.base + i.u8.r2 + STACK_FRAME_OVERHEAD;                        
+                    auto retval = (*cfunc)(this, nargs, &stack[stack.base]);
+                    stack.base = old_base;
                     REGISTER_RAW(i.u8.r2) = retval;
                 } else {
                     in_error("tried to call non-function");
                 }
             }
             handle(RET) {
-                auto return_addr = REGISTER_RAW(-3);
-                auto return_func = REGISTER_RAW(-2);
-                auto return_stack = REGISTER_RAW(-1);
                 auto return_val = REGISTER(i.u8.r1);
-
-                _pc = return_addr._i;
-                _pr = (TackValue::FunctionType*)return_func._p;
-                _pe = _pr->bytecode->instructions.size();
-
-                // "Clean" the stack - Must not leave any boxes in unused registers or subsequent loads to register will mistakenly write-through
-                std::memset(stack.data() + stackbase, 0xffffffff, MAX_REGISTERS * sizeof(TackValue));
-                    
-                REGISTER_RAW(-3) = return_val;
-                REGISTER_RAW(-2) = TackValue::null();
-                REGISTER_RAW(-1) = TackValue::null();
-                heap.gc(globals, stack, stackbase);
-                    
-                stackbase = return_stack._i;
-                if (stackbase == initial_stackbase) {
+                auto oldbase = stack.base;
+                stack.pop_frame(&_pr, &_pc);
+                stack[oldbase-3] = return_val;
+                heap.gc(globals, stack, oldbase);
+                if (!_pr) {
                     return return_val;
                 }
+                _pe = _pr->bytecode->instructions.size();
             }
         break; default: in_error("unknown instruction: " + to_string(i.opcode));
         }
@@ -749,6 +730,23 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
     error("Reached end of interpreter loop - should be impossible");
     return TackValue::null(); // should be unreachable
 }
+
+
+// void Stack::push_frame(TackValue::FunctionType* return_pr, uint32_t return_pc, uint8_t return_reg) {
+//     auto old_base = base;
+//     base += return_reg + STACK_FRAME_OVERHEAD;
+//     at(base - 3)._i = return_pc;
+//     at(base - 2)._p = (void*)return_pr;
+//     at(base - 1)._i = old_base;
+// }
+// void Stack::pop_frame(TackValue::FunctionType** out_pr, uint32_t* out_pc) {
+//     *out_pc = at(base-3)._i;
+//     *out_pr = (TackValue::FunctionType*)at(base-2)._p;
+//     auto return_base = at(base-1)._i;
+//     // "Clean" the stack - Must not leave any boxes in unused registers or subsequent loads to register will mistakenly write-through
+//     std::memset(data() + base - 2, 0xffffffff, MAX_REGISTERS * sizeof(TackValue));
+//     base = return_base;
+// }
 
 #undef check
 #undef handle
