@@ -26,7 +26,7 @@ std::string TackValue::get_string() {
         case (uint64_t)TackType::Null:      { s << "null"; break; }
         case (uint64_t)TackType::Boolean:   { s << (boolean() ? "true" : "false"); break; }
         case (uint64_t)TackType::String:    { s << string()->data; break; }
-        case (uint64_t)TackType::Pointer:   { s << pointer(); break; }
+        case (uint64_t)TackType::Pointer:   { s << std::hex << pointer(); break; }
         case (uint64_t)TackType::Function:  { s << "function: " << function()->bytecode->name; break; }
         case (uint64_t)TackType::CFunction: { s << "c-func:   " << std::hex << _p; break; }
         case type_bits_boxed:               { s << "box [" << value_to_boxed(*this)->value.get_string() << "]"; break; }

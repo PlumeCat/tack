@@ -233,38 +233,41 @@ Compiler::ScopeContext* Interpreter::load_module_s(const std::string& module_nam
 
 
 void Interpreter::error(const std::string& msg) {
-    /*
-    * // TODO: dump stack
-    auto ln = _pr->bytecode->line_numbers[_pc];
-    std::cout << "encountered at line: " << ln << " in " << _pr->bytecode->name << std::endl;
-    auto s = stackbase;
-    while (stack[s - 1]._i != 0) {
-        auto retpc = stack[s - 3]._i;
-        auto func = ((TackValue::FunctionType*)stack[s - 2]._p)->bytecode;
-        auto retln = func->line_numbers[retpc];
-        log(" - called from line:", retln, "in", func->name);
-        s = stack[s - 1]._i;
-    }*/
+    // auto nextbase = stack[stack.base-1]._i;
+    // for (auto s = stack.base; s --> 0; ) {
+    //     std::cout << "STACK: " << s << ", " << stack[s].get_string();
+    //     if (s == nextbase) {
+    //         std::cout << "------";
+    //         nextbase = stack[nextbase-1]._i;
+    //     }
+    //     std::cout << std::endl;
+    // }
 
-    for (auto s = stack.base; s --> 0; ) {
-        std::cout << "STACK: " << s << ", " << stack[s].get_string() << std::endl;
+    auto s = stack.base;
+    auto stacktrace = std::stringstream {};
+    stacktrace << msg << std::endl;
+    
+    // _pr->bytecode->name + " line " + std::to_string(_pr->bytecode->line_numbers[_pc];
+    
+    while (true) {
+        auto func = ((TackValue::FunctionType*)stack[s-2]._p);
+        if (func) {
+            stacktrace << " in " << func->bytecode->name << std::endl;
+            auto _pc = stack[s-3]._i; // pc
+            s = stack[s-1]._i; // base
+        } else {
+            break;
+        }
     }
 
-    auto s = stack.base-2;
-    while (s > 0) {
-        auto func = ((TackValue::FunctionType*)stack[s]._p)->bytecode;
-        std::cout << func->name << std::endl;
-        s = stack[s-1]._i;
-    }
-
-    throw std::runtime_error(msg);
+    throw std::runtime_error(stacktrace.str());
 }
 
 #define handle(opcode)  break; case Opcode::opcode:
 #define REGISTER_RAW(n) stack[stack.base+n]
 #define REGISTER(n)     (*(value_is_boxed(REGISTER_RAW(n)) ? &value_to_boxed(REGISTER_RAW(n))->value : &REGISTER_RAW(n)))
 #define check(v, ty)    if (!(v).is_##ty()) error("type error: expected " #ty);
-#define in_error(msg)   error(msg + _pr->bytecode->name + std::to_string(_pr->bytecode->line_numbers[_pc]))
+#define in_error(msg)   error(msg)
 
 TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
     if (!fn.is_function()) {
@@ -702,7 +705,6 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 } else if (r0.is_cfunction()) {
                     auto cfunc = r0.cfunction();
                     auto nargs = i.u8.r1;
-                        
                     auto old_base = stack.base;
                     stack.base = stack.base + i.u8.r2 + STACK_FRAME_OVERHEAD;                        
                     auto retval = (*cfunc)(this, nargs, &stack[stack.base]);
@@ -731,22 +733,6 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
     return TackValue::null(); // should be unreachable
 }
 
-
-// void Stack::push_frame(TackValue::FunctionType* return_pr, uint32_t return_pc, uint8_t return_reg) {
-//     auto old_base = base;
-//     base += return_reg + STACK_FRAME_OVERHEAD;
-//     at(base - 3)._i = return_pc;
-//     at(base - 2)._p = (void*)return_pr;
-//     at(base - 1)._i = old_base;
-// }
-// void Stack::pop_frame(TackValue::FunctionType** out_pr, uint32_t* out_pc) {
-//     *out_pc = at(base-3)._i;
-//     *out_pr = (TackValue::FunctionType*)at(base-2)._p;
-//     auto return_base = at(base-1)._i;
-//     // "Clean" the stack - Must not leave any boxes in unused registers or subsequent loads to register will mistakenly write-through
-//     std::memset(data() + base - 2, 0xffffffff, MAX_REGISTERS * sizeof(TackValue));
-//     base = return_base;
-// }
 
 #undef check
 #undef handle

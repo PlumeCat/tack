@@ -1,6 +1,6 @@
 
 fn baz(x, y, a) {
-    return x == sort([ x, y ], fn(a,b) { return a > b })[0]
+    return x == sort([ x, y ], fn(a,b) { return a > b })[2]
 }
 
 fn bar(x, y) {
