@@ -4,6 +4,7 @@
 #include "compiler.h"
 
 #include <chrono>
+#include <cstring>
 
 // Hidden box type
 struct BoxType {
@@ -15,7 +16,25 @@ static inline TackValue value_from_boxed(BoxType* box)             { return { na
 static inline bool value_is_boxed(TackValue v)                     { return std::isnan(v._d) && (v._i & type_bits) == type_bits_boxed; }
 static inline BoxType* value_to_boxed(TackValue v)                 { return (BoxType*)(v._i & pointer_bits); }
 
-struct Stack : std::array<TackValue, MAX_STACK> {};
+struct Stack : std::array<TackValue, MAX_STACK> {
+    uint32_t base = 0;
+
+    inline void push_frame(TackValue::FunctionType* return_pr, uint32_t return_pc, uint8_t return_reg) {
+        auto old_base = base;
+        base += return_reg + STACK_FRAME_OVERHEAD;
+        operator[](base - 3)._i = return_pc;
+        operator[](base - 2)._p = (void*)return_pr;
+        operator[](base - 1)._i = old_base;
+    }
+    inline void pop_frame(TackValue::FunctionType** out_pr, uint32_t* out_pc) {
+        *out_pc = operator[](base-3)._i;
+        *out_pr = (TackValue::FunctionType*)operator[](base-2)._p;
+        auto return_base = operator[](base-1)._i;
+        // "Clean" the stack - Must not leave any boxes in unused registers or subsequent loads to register will mistakenly write-through
+        std::memset(data() + base - 2, 0xffffffff, MAX_REGISTERS * sizeof(TackValue));
+        base = return_base;
+    }
+};
 struct Heap {
 private:
     // heap
@@ -38,13 +57,11 @@ public:
     TackValue::FunctionType* alloc_function(CodeFragment* code);
     TackValue::FunctionType* alloc_function(TackValue::CFunctionType cfunction);
     BoxType* alloc_box(TackValue val);
-
-    // takes ownership of data; data must be allocated with 'new[]'
+    // makes copy of data
     TackValue::StringType* alloc_string(const std::string& data);
 
     TackGCState gc_state() const;
     void gc_state(TackGCState new_state);
-
     void gc(std::vector<TackValue>& globals, const Stack& stack, uint32_t stackbase);
 };
 class Interpreter: public TackVM {

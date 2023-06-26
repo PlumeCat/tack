@@ -34,7 +34,9 @@ Interpreter::Interpreter() {
     global_scope.is_function_scope = false;
     modules.value_at(modules.put(GLOBAL_NAMESPACE)) = &global_scope;
 
-    stack.fill(TackValue::null());
+    if constexpr(std::is_base_of<std::array<TackValue, MAX_STACK>, Stack>::value) {
+        stack.fill(TackValue::null());
+    }
 }
 Interpreter::~Interpreter() {}
 
@@ -234,23 +236,38 @@ Compiler::ScopeContext* Interpreter::load_module_s(const std::string& module_nam
 
 
 void Interpreter::error(const std::string& msg) {
-    /*
-    * // TODO: dump stack
-    auto ln = _pr->bytecode->line_numbers[_pc];
-    std::cout << "encountered at line: " << ln << " in " << _pr->bytecode->name << std::endl;
-    auto s = stackbase;
-    while (stack[s - 1]._i != 0) {
-        auto retpc = stack[s - 3]._i;
-        auto func = ((TackValue::FunctionType*)stack[s - 2]._p)->bytecode;
-        auto retln = func->line_numbers[retpc];
-        log(" - called from line:", retln, "in", func->name);
-        s = stack[s - 1]._i;
-    }*/
-    throw std::runtime_error(msg);
+    // auto nextbase = stack[stack.base-1]._i;
+    // for (auto s = stack.base; s --> 0; ) {
+    //     std::cout << "STACK: " << s << ", " << stack[s].get_string();
+    //     if (s == nextbase) {
+    //         std::cout << "------";
+    //         nextbase = stack[nextbase-1]._i;
+    //     }
+    //     std::cout << std::endl;
+    // }
+
+    auto s = stack.base;
+    auto stacktrace = std::stringstream {};
+    stacktrace << msg << std::endl;
+    
+    // _pr->bytecode->name + " line " + std::to_string(_pr->bytecode->line_numbers[_pc];
+    
+    while (true) {
+        auto func = ((TackValue::FunctionType*)stack[s-2]._p);
+        if (func) {
+            stacktrace << " in " << func->bytecode->name << std::endl;
+            auto _pc = stack[s-3]._i; // pc
+            s = stack[s-1]._i; // base
+        } else {
+            break;
+        }
+    }
+
+    throw std::runtime_error(stacktrace.str());
 }
 
 #define handle(opcode)  break; case Opcode::opcode:
-#define REGISTER_RAW(n) stack[stackbase+n]
+#define REGISTER_RAW(n) stack[stack.base+n]
 #define REGISTER(n)     (*(value_is_boxed(REGISTER_RAW(n)) ? &value_to_boxed(REGISTER_RAW(n))->value : &REGISTER_RAW(n)))
 #define check(v, ty)    if (!(v).is_##ty()) error("type error: expected " #ty);
 #define in_error(msg)   error(msg + ((CodeFragment*)_pr->code_ptr)->name + std::to_string(((CodeFragment*)_pr->code_ptr)->line_numbers[_pc]))
@@ -275,8 +292,8 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
     stackbase += STACK_FRAME_OVERHEAD;
 
     // copy arguments to stack
-    if (nargs && args != &stack[stackbase]) {
-        std::memcpy(&stack[stackbase], args, sizeof(TackValue) * nargs);
+    if (nargs && args != &stack[stack.base]) {
+        std::memcpy(&stack[stack.base], args, sizeof(TackValue) * nargs);
     }
 
     // set up initial call frame
@@ -732,7 +749,11 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
             }
             handle(CALL) {
                 auto r0 = REGISTER(i.r0);
+                auto return_reg = i.u8.r2;
                 if (r0.is_function()) {
+                    // TODO: stack overflow checking
+                    // TODO: arity checking
+                    stack.push_frame(_pr, _pc, return_reg);
                     auto func = r0.function();
                     if (func->is_cfunction) {
                         auto cfunc = (TackValue::CFunctionType*)func->code_ptr;
@@ -772,9 +793,6 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 }
             }
             handle(RET) {
-                auto return_addr = REGISTER_RAW(-3);
-                auto return_func = REGISTER_RAW(-2);
-                auto return_stack = REGISTER_RAW(-1);
                 auto return_val = REGISTER(i.u8.r1);
 
                 _pc = return_addr._i;
@@ -793,6 +811,7 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 if (stackbase == initial_stackbase) {
                     return return_val;
                 }
+                _pe = _pr->bytecode->instructions.size();
             }
         break; default: in_error("unknown instruction: " + to_string(i.opcode));
         }
@@ -801,6 +820,7 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
     error("Reached end of interpreter loop - should be impossible");
     return TackValue::null(); // should be unreachable
 }
+
 
 #undef check
 #undef handle
