@@ -27,9 +27,18 @@ std::string TackValue::get_string() {
         case (uint64_t)TackType::Boolean:   { s << (boolean() ? "true" : "false"); break; }
         case (uint64_t)TackType::String:    { s << string()->data; break; }
         case (uint64_t)TackType::Pointer:   { s << pointer(); break; }
-        case (uint64_t)TackType::Function:  { s << "function: " << function()->bytecode->name; break; }
-        case (uint64_t)TackType::CFunction: { s << "c-func:   " << std::hex << _p; break; }
-        case type_bits_boxed:           { s << "box:      " << std::hex << _p << "(" << std::hex << value_to_boxed(*this)->value._p << ")"; break; }
+        case type_bits_boxed:               { s << "box:      " << std::hex << _p << "(" << std::hex << value_to_boxed(*this)->value._p << ")"; break; }
+        // case (uint64_t)TackType::CFunction: { s << "c-func:   " << std::hex << _p; break; }
+        case (uint64_t)TackType::Function:  { 
+            auto* func = function();
+            s << "function: "; 
+            if (func->is_cfunction) {
+                s << "(C): " << std::hex << func->code_ptr;
+            } else {
+                s << ((CodeFragment*)func->code_ptr)->name;
+            }
+            break;
+        }
         case (uint64_t)TackType::Object: { 
             auto* obj = object();
             s << "object {";

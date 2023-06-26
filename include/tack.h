@@ -20,7 +20,7 @@ enum class TackType : uint64_t {
     Array              = 0x00'0a'00'00'00'00'00'00,
     Object             = 0x00'09'00'00'00'00'00'00,
     Function           = 0x00'0c'00'00'00'00'00'00,
-    CFunction          = 0x00'0d'00'00'00'00'00'00
+    // CFunction          = 0x00'0d'00'00'00'00'00'00
 };
 
 enum class TackGCState : uint8_t {
@@ -56,17 +56,19 @@ struct TackValue {
         uint32_t refcount = 0;
         bool marker = false;
     };
+    
+    /// @brief Function signature for c functions which can be called by the VM through tack code
+    using CFunctionType = TackValue(*)(class TackVM*, int, TackValue*);
 
     /// @brief Underlying representation for closures
     struct FunctionType {
-        struct CodeFragment* bytecode;
+        void* code_ptr; // pointer to CodeFragment, or pointer to CFunctionType
+        bool is_cfunction = false;
         std::vector<TackValue> captures; // contains boxes
         uint32_t refcount = 0;
         bool marker = false;
     };
 
-    /// @brief Function signature for c functions which can be called by the VM through tack code
-    using CFunctionType = TackValue(*)(class TackVM*, int, TackValue*);
 
 
     /// @brief Return false if the value is 0.0, null or false, else true
@@ -100,13 +102,14 @@ struct TackValue {
     /// @brief Check if this value is of type Function
     /// @return 
     inline bool is_function()  const                    { return (_i & type_bits) == (uint64_t)TackType::Function; }
-    /// @brief Check if this value is of type Cfunction
-    /// @return 
-    inline bool is_cfunction() const                    { return (_i & type_bits) == (uint64_t)TackType::CFunction; }
+    // /// @brief Check if this value is of type Cfunction
+    // /// @return 
+    // inline bool is_cfunction() const                    { return (_i & type_bits) == (uint64_t)TackType::CFunction; }
     /// @brief Check if this value is of type String
     /// @return 
     inline bool is_string()    const                    { return (_i & type_bits) == (uint64_t)TackType::String; }
     /// @brief Check if this value is of type Object
+    /// @details TODO: returning true for numbers for some reason
     /// @return 
     inline bool is_object()    const                    { return (_i & type_bits) == (uint64_t)TackType::Object; }
     /// @brief Check if this value is of type Array
@@ -134,11 +137,13 @@ struct TackValue {
     /// Undefined behaviour (most likely segfault/exception) if the value is not of this type, so check first
     /// @return  
     inline FunctionType*    function()  const           { return (FunctionType*)(_i & pointer_bits); }
+    
     /// @brief Get the underlying representation. UB if not cfunction
     /// @details Convert to actual type.
     /// Undefined behaviour (most likely segfault/exception) if the value is not of this type, so check first
     /// @return  
-    inline CFunctionType    cfunction() const           { return (CFunctionType)(_i & pointer_bits); }
+    // inline CFunctionType    cfunction() const           { return (CFunctionType)(_i & pointer_bits); }
+    
     /// @brief Get the underlying representation. UB if not boolean
     /// @details Convert to actual type.
     /// Undefined behaviour (most likely nonsense return value) if the value is not of this type, so check first
@@ -187,7 +192,7 @@ struct TackValue {
     static inline TackValue function(FunctionType* func){ return { nan_bits | (uint64_t)TackType::Function | uint64_t(func) }; }
     /// @brief Construct a new string value from the given underlying string
     /// @param str 
-    /// @return 
+    /// @return
     static inline TackValue string(StringType* str)     { return { nan_bits | (uint64_t)TackType::String | uint64_t(str) }; }
     /// @brief Construct a new object value from the given underlying object
     /// @param obj 
@@ -197,10 +202,10 @@ struct TackValue {
     /// @param arr 
     /// @return 
     static inline TackValue array(ArrayType* arr)       { return { nan_bits | (uint64_t)TackType::Array | uint64_t(arr) }; }
-    /// @brief Construct a new cfunction value from the given function
-    /// @param cf 
-    /// @return 
-    static inline TackValue cfunction(CFunctionType cf) { return { nan_bits | (uint64_t)TackType::CFunction | uint64_t(cf) }; }
+    // /// @brief Construct a new cfunction value from the given function
+    // /// @param cf 
+    // /// @return 
+    // static inline TackValue cfunction(CFunctionType cf) { return { nan_bits | (uint64_t)TackType::CFunction | uint64_t(cf) }; }
 
     /// @brief Test equality.
     /// @details Strings and numbers will be equivalent by value, everything else will be equivalent by identity

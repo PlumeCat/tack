@@ -21,3 +21,6 @@ fn test_closure() {
     }
 }
 print("203 ==", test_closure()()())
+
+let x = 452
+print(x.to_string)

@@ -24,7 +24,16 @@ TackValue::ObjectType* Heap::alloc_object() {
 TackValue::FunctionType* Heap::alloc_function(CodeFragment* code) {
     alloc_count++;
     return &functions.emplace_back(TackValue::FunctionType {
-        .bytecode = code,
+        .code_ptr = (void*)code,
+        .is_cfunction = false,
+        .captures = {}
+    });
+}
+TackValue::FunctionType* Heap::alloc_function(TackValue::CFunctionType cfunction) {
+    alloc_count++;
+    return &functions.emplace_back(TackValue::FunctionType {
+        .code_ptr = (void*)cfunction,
+        .is_cfunction = true,
         .captures = {}
     });
 }
@@ -203,7 +212,7 @@ void Heap::gc(std::vector<TackValue>& globals, const Stack &stack, uint32_t stac
         auto i = functions.begin();
         while (i != functions.end()) {
             if (!i->marker && i->refcount == 0) {
-                dump("collected function: ", i->bytecode->name);
+                // dump("collected function: ", i->bytecode->name);
                 num_collections += 1;
                 i = functions.erase(i);
             } else {

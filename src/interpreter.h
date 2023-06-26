@@ -36,6 +36,7 @@ public:
     TackValue::ArrayType* alloc_array();
     TackValue::ObjectType* alloc_object();
     TackValue::FunctionType* alloc_function(CodeFragment* code);
+    TackValue::FunctionType* alloc_function(TackValue::CFunctionType cfunction);
     BoxType* alloc_box(TackValue val);
 
     // takes ownership of data; data must be allocated with 'new[]'
@@ -93,8 +94,9 @@ public:
     TackValue::ObjectType* alloc_object() override;
     TackValue::StringType* alloc_string(const std::string& data) override;
     TackValue::StringType* intern_string(const std::string& data) override;
-    
     TackValue::FunctionType* alloc_function(CodeFragment* code);
+    TackValue::FunctionType* alloc_function(TackValue::CFunctionType cfunction);
+
     CodeFragment* create_fragment();
     BoxType* alloc_box(TackValue val);
     void add_module_dir_cwd();

@@ -68,6 +68,9 @@ TackValue::ObjectType* Interpreter::alloc_object() {
 TackValue::FunctionType* Interpreter::alloc_function(CodeFragment* code) {
     return heap.alloc_function(code);
 }
+TackValue::FunctionType* Interpreter::alloc_function(TackValue::CFunctionType func) {
+    return heap.alloc_function(func);
+}
 BoxType* Interpreter::alloc_box(TackValue val) {
     return heap.alloc_box(val);
 }
@@ -110,7 +113,7 @@ TackValue Interpreter::get_type_name(TackType type) {
     static auto ptrtype     = TackValue::string(intern_string("pointer"));
     static auto objecttype  = TackValue::string(intern_string("object"));
     static auto arraytype   = TackValue::string(intern_string("array"));
-    static auto cftype      = TackValue::string(intern_string("cfunction"));
+    // static auto cftype      = TackValue::string(intern_string("cfunction"));
     static auto ftype       = TackValue::string(intern_string("function"));
     static auto unknown     = TackValue::string(intern_string("unknown"));
 
@@ -122,7 +125,7 @@ TackValue Interpreter::get_type_name(TackType type) {
         case TackType::Pointer: return ptrtype;
         case TackType::Object:  return objecttype;
         case TackType::Array:   return arraytype;
-        case TackType::CFunction:return cftype;
+        // case TackType::CFunction:return cftype;
         case TackType::Function:return ftype;
         default: return unknown;
     }
@@ -250,18 +253,22 @@ void Interpreter::error(const std::string& msg) {
 #define REGISTER_RAW(n) stack[stackbase+n]
 #define REGISTER(n)     (*(value_is_boxed(REGISTER_RAW(n)) ? &value_to_boxed(REGISTER_RAW(n))->value : &REGISTER_RAW(n)))
 #define check(v, ty)    if (!(v).is_##ty()) error("type error: expected " #ty);
-#define in_error(msg)   error(msg + func->bytecode->name + std::to_string(func->bytecode->line_numbers[_pc]))
+#define in_error(msg)   error(msg + ((CodeFragment*)_pr->code_ptr)->name + std::to_string(((CodeFragment*)_pr->code_ptr)->line_numbers[_pc]))
 
 TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
     if (!fn.is_function()) {
         error("type error: call() expects function type");
     }
-    auto* func = fn.function();
-
-    // program counter
-    auto _pr = func; // current program
-    auto _pc = 0u;
-    auto _pe = func->bytecode->instructions.size();
+    
+    auto* _pr = fn.function();
+    if (_pr->is_cfunction) {
+        // error("Interpreter::call() with cfunction");
+        return ((*((TackValue::CFunctionType*)_pr->code_ptr))(this, nargs, args));
+    }
+    
+    // it's a tack-defined function not a cfunction
+    auto _pc = 0u; // program counter
+    auto _pe = ((CodeFragment*)_pr->code_ptr)->instructions.size();
 
     // stack/registers
     auto initial_stackbase = stackbase;
@@ -273,12 +280,12 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
     }
 
     // set up initial call frame
-    REGISTER_RAW(-3)._i = _pr->bytecode->instructions.size();
-    REGISTER_RAW(-2)._p = (void*)func;
+    REGISTER_RAW(-3)._i = ((CodeFragment*)_pr->code_ptr)->instructions.size();
+    REGISTER_RAW(-2)._p = (void*)_pr;
     REGISTER_RAW(-1)._i = initial_stackbase; // special case
 
     while (_pc < _pe) {
-        auto i = _pr->bytecode->instructions[_pc];
+        auto i = ((CodeFragment*)_pr->code_ptr)->instructions[_pc];
         switch (i.opcode) {
         case Opcode::UNKNOWN: break;
             handle(ZERO_CAPTURE) {
@@ -294,7 +301,7 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 REGISTER(i.r0) = TackValue::boolean(i.u8.r1);
             }
             handle(LOAD_CONST) {
-                REGISTER(i.r0) = _pr->bytecode->storage[i.u1];
+                REGISTER(i.r0) = ((CodeFragment*)_pr->code_ptr)->storage[i.u1];
             }
             handle(INCREMENT) {
                 auto r0 = REGISTER(i.r0);
@@ -577,18 +584,16 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
             }
             handle(ALLOC_FUNC) {
                 // create closure
-                auto code = (CodeFragment*)_pr->bytecode->storage[i.u1].pointer(); // assumed correct type due to compiler
+                auto code = (CodeFragment*)((CodeFragment*)_pr->code_ptr)->storage[i.u1].pointer(); // assumed correct type due to compiler
                 auto* func = heap.alloc_function(code);
                 // capture captures; box inplace if necessary
                 for (const auto& c : code->capture_info) {
                     auto val = REGISTER_RAW(c.source_register);
                     if (!value_is_boxed(val)) {
-                        auto box = value_from_boxed(heap.alloc_box(val));
-                        func->captures.emplace_back(box);
-                        REGISTER_RAW(c.source_register) = box;
-                    } else {
-                        func->captures.emplace_back(val);
+                        val = value_from_boxed(heap.alloc_box(val));
+                        REGISTER_RAW(c.source_register) = val;
                     }
+                    func->captures.emplace_back(val);
                 }
                 // done
                 REGISTER(i.r0) = TackValue::function(func);
@@ -660,16 +665,60 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
             handle(LOAD_OBJECT) {
                 auto lhs = REGISTER(i.u8.r1);
                 auto rhs = REGISTER(i.u8.r2);
-                check(lhs, object);
                 check(rhs, string);
                 auto key = rhs.string();
-                auto* obj = lhs.object();
-                auto found = false;
-                auto val = obj->data.get(key->data, found);
-                if (!found) {
-                    in_error("key not found: "s + key->data);
+
+                if (lhs.is_number()) {
+                    // auto code = nullptr; // look up function from vtable for number
+                    // auto* func = heap.alloc_function(code);
+                    // auto self = REGISTER_RAW(i.u8.r1);
+                    // if (!value_is_boxed(self)) {
+                    //     auto box = value_from_boxed(heap.alloc_box(self));
+                    //     func->self = box;
+                    // }
+                    // REGISTER(i.r0) = func;
+
+                    /*
+                    Several pre-requisites here:
+                        - Vtables: Fixed for the fixed types
+                        then we will add custom ones later
+
+                        - Cfunction needs to be able to accept captures
+                        or at least a single 'self' capture
+                        (for the builtins, type can be safely assumed, but need to check boxing still)
+
+                        - Try and elide the allocation.
+                        Detect immediate self-calls like this in the compiler
+                        and emit a custom LOAD_CALL opcode
+                            that combines LOAD_CALL and CALL
+
+                        LOAD_CALL would also handle this case
+                            let a = 1
+                            let b = { foo = fn() {} }
+
+                            a.to_string()
+                            b.foo()
+
+                        b.foo() will also compile to LOAD_CALL, but it can detect that foo
+                        comes from the object not the vtable, so it won't do the binding
+                        (or maybe it doesn't matter)
+
+                        - Vtable methods MUST NOT allow self to escape
+                        (eg by returning another bound method)
+                    */
+
+
+                } else if (lhs.is_object()) {
+                    auto* obj = lhs.object();
+                    auto found = false;
+                    auto val = obj->data.get(key->data, found);
+                    if (!found) {
+                        in_error("key not found: "s + key->data);
+                    } else {
+                        REGISTER(i.r0) = val;
+                    }
                 } else {
-                    REGISTER(i.r0) = val;
+                    in_error("unknown type for LOAD_OBJECT");
                 }
             }
             handle(STORE_OBJECT) {
@@ -685,36 +734,39 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 auto r0 = REGISTER(i.r0);
                 if (r0.is_function()) {
                     auto func = r0.function();
-                    auto nargs = i.u8.r1;
-                    auto correct_nargs = 0; // func->bytecode->nargs;
-                    // TODO: arity checking
-                    if (false && nargs != correct_nargs) {
-                        in_error("wrong nargs");
+                    if (func->is_cfunction) {
+                        auto cfunc = (TackValue::CFunctionType*)func->code_ptr;
+                        auto nargs = i.u8.r1;
+                            
+                        auto old_base = stackbase;
+                        stackbase = stackbase + i.u8.r2 + STACK_FRAME_OVERHEAD;                        
+                        auto retval = (*cfunc)(this, nargs, &stack[stackbase]);
+                        stackbase = old_base;
+                        REGISTER_RAW(i.u8.r2) = retval;
+                    } else {
+                        auto bytecode = (CodeFragment*)func->code_ptr;
+                        auto nargs = i.u8.r1;
+                        auto correct_nargs = 0; // func->bytecode->nargs;
+                        // TODO: arity checking
+                        if (false && nargs != correct_nargs) {
+                            in_error("wrong nargs");
+                        }
+                        auto new_base = i.u8.r2 + STACK_FRAME_OVERHEAD;
+
+                        if (new_base + bytecode->max_register > MAX_STACK) {
+                            in_error("would exceed stack");
+                        }
+
+                        // set up call frame
+                        REGISTER_RAW(new_base - 3)._i = _pc; // push return addr
+                        REGISTER_RAW(new_base - 2)._p = (void*)_pr; // return program
+                        REGISTER_RAW(new_base - 1)._i = stackbase; // push return frameptr
+
+                        _pr = func;
+                        _pe = bytecode->instructions.size();
+                        _pc = -1;
+                        stackbase = stackbase + new_base; // new stack frame
                     }
-                    auto new_base = i.u8.r2 + STACK_FRAME_OVERHEAD;
-
-                    if (new_base + func->bytecode->max_register > MAX_STACK) {
-                        in_error("would exceed stack");
-                    }
-
-                    // set up call frame
-                    REGISTER_RAW(new_base - 3)._i = _pc; // push return addr
-                    REGISTER_RAW(new_base - 2)._p = (void*)_pr; // return program
-                    REGISTER_RAW(new_base - 1)._i = stackbase; // push return frameptr
-
-                    _pr = func;
-                    _pe = func->bytecode->instructions.size();
-                    _pc = -1;
-                    stackbase = stackbase + new_base; // new stack frame
-                } else if (r0.is_cfunction()) {
-                    auto cfunc = r0.cfunction();
-                    auto nargs = i.u8.r1;
-                        
-                    auto old_base = stackbase;
-                    stackbase = stackbase + i.u8.r2 + STACK_FRAME_OVERHEAD;                        
-                    auto retval = (*cfunc)(this, nargs, &stack[stackbase]);
-                    stackbase = old_base;
-                    REGISTER_RAW(i.u8.r2) = retval;
                 } else {
                     in_error("tried to call non-function");
                 }
@@ -727,7 +779,7 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
 
                 _pc = return_addr._i;
                 _pr = (TackValue::FunctionType*)return_func._p;
-                _pe = _pr->bytecode->instructions.size();
+                _pe = ((CodeFragment*)_pr->code_ptr)->instructions.size();
 
                 // "Clean" the stack - Must not leave any boxes in unused registers or subsequent loads to register will mistakenly write-through
                 std::memset(stack.data() + stackbase, 0xffffffff, MAX_REGISTERS * sizeof(TackValue));

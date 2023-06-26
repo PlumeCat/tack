@@ -103,30 +103,47 @@ std::vector<std::string> split(const std::string& data, const std::string& split
 }
 
 #define paste(a, b) a##b
-#define check_args(n) { if (nargs != n) { vm->error("expected "s + std::to_string(n) + " arguments"); }}
+
+// template<typename Arg>
+// bool check_n_args(uint32_t nargs, uint32_t n) {
+//     return nargs == n;
+// }
+// template<typename A, typename... R>
+// bool check_n_args(uint32_t nargs, A a, R... r) {
+//     return (nargs == a) || check_n_args(nargs, r);
+// }
+
+// candidate function not viable: no known conversion from 
+
+// 'TackValue (*)(TackVM *, int, TackValue *)' to 'TackValue::CFunctionType *' (aka 
+// 'TackValue (**)(class TackVM *, int, TackValue *)'
+
+
+#define check_args(n) { if (!(nargs == n)) { vm->error("expected "s + std::to_string(n) + " arguments"); }}
 #define check_arg(i, ty) if (!(args[i].is_##ty())) vm->error("type error: expected " #ty " in argument " #ty);
 #define check_val(v, ty) if (!((v).is_##ty())) vm->error("type error: expected " #ty);
-#define tack_func_name(name) paste(tack_, name)
-#define tack_func(name) TackValue tack_func_name(name)(TackVM* vm, int nargs, TackValue* args)
-#define tack_bind(name)  set_global(#name, TackValue::cfunction(tack_func_name(name)), true);
-#define tack_math(func)  set_global(#func, TackValue::cfunction([](TackVM* vm, int nargs, TackValue* args) { \
+#define tack_func_ident(name) paste(tack_, name)
+#define tack_func(name) TackValue tack_func_ident(name)(TackVM* vm, int nargs, TackValue* args)
+
+#define tack_bind(func)  set_global(#func, TackValue::function(alloc_function(tack_func_ident(func))), true);
+#define tack_math(func)  set_global(#func, TackValue::function(alloc_function([](TackVM* vm, int nargs, TackValue* args) { \
     check_args(1); \
     check_arg(0, number); \
     return TackValue::number(func(args[0].number()));\
-}), true);
-#define tack_math2(func) set_global(#func, TackValue::cfunction([](TackVM* vm, int nargs, TackValue* args) { \
+})), true);
+#define tack_math2(func) set_global(#func, TackValue::function(alloc_function([](TackVM* vm, int nargs, TackValue* args) { \
     check_args(2);\
     check_arg(0, number);\
     check_arg(1, number);\
     return TackValue::number(func(args[0].number(), args[1].number()));\
-}), true);
-#define tack_math3(func) set_global(#func, TackValue::cfunction([](TackVM* vm, int nargs, TackValue* args) { \
+})), true);
+#define tack_math3(func) set_global(#func, TackValue::function(alloc_function([](TackVM* vm, int nargs, TackValue* args) { \
     check_args(3);\
     check_arg(0, number);\
     check_arg(1, number);\
     check_arg(2, number);\
     return TackValue::number(func(args[0].number(), args[1].number(), args[2].number());\
-}), true);
+})), true);
 
 // standard library
 tack_func(print) {
@@ -168,209 +185,165 @@ tack_func(any) {
     check_args(1);
     check_arg(0, array);
     auto* arr = args[0].array();
-    if (arr->data.size()) {
-        for (auto i = 0u; i < arr->data.size(); i++) {
-            if (arr->data.at(i).get_truthy()) {
-                return TackValue::true_();
-            }
+
+    for (auto& val: arr->data) {
+        if (val.get_truthy()) {
+            return TackValue::true_();
         }
     }
+    
     return TackValue::false_();
 }
 tack_func(all) {
     check_args(1);
     check_arg(0, array);
     auto* arr = args[0].array();
-    if (arr->data.size()) {
-        for (auto i = 0u; i < arr->data.size(); i++) {
-            if (!arr->data.at(i).get_truthy()) {
-                return TackValue::false_();
-            }
+    
+    for (auto& val: arr->data) {
+        if (!val.get_truthy()) {
+            return TackValue::false_();
         }
     }
+    
     return TackValue::true_();
 }
 tack_func(next) {
     check_args(2);
     check_arg(0, array);
+    check_arg(1, function);
     auto* arr = args[0].array();
-    if (arr->data.size()) {
-        if (args[1].is_function()) {
-            auto func = args[1];
-            for (auto i = 0u; i < arr->data.size(); i++) {
-                auto val = arr->data.at(i);
-                auto res = vm->call(func, 1, &val);
-                if (res.get_truthy()) {
-                    return val;
-                }
-            }
-        } else if (args[1].is_cfunction()) {
-            auto func = args[1].cfunction();
-            for (auto i = 0u; i < arr->data.size(); i++) {
-                auto val = arr->data.at(i);
-                auto res = (*func)(vm, 1, &val);
-                if (res.get_truthy()) {
-                    return val;
-                }
-            }
+
+    for (auto& val: arr->data) {
+        if (vm->call(args[1], 1, &val).get_truthy()) {
+            return val;
         }
     }
+
     return TackValue::null();
 }
 tack_func(foreach) {
     check_args(2);
     check_arg(0, array);
     auto* arr = args[0].array();
-    if (arr->data.size()) {
-        if (args[1].is_function()) {
-            auto func = args[1];
-            for (auto i = 0u; i < arr->data.size(); i++) {
-                vm->call(func, 1, &arr->data.at(i));
-            }
-        } else if (args[1].is_cfunction()) {
-            auto func = args[1].cfunction();
-            for (auto i = 0u; i < arr->data.size(); i++) {
-                (*func)(vm, 1, &arr->data.at(i));
-            }
-        }
+
+    for (auto& val: arr->data) {
+        vm->call(args[1], 1, &val);
     }
+    
     return TackValue::null();
 }
 tack_func(map) {
     check_args(2);
     check_arg(0, array);
+    check_arg(1, function);
     auto* arr = args[0].array();
-    auto retval = vm->alloc_array();
-    retval->refcount = 1;
+    auto* retval = vm->alloc_array();
+
     if (arr->data.size()) {
-        retval->data.resize(arr->data.size(), TackValue::null());
-        if (args[1].is_function()) {
-            auto func = args[1];
-            for (auto i = 0u; i < arr->data.size(); i++) {
-                retval->data.at(i) = vm->call(func, 1, &arr->data.at(i));
-            }
-        } else if (args[1].is_cfunction()) {
-            auto func = args[1].cfunction();
-            for (auto i = 0u; i < arr->data.size(); i++) {
-                retval->data.at(i) = (*func)(vm, 1, &arr->data.at(i));
-            }
+        retval->data.reserve(arr->data.size());
+        retval->refcount = 1;
+        for (auto& val: arr->data) {
+            retval->data.emplace_back(vm->call(args[1], 1, &val));
         }
+        retval->refcount = 0;
     }
-    retval->refcount = 0;
+
     return TackValue::array(retval);
 }
 tack_func(filter) {
     check_args(2);
     check_arg(0, array);
+    check_arg(1, function);
     auto* arr = args[0].array();
     auto* retval = vm->alloc_array();
-    retval->refcount = 1;
-    auto func = args[1];
-    if (func.is_function()) {
-        for (auto i = arr->data.begin(); i != arr->data.end(); i++) {
-            auto val = *i;
-            if (vm->call(func, 1, &val).get_truthy()) {
+    
+    if (arr->data.size()) {
+        retval->refcount = 1;
+        for (auto& val: arr->data) {
+            if (vm->call(args[1], 1, &val).get_truthy()) {
                 retval->data.emplace_back(val);
             }
         }
-    } else if (func.is_cfunction()) {
-        auto* f = func.cfunction();
-        for (auto val : arr->data) {
-            if (f(vm, 1, &val).get_truthy()) {
-                retval->data.push_back(val);
-            }
-        }
-    } else {
-        vm->error("expected function or cfunction in filter()");
+        retval->refcount = 0;
     }
-    retval->refcount = 0;
+
     return TackValue::array(retval);
 }
 tack_func(reduce) {
     check_args(3);
     check_arg(0, array);
     auto* arr = args[0].array();
-    auto func = args[1];
-    if (func.is_function()) {
-        auto ra = std::array<TackValue, 2>{}; // arguments for reducer function
-        ra[1] = args[2];
-        for (auto i = arr->data.begin(); i != arr->data.end(); i++) {
-            ra[0] = *i;
-            ra[1] = vm->call(func, 2, ra.data());
-        }
-        return ra[1];
-    } else if (func.is_cfunction()) {
-        auto* f = func.cfunction();
-        auto ra = std::array<TackValue, 2>{}; // arguments for reducer function
-        ra[1] = args[2];
-        for (auto i = arr->data.begin(); i != arr->data.end(); i++) {
-            ra[0] = *i;
-            ra[1] = f(vm, 2, ra.data());
-        }
-        return ra[1];
-    } else {
-        vm->error("expected function or cfunction in reduce()");
+
+    auto ra = std::array<TackValue, 2>{
+        TackValue::null(),
+        args[2]
+    }; // arguments for reducer function
+    
+    ra[1] = args[2];
+    for (auto& val: arr->data) {
+        ra[0] = val;
+        ra[1] = vm->call(args[1], 2, ra.data());
     }
-    return TackValue::null();
+    return ra[1];
 }
-tack_func(sort) {
-    // TODO: currently assumes the type by looking at the first elemen { return TackValue::null(); }
-    // behaviour will be undefined for a mixed-type array (and no custom predicate)
+
+TackValue tack_sort_default(TackVM* vm, TackValue::ArrayType* arr) {
+    // TODO: currently assumes the type by looking at the first element
+    // behaviour will be undefined for sort called with a mixed-type array and no custom predicate
     auto retval = vm->alloc_array();
-    retval->refcount = 1;
-    if (nargs == 1) {
-        check_arg(0, array);
-        auto* arr = args[0].array();
-        if (arr->data.size()) {
-            std::copy(arr->data.begin(), arr->data.end(), std::back_inserter(retval->data));
-            auto type = arr->data.at(0).get_type();
-            if (type == TackType::Number) {
-                // default number sort
-                std::sort(retval->data.begin(), retval->data.end(), [vm](TackValue l, TackValue r) {
-                    check_val(l, number);
-                    check_val(r, number);
-                    return l.number() < r.number();
-                });
-            } else if (type == TackType::String) {
-                // default string sort
-                std::sort(retval->data.begin(), retval->data.end(), [vm](TackValue l, TackValue r) {
-                    check_val(l, string);
-                    check_val(r, string);
-                    return l.string()->data < r.string()->data;
-                });
-            } else {
-                vm->error("sort: expects an array of number or an array of string");
-            }
+    if (arr->data.size()) {
+        retval->refcount = 1;
+        std::copy(arr->data.begin(), arr->data.end(), std::back_inserter(retval->data));
+        auto type = arr->data.at(0).get_type();
+        if (type == TackType::Number) {
+            // default number sort
+            std::sort(retval->data.begin(), retval->data.end(), [vm](TackValue l, TackValue r) {
+                check_val(l, number);
+                check_val(r, number);
+                return l.number() < r.number();
+            });
+        } else if (type == TackType::String) {
+            // default string sort
+            std::sort(retval->data.begin(), retval->data.end(), [vm](TackValue l, TackValue r) {
+                check_val(l, string);
+                check_val(r, string);
+                return l.string()->data < r.string()->data;
+            });
+        } else {
+            vm->error("sort: expects an array of number or an array of string");
         }
-    } else if (nargs == 2) {
-        check_arg(0, array);
-        auto* arr = args[0].array();
-        if (arr->data.size()) {
-            std::copy(arr->data.begin(), arr->data.end(), std::back_inserter(retval->data));
-            auto func = args[1];
-            if (func.is_function()) {
-                // custom sort with tack function
-                std::sort(retval->data.begin(), retval->data.end(), [&](TackValue l, TackValue r) {
-                    TackValue lr[2] = { l, r };
-                    return vm->call(func, 2, lr).get_truthy();
-                });
-            } else if (func.is_cfunction()) {
-                auto f = func.cfunction();
-                // custom sort with c function
-                std::sort(retval->data.begin(), retval->data.end(), [&](TackValue l, TackValue r) {
-                    TackValue lr[2] = { l, r };
-                    return f(vm, 2, lr).get_truthy();
-                });
-            } else {
-                vm->error("sort: expected function or cfunction for optional second argument");
-            }
-        }
-    } else {
-        vm->error("sort expected 1 or 2 arguments");
+        retval->refcount = 0;
+    }
+    return TackValue::array(retval);
+}
+TackValue tack_sort_custom(TackVM* vm, TackValue::ArrayType* arr, TackValue func) {
+    auto retval = vm->alloc_array();
+
+    if (arr->data.size()) {
+        retval->refcount = 1;
+        std::copy(arr->data.begin(), arr->data.end(), std::back_inserter(retval->data));
+        std::sort(retval->data.begin(), retval->data.end(), [&](TackValue l, TackValue r) {
+            auto lr = std::array<TackValue, 2> { l, r };
+            return vm->call(func, 1, lr.data()).get_truthy();
+        });
+        retval->refcount = 0;
     }
 
-    retval->refcount = 0;
     return TackValue::array(retval);
+}
+
+tack_func(sort) {
+    if (nargs == 1) {
+        check_arg(0, array);
+        return tack_sort_default(vm, args[0].array());
+    } else if (nargs == 2) {
+        check_arg(0, array);
+        check_arg(1, function);
+        return tack_sort_custom(vm, args[0].array(), args[1]);
+    } else {
+        vm->error("sort expected 1 or 2 arguments");
+        return TackValue::null();
+    }
 }
 tack_func(sum) {
     check_args(1);
@@ -475,20 +448,13 @@ tack_func(remove_value) {
 tack_func(remove_if) {
     check_args(2);
     check_arg(0, array);
+    check_arg(1, function);
     auto* arr = args[0].array();
-    auto func = args[1];
-    if (func.is_function()) {
-        std::erase_if(arr->data, [&](TackValue val) {
-            return vm->call(func, 1, &val).get_truthy();
-        });
-    } else if (func.is_cfunction()) {
-        auto* f = func.cfunction();
-        std::erase_if(arr->data, [&](TackValue val) {
-            return f(vm, 1, &val).get_truthy();
-        });
-    } else {
-        vm->error("expected function or cfunction in remove_if()");
-    }
+    
+    std::erase_if(arr->data, [&](TackValue val) {
+        return vm->call(args[1], 1, &val).get_truthy();
+    });
+
     return TackValue::null();
 }
 tack_func(min) {

@@ -74,3 +74,31 @@ print("-------------------------------------------")
 print("RESULT:")
 print(res)
 print("-------------------------------------------")
+
+
+fn quicksort(arr) {
+    const n = #arr
+    if n <= 1 { return arr }
+
+    " find the midpoint "
+    let l = min(arr)
+    let r = max(arr)
+    if r == l { return arr }
+    const mid = (l + r) / 2
+    
+    " split array into upper and lower "
+    const upper = filter(arr, fn(x) { return x < mid })
+    const lower = filter(arr, fn(x) { return x >= mid })
+
+    " recursively sort the upper and lower sub-arrays and join the result"
+    return quicksort(lower) + quicksort(upper)
+}
+
+let A = []
+for i in 1, 1000000 {
+    A << random()
+}
+let before = clock()
+let B = quicksort(A)
+let after = clock()
+print("Time taken: ", after - before, "seconds")
