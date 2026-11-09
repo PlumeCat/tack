@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <cstring>
+#include <cstdint>
 
 // Hidden box type
 struct BoxType {
@@ -71,10 +72,10 @@ class Interpreter: public TackVM {
     uint32_t stackbase;
     std::vector<TackValue> globals;
     uint16_t next_globalid;
-    KHash<std::string, TackValue::StringType*> key_cache; // TODO: move this into heap and use the refcount mechanism (and rename it!)
+    hash_map<std::string, TackValue::StringType*> key_cache; // TODO: move this into heap and use the refcount mechanism (and rename it!)
 
     Compiler::ScopeContext global_scope; // c-provided globals go here
-    KHash<std::string, Compiler::ScopeContext*> modules; // all loaded modules; "" is global module and is always implicitly imported
+    hash_map<std::string, Compiler::ScopeContext*> modules; // all loaded modules; "" is global module and is always implicitly imported
     std::list<CodeFragment> fragments;
 
     void* user_pointer = nullptr;

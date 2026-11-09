@@ -1,8 +1,9 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 #include <vector>
+#include <cstdint>
+#include "hash_map.h"
 
 #define ast_type()\
     ast(Unknown)\
@@ -73,7 +74,7 @@ enum class AstType { ast_type() };
 #undef ast
 #define ast(x) { AstType::x, #x },
 inline std::string to_string(AstType type) {
-    static const std::unordered_map<AstType, std::string> typestring = { ast_type() };
+    static const hash_map<AstType, std::string> typestring = { ast_type() };
     return typestring.at(type);
 }
 #undef ast

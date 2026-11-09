@@ -4,9 +4,11 @@
 #include <list>
 #include <array>
 #include <vector>
+#include <cstdint>
 
 #include "instructions.h"
 #include "../include/tack.h"
+#include "hash_map.h"
 
 static const uint32_t MAX_REGISTERS = 256;
 static const uint32_t STACK_FRAME_OVERHEAD = 3;
@@ -53,7 +55,7 @@ struct Compiler {
         Compiler* compiler;
         ScopeContext* parent_scope = nullptr;
         bool is_function_scope = false;
-        std::unordered_map<std::string, VariableContext> bindings = {}; // variables
+        hash_map<std::string, VariableContext> bindings = {}; // variables
         std::list<ScopeContext*> imports = {}; // imported modules
 
         // lookup a variable

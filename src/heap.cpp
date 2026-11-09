@@ -53,9 +53,12 @@ void gc_visit(BoxType* box) {
 void gc_visit(TackValue::ObjectType* obj) {
     if (!obj->marker) {
         obj->marker = true;
-        for (auto i = obj->data.begin(); i != obj->data.end(); i = obj->data.next(i)) {
-            gc_visit(obj->data.value_at(i));
+        for (auto& [ k, v ] : obj->data) {
+            gc_visit(v);
         }
+        // for (auto i = obj->data.begin(); i != obj->data.end(); i = obj->data.next(i)) {
+        //     gc_visit(obj->data.value_at(i));
+        // }
     }
 }
 void gc_visit(TackValue::ArrayType* arr) {

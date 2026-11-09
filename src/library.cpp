@@ -644,7 +644,7 @@ tack_func(find) {
         if (f == obj->data.end()) {
             return TackValue::null();
         }
-        return obj->data.value_at(f);
+        return f->second;
     } else {
         vm->error("find expected array or string");
     }
@@ -787,8 +787,9 @@ tack_func(keys) {
     check_arg(0, object);
     auto* obj = args[0].object();
     auto* arr = vm->alloc_array();
-    for (auto i = obj->data.begin(); i != obj->data.end(); i = obj->data.next(i)) {
-        auto& key = obj->data.key_at(i);
+    // for (auto i = obj->data.begin(); i != obj->data.end(); i = obj->data.next(i)) {
+    for (auto& [ key, _ ]: obj->data) {
+        // auto& key = obj->data.key_at(i);
         auto cached = vm->intern_string(key);
         arr->data.push_back(TackValue::string(cached));
     }
@@ -799,8 +800,10 @@ tack_func(values) {
     check_arg(0, object);
     auto* obj = args[0].object();
     auto* arr = vm->alloc_array();
-    for (auto i = obj->data.begin(); i != obj->data.end(); i = obj->data.next(i)) {
-        arr->data.push_back(obj->data.value_at(i));
+    // for (auto i = obj->data.begin(); i != obj->data.end(); i = obj->data.next(i)) {
+    for (auto& [ _, value ]: obj->data) {
+        // arr->data.push_back(obj->data.value_at(i));
+        arr->data.push_back(value);
     }
     return TackValue::array(arr);
 }

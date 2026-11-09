@@ -4,6 +4,7 @@
 #include <string>
 #include <utility>
 #include <assert.h>
+#include <cstdint>
 
 // Adapted from khash (commit: 5fc2090) to have a more C++-friendly interface
 // Uses std::vector instead of realloc

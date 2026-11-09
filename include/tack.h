@@ -5,7 +5,7 @@
 #include <vector>
 #include <cmath>
 
-#include "../src/khash2.h"
+#include "../src/hash_map.h"
 
 #define nan_bits        (0x7f'f0'00'00'00'00'00'00)
 #define type_bits       (0x00'0f'00'00'00'00'00'00)
@@ -52,7 +52,7 @@ struct TackValue {
 
     /// @brief Underlying representation for Objects
     struct ObjectType {
-        KHash<std::string, TackValue> data;
+        hash_map<std::string, TackValue> data;
         uint32_t refcount = 0;
         bool marker = false;
     };

@@ -32,7 +32,8 @@ Interpreter::Interpreter() {
     global_scope.compiler = nullptr;
     global_scope.parent_scope = nullptr;
     global_scope.is_function_scope = false;
-    modules.value_at(modules.put(GLOBAL_NAMESPACE)) = &global_scope;
+    // modules.at(GLOBAL_NAMESPACE) = &global_scope;
+    modules.try_emplace(GLOBAL_NAMESPACE, &global_scope);
 
     if constexpr(std::is_base_of<std::array<TackValue, MAX_STACK>, Stack>::value) {
         stack.fill(TackValue::null());
@@ -76,12 +77,9 @@ BoxType* Interpreter::alloc_box(TackValue val) {
 TackValue::StringType* Interpreter::intern_string(const std::string& data) {
     auto got = key_cache.find(data);
     if (got == key_cache.end()) {
-        auto put = key_cache.put(data);
-        auto str = new TackValue::StringType { data };
-        key_cache.value_at(put) = str;
-        return str;
+        got = key_cache.try_emplace(data, new TackValue::StringType{data}).first;
     }
-    return key_cache.value_at(got);
+    return got->second;
 }
 TackValue::StringType* Interpreter::alloc_string(const std::string& data) {
     return heap.alloc_string(data);
@@ -95,8 +93,7 @@ TackValue Interpreter::get_global(const std::string& name, const std::string& mo
     if (mod == modules.end()) {
         return TackValue::null();
     }
-    auto* module = modules.value_at(mod);
-
+    auto* module = mod->second;
     auto* var = module->lookup(name);
     if (!var) {
         return TackValue::null();
@@ -140,7 +137,7 @@ Compiler::VariableContext* Interpreter::set_global_v(const std::string& name, co
         error("Error: module not found:" + module_name);
         return nullptr;
     }
-    auto scope = modules.value_at(iter);
+    auto scope = iter->second;
 
     // lookup binding
     auto* var = scope->lookup(name);
@@ -207,7 +204,7 @@ Compiler::ScopeContext* Interpreter::load_module_s(const std::string& module_nam
         scope->compiler = nullptr;
         scope->parent_scope = &global_scope;
         scope->is_function_scope = false;
-        modules.value_at(modules.put(module_name)) = scope;
+        modules.try_emplace(module_name, scope);
 
         // compile root fragment
         auto compiler = Compiler { .interpreter = this };
@@ -226,7 +223,7 @@ Compiler::ScopeContext* Interpreter::load_module_s(const std::string& module_nam
     } else {
         // already loaded
         // log("Module already loaded: ", module_name, " - already loaded");
-        return modules.value_at(iter);
+        return iter->second;
     }
     
 }
@@ -497,8 +494,9 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 if (iter_type == TackType::Array) {
                     REGISTER_RAW(i.r0)._i = 0;
                 } else if (iter_type == TackType::Object) {
-                    REGISTER_RAW(i.r0)._i = iter_val.object()->data.begin();
+                    REGISTER_RAW(i.r0)._i = 0u;//iter_val.object()->data.begin();
                 // } else if (iter_type == Type::Function) {
+                    // TODO: generator functions
                 } else {
                     in_error("for loop expected array or object");
                 }
@@ -516,9 +514,10 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 } else if (iter_type == TackType::Object) {
                     auto it = REGISTER_RAW(i.r0)._i;
                     auto obj = iter_val.object();
-                    if (it != obj->data.end()) {
-                        auto& key = obj->data.key_at(it);
-                        auto cached = intern_string(key);
+                    // if (it != obj->data.end()) {
+                    //     auto& key = obj->data.key_at(it);
+                    if (it < obj->data.nodes.size()) {
+                        auto cached = intern_string(obj->data.nodes[it].first);
                         REGISTER(i.u8.r2) = TackValue::string(cached);
                         _pc++;
                     }
@@ -530,11 +529,13 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 check(iter_val, object);
                 auto obj = iter_val.object();
                 auto it = REGISTER_RAW(i.r0)._i;
-                if (it != obj->data.end()) {
-                    auto& key = obj->data.key_at(it);
-                    auto cached = intern_string(key);
-                    REGISTER(i.u8.r2) = TackValue::string(cached);
-                    REGISTER(i.u8.r2 + 1) = obj->data.value_at(it);
+                // if (it != obj->data.end()) {
+                if (it < obj->data.nodes.size()) {
+                    // auto& key = obj->data.key_at(it);
+                    auto& node = obj->data.nodes[it];
+                    // auto cached = intern_string(key);
+                    REGISTER(i.u8.r2) = TackValue::string(intern_string(node.first));
+                    REGISTER(i.u8.r2 + 1) = node.second;//obj->data.value_at(it);
                     _pc++;
                 }
             }
@@ -547,7 +548,7 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 } else if (iter_type == TackType::Object) {
                     // next key
                     auto obj = iter_val.object();
-                    REGISTER_RAW(i.r0)._i = obj->data.next(REGISTER_RAW(i.r0)._i);
+                    REGISTER_RAW(i.r0)._i += 1;//obj->data.next(REGISTER_RAW(i.r0)._i);
                 }
             }
             handle(CONDSKIP) {
@@ -614,7 +615,8 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 for (auto e = 0; e < i.u8.r1; e++) {
                     auto key = REGISTER(i.u8.r2 + e * 2).string(); // assumed correct type due to compiler
                     auto val = REGISTER(i.u8.r2 + e * 2 + 1);
-                    obj->data.set(key->data, val);
+                    // TODO: try_emplace() the first one wins
+                    obj->data.insert_or_assign(key->data, val);
                 }
                 REGISTER(i.r0) = TackValue::object(obj);
             }
@@ -638,7 +640,7 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                     if (f == obj->data.end()) {
                         in_error("key not found: " + ind_val.get_string());
                     }
-                    REGISTER(i.r0) = obj->data.value_at(f);
+                    REGISTER(i.r0) = f->second;
                 } else {
                     in_error("[]: expected array or object");
                 }
@@ -659,7 +661,8 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                     check(ind_val, string);
                     auto* obj = arr_val.object();
                     auto* str = ind_val.string();
-                    obj->data.value_at(obj->data.put(str->data)) = REGISTER(i.r0);
+                    obj->data.insert_or_assign(str->data, REGISTER(i.r0));
+                    // obj->data.value_at(obj->data.put(str->data)) = REGISTER(i.r0);
                 } else {
                     in_error("[]: expected array or object");
                 }
@@ -672,11 +675,11 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 auto key = rhs.string();
                 auto* obj = lhs.object();
                 auto found = false;
-                auto val = obj->data.get(key->data, found);
-                if (!found) {
+                auto val = obj->data.find(key->data);
+                if (val == obj->data.end()) {
                     in_error("key not found: "s + key->data);
                 } else {
-                    REGISTER(i.r0) = val;
+                    REGISTER(i.r0) = val->second;
                 }
             }
             handle(STORE_OBJECT) {
@@ -686,7 +689,7 @@ TackValue Interpreter::call(TackValue fn, int nargs, TackValue* args) {
                 check(key_val, string);
                 auto* obj = lhs.object();
                 auto key = key_val.string();
-                obj->data.set(key->data, REGISTER(i.r0));
+                obj->data.try_emplace(key->data, REGISTER(i.r0));
             }
             handle(CALL) {
                 auto r0 = REGISTER(i.r0);

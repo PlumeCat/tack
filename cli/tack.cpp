@@ -1,14 +1,8 @@
 ﻿#include "../include/tack.h"
 
 #include <iostream>
-#include <sstream>
 #include <vector>
 #include <string>
-#include <string_view>
-#include <array>
-#include <unordered_map>
-#include <chrono>
-#include <filesystem>
 
 #if (defined _MSC_VER && defined _DEBUG)
 #define _CRTDBG_MAP_ALLOC

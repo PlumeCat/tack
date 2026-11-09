@@ -34,13 +34,15 @@ std::string TackValue::get_string() {
             auto* obj = object();
             s << "object {";
             if (obj->data.size()) {
-                auto i = obj->data.begin();
-                s << ' ' << obj->data.key_at(i) << " = " << obj->data.value_at(i).get_string();
-                // i = obj->data.next(i);
-                i = obj->data.next(i);
-                for (auto e = obj->data.end(); i != e; i = obj->data.next(i)) {
-                    s << ", " << obj->data.key_at(i) << " = " << obj->data.value_at(i).get_string();
+                for (auto& [ k, v ]: obj->data) {
+                    s << k << " = " << v.get_string() << ", ";
                 }
+                // auto i = obj->data.begin();
+                // s << ' ' << obj->data.key_at(i) << " = " << obj->data.value_at(i).get_string();
+                // i = obj->data.next(i);
+                // for (auto e = obj->data.end(); i != e; i = obj->data.next(i)) {
+                //     s << ", " << obj->data.key_at(i) << " = " << obj->data.value_at(i).get_string();
+                // }
                 s << ' ';
             }
 
